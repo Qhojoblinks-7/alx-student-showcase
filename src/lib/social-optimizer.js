@@ -4,9 +4,10 @@ import { GitHubService } from './github-service.js';
 export class GitHubCommitsService extends GitHubService {
   // Fetch recent commits for a repository
   static async fetchRepositoryCommits(username, repoName, limit = 10) {
+    const GITHUB_API_BASE = 'https://api.github.com';
     try {
       const response = await fetch(
-        `${this.GITHUB_API_BASE}/repos/${username}/${repoName}/commits?per_page=${limit}`
+        `${GITHUB_API_BASE}/repos/${username}/${repoName}/commits?per_page=${limit}`
       );
       
       if (!response.ok) {
@@ -169,43 +170,23 @@ export class SocialContentOptimizer {
   static generateTwitterContent({ project, workLog, customMessage }) {
     const limit = this.PLATFORM_LIMITS.twitter;
     
-    // Build content components
+    // Build content components with smart personalization
     const components = {
-      hook: customMessage || this.generateHook(project, 'twitter'),
+      hook: customMessage || this.generatePersonalizedHook(project, workLog, 'twitter'),
       achievement: this.generateAchievement(project, workLog, 'twitter'),
       tech: this.generateTechStack(project.technologies, 'twitter'),
-      progress: workLog ? this.generateProgress(workLog, 'twitter') : '',
-      hashtags: this.generateHashtags(project, 'twitter'),
+      progress: workLog ? this.generateSmartProgress(workLog, 'twitter') : '',
+      hashtags: this.generateSmartHashtags(project, workLog, 'twitter'),
       url: project.live_url || project.github_url || ''
     };
 
-    // Calculate available space
+    // Calculate available space with smart URL handling
     const urlSpace = components.url ? limit.urlLength + 1 : 0; // +1 for space
     const hashtagSpace = components.hashtags.length + 1;
     const availableSpace = limit.maxLength - urlSpace - hashtagSpace;
 
-    // Build content prioritizing by importance
-    let content = '';
-    
-    // Priority 1: Hook/Achievement (most important)
-    const mainContent = components.hook || components.achievement;
-    if (mainContent.length <= availableSpace - 20) {
-      content = mainContent;
-    } else {
-      content = this.truncateWithEllipsis(mainContent, availableSpace - 20);
-    }
-
-    // Priority 2: Add progress if there's space
-    if (components.progress && (content.length + components.progress.length + 2) <= availableSpace) {
-      content += '\n\n' + components.progress;
-    }
-
-    // Priority 3: Add tech if there's space  
-    const remainingSpace = availableSpace - content.length;
-    if (components.tech && remainingSpace > 20) {
-      const techToAdd = this.truncateWithEllipsis(components.tech, remainingSpace - 2);
-      content += '\n\n' + techToAdd;
-    }
+    // Smart content building with multiple strategies
+    let content = this.buildOptimalTwitterContent(components, availableSpace);
 
     // Add hashtags and URL
     const finalContent = [
@@ -214,12 +195,166 @@ export class SocialContentOptimizer {
       components.url
     ].filter(Boolean).join('\n\n');
 
+    // If still too long, apply aggressive compression
+    if (finalContent.length > limit.maxLength) {
+      return this.applyAggressiveTwitterCompression(components, limit);
+    }
+
     return {
       content: finalContent,
       length: finalContent.length,
       components,
       optimized: true
     };
+  }
+
+  // Smart content building for Twitter with multiple strategies
+  static buildOptimalTwitterContent(components, availableSpace) {
+    // Strategy 1: Try full content
+    let content = components.hook || components.achievement;
+    
+    // Strategy 2: If hook is too long, try abbreviated version
+    if (content.length > availableSpace - 20) {
+      const abbreviated = this.abbreviateText(content, availableSpace - 20);
+      content = abbreviated;
+    }
+
+    // Strategy 3: Add progress if valuable and space allows
+    if (components.progress) {
+      const withProgress = content + '\n\n' + components.progress;
+      if (withProgress.length <= availableSpace) {
+        content = withProgress;
+      }
+    }
+
+    // Strategy 4: Add condensed tech if space allows
+    const remainingSpace = availableSpace - content.length;
+    if (components.tech && remainingSpace > 15) {
+      const condensedTech = this.condenseTechStack(components.tech, remainingSpace - 2);
+      if (condensedTech) {
+        content += '\n\n' + condensedTech;
+      }
+    }
+
+    return content;
+  }
+
+  // Aggressive compression for Twitter when standard methods exceed limit
+  static applyAggressiveTwitterCompression(components, limit) {
+    const maxContentSpace = limit.maxLength - 50; // Reserve space for hashtags and URL
+    
+    // Ultra-compact format
+    const parts = [];
+    
+    // Minimal hook
+    const hook = this.getMinimalHook(components.hook);
+    parts.push(hook);
+    
+    // Essential info only
+    if (components.progress) {
+      const minProgress = this.getMinimalProgress(components.progress);
+      if (minProgress) parts.push(minProgress);
+    }
+    
+    // Minimal tech (just top 2)
+    if (components.tech) {
+      const minTech = this.getMinimalTech(components.tech);
+      if (minTech) parts.push(minTech);
+    }
+    
+    let content = parts.join(' • ');
+    
+    // Final truncation if still too long
+    if (content.length > maxContentSpace) {
+      content = this.truncateWithEllipsis(content, maxContentSpace);
+    }
+    
+    // Minimal hashtags
+    const minHashtags = this.getMinimalHashtags(components.hashtags);
+    
+    const finalContent = [content, minHashtags, components.url].filter(Boolean).join('\n');
+    
+    return {
+      content: finalContent,
+      length: finalContent.length,
+      components,
+      optimized: true,
+      compressed: true
+    };
+  }
+
+  // Smart text abbreviation
+  static abbreviateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    
+    // Try to find natural break points
+    const sentences = text.split(/[.!?]/);
+    if (sentences[0] && sentences[0].length <= maxLength) {
+      return sentences[0] + (sentences.length > 1 ? '...' : '');
+    }
+    
+    // Remove less important words
+    const words = text.split(' ');
+    const importantWords = words.filter(word => 
+      !['the', 'a', 'an', 'is', 'was', 'were', 'and', 'or', 'but', 'in', 'on', 'at', 'to'].includes(word.toLowerCase())
+    );
+    
+    let abbreviated = importantWords.join(' ');
+    if (abbreviated.length <= maxLength) return abbreviated;
+    
+    // Final truncation
+    return this.truncateWithEllipsis(text, maxLength);
+  }
+
+  // Condensed tech stack for space-constrained platforms
+  static condenseTechStack(tech, maxLength) {
+    if (tech.length <= maxLength) return tech;
+    
+    // Extract just technology names, remove "Built with", "Tech:", etc.
+    const cleanTech = tech.replace(/^(Tech:|Built with:|🛠️\s*)/i, '');
+    if (cleanTech.length <= maxLength) return cleanTech;
+    
+    // Abbreviate common technologies
+    const abbreviated = cleanTech
+      .replace(/JavaScript/gi, 'JS')
+      .replace(/TypeScript/gi, 'TS')
+      .replace(/Python/gi, 'Python')
+      .replace(/, /g, ','); // Remove spaces after commas
+    
+    if (abbreviated.length <= maxLength) return abbreviated;
+    
+    // Take only first 2-3 technologies
+    const techs = abbreviated.split(',');
+    return techs.slice(0, 2).join(',') + (techs.length > 2 ? '+' : '');
+  }
+
+  // Get minimal versions for aggressive compression
+  static getMinimalHook(hook) {
+    return hook
+      .replace(/🚀 Just shipped /, '🚀 ')
+      .replace(/✨ (.+) is now live!/, '✨ $1 live!')
+      .replace(/🎉 Completed /, '🎉 ')
+      .replace(/💻 New project alert: /, '💻 ');
+  }
+
+  static getMinimalProgress(progress) {
+    // Extract just the essential numbers
+    const match = progress.match(/(\d+)\s*(commits?)/i);
+    if (match) {
+      return `${match[1]}c`;
+    }
+    return null;
+  }
+
+  static getMinimalTech(tech) {
+    const cleanTech = tech.replace(/^(Tech:|Built with:|🛠️\s*)/i, '');
+    const techs = cleanTech.split(/[,\s]+/).filter(Boolean);
+    return techs.slice(0, 2).join(',');
+  }
+
+  static getMinimalHashtags(hashtags) {
+    const tags = hashtags.split(' ').filter(tag => tag.startsWith('#'));
+    return tags.slice(0, 2).join(' '); // Only top 2 hashtags for ultra-compact
   }
 
   // LinkedIn optimized content
@@ -336,6 +471,142 @@ export class SocialContentOptimizer {
 
     const platformHooks = hooks[platform] || hooks.twitter;
     return platformHooks[Math.floor(Math.random() * platformHooks.length)];
+  }
+
+  // Personalized hook generation based on commit activity
+  static generatePersonalizedHook(project, workLog, platform) {
+    if (!workLog || !workLog.summary) {
+      return this.generateHook(project, platform);
+    }
+
+    const { summary, commitCount, timeframe } = workLog;
+    const { mostActiveArea, categories } = summary;
+
+    // Personalize based on commit activity
+    const personalizedHooks = {
+      twitter: {
+        features: [
+          `🚀 ${project.title} packed with new features!`,
+          `✨ Feature-rich ${project.title} is live!`,
+          `🎉 ${project.title} with ${categories.features} new features!`
+        ],
+        fixes: [
+          `🐛 ${project.title} now bug-free & polished!`,
+          `✅ ${project.title} refined & ready!`,
+          `🚀 ${project.title} optimized & shipped!`
+        ],
+        refactor: [
+          `⚡ ${project.title} rebuilt & improved!`,
+          `🔥 ${project.title} completely refactored!`,
+          `✨ ${project.title} clean & optimized!`
+        ],
+        docs: [
+          `📚 ${project.title} fully documented & live!`,
+          `✨ ${project.title} with complete docs!`,
+          `🚀 ${project.title} documented & ready!`
+        ]
+      }
+    };
+
+    const platformHooks = personalizedHooks[platform]?.[mostActiveArea];
+    if (platformHooks) {
+      return platformHooks[Math.floor(Math.random() * platformHooks.length)];
+    }
+
+    // Fallback with activity context
+    if (commitCount > 10) {
+      return `🔥 After ${commitCount} commits, ${project.title} is ready!`;
+    } else if (commitCount > 5) {
+      return `💪 ${commitCount} commits later, ${project.title} is live!`;
+    }
+
+    return this.generateHook(project, platform);
+  }
+
+  // Smart progress generation with context awareness
+  static generateSmartProgress(workLog, platform) {
+    if (!workLog || !workLog.summary) return '';
+
+    const { categories, mostActiveArea } = workLog.summary;
+    const { commitCount, timeframe } = workLog;
+    
+    if (platform === 'twitter') {
+      // Ultra-compact for Twitter
+      if (commitCount > 20) return `${commitCount}c in ${timeframe} 🔥`;
+      if (commitCount > 10) return `${commitCount}c ${timeframe} 💪`;
+      if (commitCount > 5) return `${commitCount}c last ${timeframe}`;
+      return `${commitCount}c`;
+    }
+
+    // More detailed for other platforms
+    const highlights = [];
+    if (categories.features > 0) highlights.push(`${categories.features} features`);
+    if (categories.fixes > 0) highlights.push(`${categories.fixes} fixes`);
+    if (categories.refactor > 0) highlights.push(`${categories.refactor} refactors`);
+
+    if (highlights.length === 0) {
+      return `📈 ${commitCount} commits in ${timeframe}`;
+    }
+
+    return `📈 ${commitCount} commits: ${highlights.join(', ')}`;
+  }
+
+  // Smart hashtag generation based on project and activity
+  static generateSmartHashtags(project, workLog, platform) {
+    const baseTags = ['#ALXStudents', '#SoftwareEngineering'];
+    
+    // Add technology-specific tags
+    const techTags = project.technologies?.slice(0, 2).map(tech => 
+      `#${this.normalizeTechTag(tech)}`
+    ) || [];
+    
+    // Add activity-based tags
+    const activityTags = [];
+    if (workLog && workLog.summary) {
+      const { mostActiveArea, categories } = workLog.summary;
+      
+      if (categories.features > 3) activityTags.push('#NewFeatures');
+      if (categories.fixes > 2) activityTags.push('#BugFixes');
+      if (categories.refactor > 2) activityTags.push('#CodeRefactor');
+      if (mostActiveArea === 'features') activityTags.push('#FeatureDev');
+    }
+    
+    // Category-specific tags
+    const categoryTags = {
+      'web': ['#WebDev'],
+      'backend': ['#Backend'],
+      'mobile': ['#MobileApp'],
+      'ai': ['#MachineLearning'],
+      'data': ['#DataScience'],
+      'devops': ['#DevOps']
+    };
+
+    const projectTags = categoryTags[project.category]?.slice(0, 1) || [];
+    
+    let allTags = [...baseTags, ...techTags, ...activityTags, ...projectTags];
+
+    // Platform-specific limits and optimization
+    if (platform === 'twitter') {
+      allTags = allTags.slice(0, 3); // Strict limit for Twitter
+    } else if (platform === 'linkedin') {
+      allTags = allTags.slice(0, 5);
+      allTags.push('#Coding'); // LinkedIn loves this
+    }
+
+    return allTags.join(' ');
+  }
+
+  // Normalize technology names for hashtags
+  static normalizeTechTag(tech) {
+    const normalized = tech
+      .replace(/[^a-zA-Z0-9]/g, '') // Remove special characters
+      .replace(/JavaScript/gi, 'JavaScript')
+      .replace(/TypeScript/gi, 'TypeScript')
+      .replace(/React/gi, 'ReactJS')
+      .replace(/Vue/gi, 'VueJS')
+      .replace(/Node/gi, 'NodeJS');
+    
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
   }
 
   static generateAchievement(project, workLog, platform) {
