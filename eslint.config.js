@@ -6,11 +6,12 @@ import reactRefresh from "eslint-plugin-react-refresh";
 export default [
   { ignores: ["dist"] },
   {
-    extends: [js.configs.recommended],
+    ...js.configs.recommended,
     files: ["**/*.{js,jsx}"],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2022,
       globals: globals.browser,
+      sourceType: "module",
       parserOptions: {
         ecmaFeatures: {
           jsx: true,
