@@ -3,22 +3,11 @@ import { useAuth } from '@/hooks/use-auth.js'
 import { supabase } from '@/lib/supabase.js'
 import { toast } from 'sonner'
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Badge,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '@/components/ui'
+import { Button } from '@/components/ui/button.jsx'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
+import { Badge } from '@/components/ui/badge.jsx'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.jsx'
 
 import { 
   Plus, 
