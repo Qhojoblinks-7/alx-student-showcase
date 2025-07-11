@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import PropTypes from 'prop-types';
-import { cn } from '@/lib/utils.js';
+import { cn } from '../../lib/utils'
 
 const Avatar = forwardRef(({ className, ...props }, ref) => (
   <div

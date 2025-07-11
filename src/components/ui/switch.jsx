@@ -4,7 +4,7 @@ import * as React from "react";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import PropTypes from "prop-types";
 
-import { cn } from "@/lib/utils.js";
+import { cn } from '../../lib/utils'
 
 function Switch({ className, ...props }) {
   return (

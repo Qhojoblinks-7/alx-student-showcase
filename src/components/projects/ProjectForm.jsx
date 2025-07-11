@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { useAuth } from '@/hooks/use-auth.js';
-import { supabase } from '@/lib/supabase.js';
-import { Button } from '@/components/ui/button.jsx';
-import { Input } from '@/components/ui/input.jsx';
-import { Label } from '@/components/ui/label.jsx';
-import { Textarea } from '@/components/ui/textarea.jsx';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx';
-import { Badge } from '@/components/ui/badge.jsx';
-import { Switch } from '@/components/ui/switch.jsx';
+import { useAuth } from '../../hooks/use-auth.js';
+import { supabase } from '../../lib/supabase.js';
+import { Button } from './../ui/button.jsx';
+import { Input } from './../ui/input.jsx';
+import { Label } from './../ui/label.jsx';
+import { Textarea } from './../ui/textarea.jsx';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './../ui/card.jsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './../ui/select.jsx';
+import { Badge } from './../ui/badge.jsx';
+import { Switch } from './../ui/switch.jsx';
 import { toast } from 'sonner';
 import { Loader2, Plus, X, Calendar } from 'lucide-react';
 

@@ -1,24 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/hooks/use-auth.js'
-import { supabase } from '@/lib/supabase.js'
+import { useAuth } from './../hooks/use-auth'
+import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Badge,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '@/components/ui'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import { Badge } from './ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 
 import { 
   Plus, 
@@ -26,10 +15,10 @@ import {
   Zap 
 } from 'lucide-react'
 
-import { ProjectForm } from '@/components/projects/ProjectForm.jsx'
-import { ProjectList } from '@/components/projects/ProjectList.jsx'
-import { UserProfile } from '@/components/profile/UserProfile.jsx'
-import { GitHubImportWizard } from '@/components/github/GitHubImportWizard.jsx'
+import { ProjectForm } from '../components/projects/ProjectForm'
+import { ProjectList } from '../components/projects/ProjectList.jsx'
+import { UserProfile } from '../components/profile/UserProfile.jsx'
+import { GitHubImportWizard } from '../components/github/GitHubImportWizard.jsx'
 
 export function Dashboard() {
   const { user, signOut } = useAuth()
