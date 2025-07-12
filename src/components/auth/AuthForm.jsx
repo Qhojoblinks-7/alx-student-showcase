@@ -1,22 +1,8 @@
-const Auth = React.lazy(() =>
-  import('@supabase/auth-ui-react').then(module => ({ default: module.Auth }))
-)
-
-const ThemeSupa = React.lazy(() =>
-  import('@supabase/auth-ui-shared').then(module => ({ default: module.ThemeSupa }))
-)
-
-const supabase = React.lazy(() =>
-  import('../../lib/supabase').then(module => ({ default: module.supabase }))
-)
-
-const Card = React.lazy(() =>
-  import('../../components/ui/card').then(module => ({ default: module.Card }))
-)
-const CardContent = React.lazy(() =>
-  import('../../components/ui/card').then(module => ({ default: module.CardContent }))
-)
-// ...repeat for CardHeader, CardDescription, CardTitle
+// src/components/AuthForm.jsx
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { supabase } from '../../lib/supabase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import PropTypes from 'prop-types';
 
 /**
@@ -28,7 +14,7 @@ import PropTypes from 'prop-types';
  * @param {object} props - The component properties.
  * @param {'sign_in' | 'sign_up' | 'forgot_password' | 'update_password'} [props.mode='sign_in'] - The specific authentication view to display.
  */
-export function AuthForm({ mode = 'sign_in' }) {
+export default function AuthForm({ mode = 'sign_in' }) {
   return (
     <Card className="w-full max-w-md mx-auto shadow-xl border-0 bg-white/90 backdrop-blur-sm"> {/* Reverted card background to white/90 for better contrast with text and buttons */}
       <CardHeader className="text-center space-y-4">

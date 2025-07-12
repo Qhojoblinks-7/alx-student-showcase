@@ -1,5 +1,5 @@
 import { useAuth } from '../../hooks/use-auth.js'
-import { AuthForm } from './AuthForm.jsx'
+import  AuthForm from './AuthForm.jsx'
 import { Skeleton } from './../ui/skeleton.jsx'
 import PropTypes from 'prop-types'
 
