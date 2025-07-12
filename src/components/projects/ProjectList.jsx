@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { useAuth } from '@/hooks/use-auth.js';
-import { supabase } from '@/lib/supabase.js';
-import { Button } from '@/components/ui/button.jsx';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
-import { Badge } from '@/components/ui/badge.jsx';
-import { Skeleton } from '@/components/ui/skeleton.jsx';
+import { useAuth } from '../../hooks/use-auth.js';
+import { supabase } from '../../lib/supabase'
+import { Button } from '../ui/button.jsx';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
+import { Badge } from '../ui/badge.jsx';
+import { Skeleton } from '../ui/skeleton.jsx';
 import { 
   Github, 
   ExternalLink, 

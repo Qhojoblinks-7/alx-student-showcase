@@ -6,7 +6,7 @@ import { Input } from '../ui/input.jsx';
 import { Label } from '../ui/label.jsx';
 import { Badge } from '../ui/badge.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs.jsx';
-import { GitHubService, ALXProjectDetector } from './GitHubImportWizard'
+import { GitHubService, ALXProjectDetector } from '../../lib/github-service'
 import { useAuth } from '../../hooks/use-auth'
 import { supabase } from '../../lib/supabase.js';
 import { toast } from 'sonner';

@@ -12,7 +12,10 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { 
   Plus, 
   Github, 
-  Zap 
+  Zap, 
+  Sparkle,
+  LogOut,
+  Target
 } from 'lucide-react'
 
 import { ProjectForm } from '../components/projects/ProjectForm'
@@ -85,7 +88,78 @@ export function Dashboard() {
   }, [user, refreshTrigger])
 
   return (
-    <main className="p-6">
+    <>
+    <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Sparkle className="h-5 w-5 text-white" />
+                </div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  ALX Showcase
+                </h1>
+              </div>
+              <Badge variant="secondary" className="hidden md:flex">
+                Portfolio & Social Sharing Platform
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>
+                    {user?.email?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span>{user?.email}</span>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+    <main className="p-8">
+      <Card className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">
+                    Welcome to your ALX Showcase! 🚀
+                  </h2>
+                  <p className="text-blue-100 mb-4">
+                    Document your coding journey and share your achievements with the world
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      className="bg-white text-blue-600 hover:bg-blue-50"
+                      onClick={() => setShowProjectForm(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Project
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      className="bg-white/20 text-white hover:bg-white/30 border-white/20"
+                      onClick={() => setShowGitHubImport(true)}
+                    >
+                      <Github className="h-4 w-4 mr-2" />
+                      Import from GitHub
+                    </Button>
+                  </div>
+                </div>
+                <div className="hidden md:block">
+                  <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
+                    <Target className="h-12 w-12 text-white" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
           <TabsTrigger value="projects">Projects</TabsTrigger>
@@ -166,5 +240,7 @@ export function Dashboard() {
         />
       )}
     </main>
+    </>
   )
 }
+
