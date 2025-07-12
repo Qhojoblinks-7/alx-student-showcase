@@ -1,35 +1,49 @@
-import { useEffect, useState } from 'react'
-import { createClient } from '@supabase/supabase-js';
+import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { supabase } from './../lib/supabase.js'
+import { 
+  checkAuthStatus, 
+  signOut as signOutAction, 
+  setUser, 
+  clearUser 
+} from '../store/slices/authSlice.js'
+
 export function useAuth() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const dispatch = useDispatch()
+  const { user, isAuthenticated, isLoading, error, isInitialized } = useSelector(state => state.auth)
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    // Check initial auth status
+    dispatch(checkAuthStatus())
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
+      if (session?.user) {
+        dispatch(setUser(session.user))
+      } else {
+        dispatch(clearUser())
+      }
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [dispatch])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await dispatch(signOutAction()).unwrap()
+    } catch (error) {
+      console.error('Sign out error:', error)
+    }
   }
 
   return {
     user,
-    loading,
+    isAuthenticated,
+    loading: isLoading,
+    error,
+    isInitialized,
     signOut,
   }
 }
