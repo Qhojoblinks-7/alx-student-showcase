@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx';
-import { Button } from '@/components/ui/button.jsx';
-import { Input } from '@/components/ui/input.jsx';
-import { Label } from '@/components/ui/label.jsx';
-import { Badge } from '@/components/ui/badge.jsx';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx';
-import { GitHubService, ALXProjectDetector } from '@/lib/github-service.js';
-import { useAuth } from '@/hooks/use-auth.js';
-import { supabase } from '@/lib/supabase.js';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Button } from '../ui/button.jsx';
+import { Input } from '../ui/input.jsx';
+import { Label } from '../ui/label.jsx';
+import { Badge } from '../ui/badge.jsx';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs.jsx';
+import { GitHubService, ALXProjectDetector } from '../../lib/github-service'
+import { useAuth } from '../../hooks/use-auth'
+import { supabase } from '../../lib/supabase.js';
 import { toast } from 'sonner';
 import { 
   Github, 
