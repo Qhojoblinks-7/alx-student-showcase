@@ -39,10 +39,22 @@ export const importSelectedProjects = createAsyncThunk(
       // Generate project data for each selected repository
       for (const repo of selectedRepos) {
         const projectData = await ALXProjectDetector.generateProjectData(repo, username);
-        projectsToCreate.push({
+        
+        // Map to full database schema
+        const enhancedProjectData = {
           ...projectData,
-          user_id: userId
-        });
+          user_id: userId,
+          original_repo_name: repo.name,
+          alx_confidence: projectData.alx_confidence || 0.0,
+          last_updated: repo.updated_at || new Date().toISOString(),
+          is_public: !repo.private,
+          category: projectData.category || 'other',
+          technologies: projectData.technologies || [],
+          github_url: repo.html_url,
+          live_url: repo.homepage || null,
+        };
+        
+        projectsToCreate.push(enhancedProjectData);
       }
 
       return projectsToCreate;

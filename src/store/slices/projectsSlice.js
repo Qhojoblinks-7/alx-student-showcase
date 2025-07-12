@@ -1,6 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { supabase } from '@/lib/supabase.js';
 
+// Project category validation
+const VALID_CATEGORIES = ['web', 'mobile', 'data', 'ai', 'backend', 'devops', 'other'];
+
+// Validation helper
+const validateCategory = (category) => {
+  return VALID_CATEGORIES.includes(category) ? category : 'other';
+};
+
 // Async thunks for project operations
 export const fetchProjects = createAsyncThunk(
   'projects/fetchProjects',
@@ -24,9 +32,20 @@ export const createProject = createAsyncThunk(
   'projects/createProject',
   async (projectData, { rejectWithValue }) => {
     try {
+      // Validate and sanitize project data
+      const sanitizedData = {
+        ...projectData,
+        category: validateCategory(projectData.category || 'other'),
+        is_public: projectData.is_public !== undefined ? projectData.is_public : true,
+        technologies: projectData.technologies || [],
+        alx_confidence: projectData.alx_confidence || null,
+        original_repo_name: projectData.original_repo_name || null,
+        last_updated: projectData.last_updated || new Date().toISOString(),
+      };
+
       const { data, error } = await supabase
         .from('projects')
-        .insert([projectData])
+        .insert([sanitizedData])
         .select()
         .single();
       
@@ -42,9 +61,20 @@ export const updateProject = createAsyncThunk(
   'projects/updateProject',
   async ({ id, projectData }, { rejectWithValue }) => {
     try {
+      // Validate and sanitize project data
+      const sanitizedData = { ...projectData };
+      
+      // Validate category if provided
+      if (projectData.category) {
+        sanitizedData.category = validateCategory(projectData.category);
+      }
+      
+      // Set last_updated timestamp
+      sanitizedData.last_updated = new Date().toISOString();
+
       const { data, error } = await supabase
         .from('projects')
-        .update(projectData)
+        .update(sanitizedData)
         .eq('id', id)
         .select()
         .single();
@@ -97,20 +127,40 @@ export const fetchProjectStats = createAsyncThunk(
     try {
       const { data: projects, error } = await supabase
         .from('projects')
-        .select('technologies')
+        .select('technologies, is_public, category, alx_confidence')
         .eq('user_id', userId);
 
       if (error) throw error;
 
       const allTechnologies = new Set();
+      const categories = {};
+      let publicCount = 0;
+      let alxProjectsCount = 0;
+      
       projects.forEach(project => {
+        // Count technologies
         project.technologies?.forEach(tech => allTechnologies.add(tech));
+        
+        // Count public projects
+        if (project.is_public) publicCount++;
+        
+        // Count by category
+        const category = project.category || 'other';
+        categories[category] = (categories[category] || 0) + 1;
+        
+        // Count ALX projects (confidence > 0.5)
+        if (project.alx_confidence && project.alx_confidence > 0.5) {
+          alxProjectsCount++;
+        }
       });
 
       return {
         total: projects.length,
-        public: projects.length, // Assuming all are public for now
-        technologies: allTechnologies.size
+        public: publicCount,
+        private: projects.length - publicCount,
+        technologies: allTechnologies.size,
+        categories,
+        alxProjects: alxProjectsCount,
       };
     } catch (error) {
       return rejectWithValue(error.message);
@@ -124,7 +174,15 @@ const initialState = {
   stats: {
     total: 0,
     public: 0,
+    private: 0,
     technologies: 0,
+    categories: {},
+    alxProjects: 0,
+  },
+  filters: {
+    category: 'all',
+    isPublic: 'all',
+    searchTerm: '',
   },
   isLoading: false,
   isCreating: false,
@@ -149,7 +207,28 @@ const projectsSlice = createSlice({
     },
     clearProjects: (state) => {
       state.projects = [];
-      state.stats = { total: 0, public: 0, technologies: 0 };
+      state.stats = { total: 0, public: 0, private: 0, technologies: 0, categories: {}, alxProjects: 0 };
+    },
+    
+    // Filter actions
+    setFilter: (state, action) => {
+      const { filterType, value } = action.payload;
+      state.filters[filterType] = value;
+    },
+    clearFilters: (state) => {
+      state.filters = {
+        category: 'all',
+        isPublic: 'all',
+        searchTerm: '',
+      };
+    },
+    
+    // Project visibility actions
+    toggleProjectVisibility: (state, action) => {
+      const project = state.projects.find(p => p.id === action.payload);
+      if (project) {
+        project.is_public = !project.is_public;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -252,7 +331,13 @@ export const {
   clearError, 
   setCurrentProject, 
   clearCurrentProject, 
-  clearProjects 
+  clearProjects,
+  setFilter,
+  clearFilters,
+  toggleProjectVisibility,
 } = projectsSlice.actions;
+
+// Export validation constants and helper
+export { VALID_CATEGORIES, validateCategory };
 
 export default projectsSlice.reducer;
