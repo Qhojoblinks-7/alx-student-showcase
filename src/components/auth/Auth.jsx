@@ -1,97 +1,133 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './../ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './../ui/card';
 import { Button } from './../ui/button.jsx';
 import { Input } from './../ui/input.jsx';
 import { Label } from './../ui//label.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './../ui/tabs.jsx';
-import { supabase } from '../../lib/supabase';
-import { toast } from 'sonner';
-import { Eye, EyeOff, Github, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase'; // Assuming your Supabase client is initialized here
+import { toast } from 'sonner'; // For displaying notifications
+import { Eye, EyeOff, Github, Mail, Lock, User, Loader2 } from 'lucide-react'; // Icons
 
+/**
+ * Auth Component
+ *
+ * Provides a user authentication interface with sign-in, sign-up, password reset,
+ * and OAuth options using Supabase.
+ *
+ * @param {object} props - The component properties.
+ * @param {string} [props.redirectTo='/dashboard'] - The path to redirect to after successful authentication.
+ */
 export function Auth({ redirectTo = '/dashboard' }) {
+  // State for managing loading indicators during async operations
   const [loading, setLoading] = useState(false);
+  // State for toggling password visibility
   const [showPassword, setShowPassword] = useState(false);
+  // State for controlling the active tab in the authentication form
   const [activeTab, setActiveTab] = useState('signin');
-  
-  // Form states
+
+  // State for sign-in form data
   const [signInData, setSignInData] = useState({
     email: '',
     password: ''
   });
-  
+
+  // State for sign-up form data
   const [signUpData, setSignUpData] = useState({
     email: '',
     password: '',
     confirmPassword: '',
     fullName: ''
   });
-  
+
+  // State for password reset email input
   const [resetEmail, setResetEmail] = useState('');
 
-  // Handle sign in
+  /**
+   * Handles the sign-in process.
+   * Prevents default form submission, validates input, and attempts to sign in
+   * the user using Supabase. Displays toast notifications for success or error.
+   * @param {Event} e - The form submission event.
+   */
   const handleSignIn = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent default form submission
+
+    // Client-side validation
     if (!signInData.email || !signInData.password) {
       toast.error('Please fill in all fields');
       return;
     }
 
-    setLoading(true);
+    setLoading(true); // Show loading indicator
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: signInData.email,
         password: signInData.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error; // Throw error to be caught by catch block
+      }
 
       toast.success('Welcome back!');
-      // Redirect will be handled by the auth state change
+      // Redirection after successful sign-in is typically handled by
+      // a Supabase auth state change listener in your main application setup.
     } catch (error) {
       console.error('Sign in error:', error);
+      // Display a user-friendly error message
       toast.error(error.message || 'Failed to sign in');
     } finally {
-      setLoading(false);
+      setLoading(false); // Hide loading indicator
     }
   };
 
-  // Handle sign up
+  /**
+   * Handles the sign-up process.
+   * Prevents default form submission, validates input (including password match and length),
+   * and attempts to create a new user account with Supabase.
+   * Displays toast notifications and handles email verification.
+   * @param {Event} e - The form submission event.
+   */
   const handleSignUp = async (e) => {
-    e.preventDefault();
-    
+    e.preventDefault(); // Prevent default form submission
+
+    // Client-side validation for sign-up
     if (!signUpData.email || !signUpData.password || !signUpData.fullName) {
       toast.error('Please fill in all fields');
       return;
     }
-    
+
     if (signUpData.password !== signUpData.confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
-    
+
     if (signUpData.password.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
     }
 
-    setLoading(true);
+    setLoading(true); // Show loading indicator
     try {
       const { data, error } = await supabase.auth.signUp({
         email: signUpData.email,
         password: signUpData.password,
         options: {
           data: {
-            full_name: signUpData.fullName,
+            full_name: signUpData.fullName, // Store full name in user metadata
           },
+          // Redirect URL after email verification
           emailRedirectTo: `${window.location.origin}${redirectTo}`
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error; // Throw error to be caught by catch block
+      }
 
+      // Check if email confirmation is required
       if (data.user && !data.user.email_confirmed_at) {
-        toast.success('Please check your email for verification link');
+        toast.success('Please check your email for a verification link');
       } else {
         toast.success('Account created successfully!');
       }
@@ -99,53 +135,72 @@ export function Auth({ redirectTo = '/dashboard' }) {
       console.error('Sign up error:', error);
       toast.error(error.message || 'Failed to create account');
     } finally {
-      setLoading(false);
+      setLoading(false); // Hide loading indicator
     }
   };
 
-  // Handle password reset
+  /**
+   * Handles the password reset process.
+   * Prevents default form submission, validates email input, and sends a password
+   * reset email using Supabase.
+   * Displays toast notifications.
+   * @param {Event} e - The form submission event.
+   */
   const handlePasswordReset = async (e) => {
-    e.preventDefault();
-    
+    e.preventDefault(); // Prevent default form submission
+
+    // Client-side validation
     if (!resetEmail) {
       toast.error('Please enter your email address');
       return;
     }
 
-    setLoading(true);
+    setLoading(true); // Show loading indicator
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        // Redirect URL after the user clicks the reset link in their email
         redirectTo: `${window.location.origin}/reset-password`
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error; // Throw error to be caught by catch block
+      }
 
       toast.success('Password reset email sent! Check your inbox.');
-      setResetEmail('');
+      setResetEmail(''); // Clear the email input field
     } catch (error) {
       console.error('Password reset error:', error);
       toast.error(error.message || 'Failed to send reset email');
     } finally {
-      setLoading(false);
+      setLoading(false); // Hide loading indicator
     }
   };
 
-  // Handle OAuth sign in
+  /**
+   * Handles OAuth (social) sign-in.
+   * Initiates the OAuth flow with the specified provider (e.g., 'github', 'google').
+   * Displays toast notifications for errors.
+   * @param {'github' | 'google'} provider - The OAuth provider to use.
+   */
   const handleOAuthSignIn = async (provider) => {
-    setLoading(true);
+    setLoading(true); // Show loading indicator
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
+          // Redirect URL after successful OAuth authentication
           redirectTo: `${window.location.origin}${redirectTo}`
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error; // Throw error to be caught by catch block
+      }
+      // Supabase handles the redirection for OAuth, so no success toast needed here directly.
     } catch (error) {
       console.error('OAuth error:', error);
       toast.error(error.message || `Failed to sign in with ${provider}`);
-      setLoading(false);
+      setLoading(false); // Hide loading indicator if an error occurs before redirect
     }
   };
 
@@ -153,18 +208,22 @@ export function Auth({ redirectTo = '/dashboard' }) {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
       <Card className="w-full max-w-md shadow-xl border-0 bg-white/90 backdrop-blur-sm">
         <CardHeader className="text-center space-y-4">
+          {/* Application Icon */}
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
             <User className="h-8 w-8 text-white" />
           </div>
+          {/* Application Title */}
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             ALX Showcase
           </CardTitle>
+          {/* Application Description */}
           <CardDescription className="text-base">
             Share your coding journey with the ALX community
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
+          {/* Authentication Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -172,9 +231,10 @@ export function Auth({ redirectTo = '/dashboard' }) {
               <TabsTrigger value="reset">Reset</TabsTrigger>
             </TabsList>
 
-            {/* Sign In Tab */}
+            {/* Sign In Tab Content */}
             <TabsContent value="signin" className="space-y-4">
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg">
+                {/* Email Input for Sign In */}
                 <div className="space-y-2">
                   <Label htmlFor="signin-email">Email</Label>
                   <div className="relative">
@@ -190,20 +250,22 @@ export function Auth({ redirectTo = '/dashboard' }) {
                     />
                   </div>
                 </div>
-                
+
+                {/* Password Input for Sign In */}
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       id="signin-password"
-                      type={showPassword ? "text" : "password"}
+                      type={showPassword ? "text" : "password"} // Toggle password visibility
                       placeholder="Enter your password"
                       value={signInData.password}
                       onChange={(e) => setSignInData(prev => ({ ...prev, password: e.target.value }))}
                       className="pl-10 pr-10"
                       required
                     />
+                    {/* Button to toggle password visibility */}
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
@@ -214,7 +276,8 @@ export function Auth({ redirectTo = '/dashboard' }) {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                {/* Sign In Button */}
+                <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-purple-60" disabled={loading}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -227,9 +290,10 @@ export function Auth({ redirectTo = '/dashboard' }) {
               </form>
             </TabsContent>
 
-            {/* Sign Up Tab */}
+            {/* Sign Up Tab Content */}
             <TabsContent value="signup" className="space-y-4">
               <form onSubmit={handleSignUp} className="space-y-4">
+                {/* Full Name Input for Sign Up */}
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Full Name</Label>
                   <div className="relative">
@@ -246,6 +310,7 @@ export function Auth({ redirectTo = '/dashboard' }) {
                   </div>
                 </div>
 
+                {/* Email Input for Sign Up */}
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <div className="relative">
@@ -261,7 +326,8 @@ export function Auth({ redirectTo = '/dashboard' }) {
                     />
                   </div>
                 </div>
-                
+
+                {/* Password Input for Sign Up */}
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
                   <div className="relative">
@@ -275,6 +341,7 @@ export function Auth({ redirectTo = '/dashboard' }) {
                       className="pl-10 pr-10"
                       required
                     />
+                    {/* Button to toggle password visibility */}
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
@@ -285,6 +352,7 @@ export function Auth({ redirectTo = '/dashboard' }) {
                   </div>
                 </div>
 
+                {/* Confirm Password Input for Sign Up */}
                 <div className="space-y-2">
                   <Label htmlFor="signup-confirm">Confirm Password</Label>
                   <div className="relative">
@@ -301,7 +369,8 @@ export function Auth({ redirectTo = '/dashboard' }) {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                {/* Create Account Button */}
+                <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-purple-60" disabled={loading}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -314,9 +383,10 @@ export function Auth({ redirectTo = '/dashboard' }) {
               </form>
             </TabsContent>
 
-            {/* Password Reset Tab */}
+            {/* Password Reset Tab Content */}
             <TabsContent value="reset" className="space-y-4">
               <form onSubmit={handlePasswordReset} className="space-y-4">
+                {/* Email Input for Password Reset */}
                 <div className="space-y-2">
                   <Label htmlFor="reset-email">Email Address</Label>
                   <div className="relative">
@@ -333,6 +403,7 @@ export function Auth({ redirectTo = '/dashboard' }) {
                   </div>
                 </div>
 
+                {/* Send Reset Email Button */}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? (
                     <>
@@ -347,7 +418,7 @@ export function Auth({ redirectTo = '/dashboard' }) {
             </TabsContent>
           </Tabs>
 
-          {/* OAuth Providers */}
+          {/* OAuth Providers Section */}
           <div className="space-y-3">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -359,6 +430,7 @@ export function Auth({ redirectTo = '/dashboard' }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              {/* GitHub OAuth Button */}
               <Button
                 variant="outline"
                 onClick={() => handleOAuthSignIn('github')}
@@ -368,13 +440,15 @@ export function Auth({ redirectTo = '/dashboard' }) {
                 <Github className="mr-2 h-4 w-4" />
                 GitHub
               </Button>
-              
+
+              {/* Google OAuth Button */}
               <Button
                 variant="outline"
                 onClick={() => handleOAuthSignIn('google')}
                 disabled={loading}
                 className="w-full"
               >
+                {/* Google SVG Icon */}
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                   <path
                     fill="currentColor"
@@ -398,10 +472,10 @@ export function Auth({ redirectTo = '/dashboard' }) {
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Footer Text */}
           <div className="text-center text-sm text-gray-600">
             <p>
-              By signing up, you agree to showcase your amazing ALX projects 
+              By signing up, you agree to showcase your amazing ALX projects
               and inspire fellow students! 🚀
             </p>
           </div>
@@ -411,6 +485,7 @@ export function Auth({ redirectTo = '/dashboard' }) {
   );
 }
 
+// PropTypes for type-checking the component's props
 Auth.propTypes = {
   redirectTo: PropTypes.string
 };
