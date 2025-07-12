@@ -1,8 +1,22 @@
-// src/components/AuthForm.jsx
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { supabase } from '../../lib/supabase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+const Auth = React.lazy(() =>
+  import('@supabase/auth-ui-react').then(module => ({ default: module.Auth }))
+)
+
+const ThemeSupa = React.lazy(() =>
+  import('@supabase/auth-ui-shared').then(module => ({ default: module.ThemeSupa }))
+)
+
+const supabase = React.lazy(() =>
+  import('../../lib/supabase').then(module => ({ default: module.supabase }))
+)
+
+const Card = React.lazy(() =>
+  import('../../components/ui/card').then(module => ({ default: module.Card }))
+)
+const CardContent = React.lazy(() =>
+  import('../../components/ui/card').then(module => ({ default: module.CardContent }))
+)
+// ...repeat for CardHeader, CardDescription, CardTitle
 import PropTypes from 'prop-types';
 
 /**
