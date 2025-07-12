@@ -1,3 +1,5 @@
+import { useDispatch, useSelector } from 'react-redux'
+
 import { useState, useEffect } from 'react'
 import { useAuth } from './../hooks/use-auth'
 import { supabase } from '../lib/supabase'
@@ -23,17 +25,18 @@ import { ProjectList } from '../components/projects/ProjectList.jsx'
 import { UserProfile } from '../components/profile/UserProfile.jsx'
 import { GitHubImportWizard } from '../components/github/GitHubImportWizard.jsx'
 
+// Redux actions
+import { setActiveTab, openModal, closeModal } from '@/store/slices/uiSlice.js'
+import { fetchProjectStats } from '@/store/slices/projectsSlice.js'
+
 export function Dashboard() {
+  const dispatch = useDispatch()
   const { user, signOut } = useAuth()
-  const [activeTab, setActiveTab] = useState('projects')
-  const [showProjectForm, setShowProjectForm] = useState(false)
-  const [showGitHubImport, setShowGitHubImport] = useState(false)
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [projectStats, setProjectStats] = useState({
-    total: 0,
-    public: 0,
-    technologies: 0
-  })
+  
+  // Redux state
+  const activeTab = useSelector(state => state.ui.activeTab)
+  const modals = useSelector(state => state.ui.modals)
+  const projectStats = useSelector(state => state.projects.stats)
 
   const handleSignOut = async () => {
     try {
@@ -45,49 +48,49 @@ export function Dashboard() {
   }
 
   const handleProjectAdded = () => {
-    setShowProjectForm(false)
-    setRefreshTrigger(prev => prev + 1)
-    fetchProjectStats()
-  }
-
-  const handleGitHubImportComplete = (importedProjects) => {
-    setShowGitHubImport(false)
-    setRefreshTrigger(prev => prev + 1)
-    fetchProjectStats()
-    toast.success(`Successfully imported ${importedProjects.length} projects from GitHub!`)
-  }
-
-  const fetchProjectStats = async () => {
-    if (!user) return
-
-    try {
-      const { data: projects, error } = await supabase
-        .from('projects')
-        .select('technologies')
-        .eq('user_id', user.id)
-
-      if (error) throw error
-
-      const allTechnologies = new Set()
-      projects.forEach(project => {
-        project.technologies?.forEach(tech => allTechnologies.add(tech))
-      })
-
-      setProjectStats({
-        total: projects.length,
-        public: projects.length, // Assuming all are public for now
-        technologies: allTechnologies.size
-      })
-    } catch (error) {
-      console.error('Error fetching project stats:', error)
+    dispatch(closeModal('projectForm'))
+    if (user) {
+      dispatch(fetchProjectStats(user.id))
     }
   }
 
+  const handleGitHubImportComplete = (importedProjects) => {
+    dispatch(closeModal('gitHubImport'))
+    if (user) {
+      dispatch(fetchProjectStats(user.id))
+    }
+    toast.success(`Successfully imported ${importedProjects.length} projects from GitHub!`)
+  }
+
+  const handleTabChange = (newTab) => {
+    dispatch(setActiveTab(newTab))
+  }
+
+  const openProjectForm = () => {
+    dispatch(openModal({ modalName: 'projectForm' }))
+  }
+
+  const openGitHubImport = () => {
+    dispatch(openModal({ modalName: 'gitHubImport' }))
+  }
+
+  const closeProjectForm = () => {
+    dispatch(closeModal('projectForm'))
+  }
+
+  const closeGitHubImport = () => {
+    dispatch(closeModal('gitHubImport'))
+  }
+
   useEffect(() => {
-    fetchProjectStats()
-  }, [user, refreshTrigger])
+    if (user) {
+      dispatch(fetchProjectStats(user.id))
+    }
+  }, [user, dispatch])
 
   return (
+    <main className="p-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
     <>
     <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
@@ -160,7 +163,7 @@ export function Dashboard() {
               </div>
             </CardContent>
           </Card>
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      
         <TabsList className="mb-6">
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -178,13 +181,13 @@ export function Dashboard() {
               <Button
                 variant="outline"
                 className="border-dashed"
-                onClick={() => setShowGitHubImport(true)}
+                onClick={openGitHubImport}
               >
                 <Github className="h-4 w-4 mr-2" />
                 <Zap className="h-4 w-4 mr-1" />
                 Import from GitHub
               </Button>
-              <Button onClick={() => setShowProjectForm(true)}>
+              <Button onClick={openProjectForm}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Project
               </Button>
@@ -212,13 +215,13 @@ export function Dashboard() {
             </Card>
           </div>
 
-          {showProjectForm ? (
+          {modals.projectForm ? (
             <ProjectForm
               onProjectAdded={handleProjectAdded}
-              onEditComplete={() => setShowProjectForm(false)}
+              onEditComplete={closeProjectForm}
             />
           ) : (
-            <ProjectList refreshTrigger={refreshTrigger} />
+            <ProjectList />
           )}
         </TabsContent>
 
@@ -233,9 +236,9 @@ export function Dashboard() {
         </TabsContent>
       </Tabs>
 
-      {showGitHubImport && (
+      {modals.gitHubImport && (
         <GitHubImportWizard
-          onClose={() => setShowGitHubImport(false)}
+          onClose={closeGitHubImport}
           onImportComplete={handleGitHubImportComplete}
         />
       )}
