@@ -148,6 +148,7 @@ export function Dashboard() {
                       onClick={() => setShowGitHubImport(true)}
                     >
                       <Github className="h-4 w-4 mr-2" />
+                      <Zap className="h-4 w-4 mr-1" />
                       Import from GitHub
                     </Button>
                   </div>
@@ -161,7 +162,7 @@ export function Dashboard() {
             </CardContent>
           </Card>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6">
+        <TabsList className="mb-6 mt-6">
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
         </TabsList>
