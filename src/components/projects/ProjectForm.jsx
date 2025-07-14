@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
-import { supabase } from '../../lib/supabase.js';
+import { useDispatch } from 'react-redux'; // Import useDispatch
+import { addProject, updateProject as updateProjectThunk } from '../../store/slices/projectsSlice.js'; // Import Redux thunks
 import { Button } from './../ui/button.jsx';
 import { Input } from './../ui/input.jsx';
 import { Label } from './../ui/label.jsx';
@@ -13,8 +14,9 @@ import { Switch } from './../ui/switch.jsx';
 import { toast } from 'sonner';
 import { Loader2, Plus, X, Calendar } from 'lucide-react';
 
-export function ProjectForm({ projectId, onSuccess, onCancel }) {
+export function ProjectForm({ projectId, initialData, onSuccess, onCancel }) { // Added initialData prop
   const { user } = useAuth();
+  const dispatch = useDispatch(); // Initialize useDispatch
   const [loading, setLoading] = useState(false);
   const [newTech, setNewTech] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -22,10 +24,10 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    tech_stack: [],
+    technologies: [], // Changed from tech_stack to technologies
     github_url: '',
-    live_demo_url: '',
-    project_type: 'web',
+    live_url: '', // Changed from live_demo_url to live_url
+    category: 'web', // Changed from project_type to category
     difficulty_level: 'beginner',
     completion_date: '',
     time_spent_hours: null,
@@ -36,19 +38,41 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
     is_public: true,
   });
 
+  // Populate form data if initialData is provided (for editing)
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        title: initialData.title || '',
+        description: initialData.description || '',
+        technologies: initialData.technologies || [],
+        github_url: initialData.github_url || '',
+        live_url: initialData.live_url || '',
+        category: initialData.category || 'web',
+        difficulty_level: initialData.difficulty_level || 'beginner',
+        completion_date: initialData.completion_date ? initialData.completion_date.split('T')[0] : '', // Format date for input
+        time_spent_hours: initialData.time_spent_hours || null,
+        key_learnings: initialData.key_learnings || '',
+        challenges_faced: initialData.challenges_faced || '',
+        image_url: initialData.image_url || '',
+        tags: initialData.tags || [],
+        is_public: initialData.is_public ?? true, // Use nullish coalescing for boolean
+      });
+    }
+  }, [initialData]);
+
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const addTechStack = () => {
-    if (newTech.trim() && !formData.tech_stack.includes(newTech.trim())) {
-      updateFormData('tech_stack', [...formData.tech_stack, newTech.trim()]);
+    if (newTech.trim() && !formData.technologies.includes(newTech.trim())) { // Changed to technologies
+      updateFormData('technologies', [...formData.technologies, newTech.trim()]); // Changed to technologies
       setNewTech('');
     }
   };
 
   const removeTechStack = (tech) => {
-    updateFormData('tech_stack', formData.tech_stack.filter(t => t !== tech));
+    updateFormData('technologies', formData.technologies.filter(t => t !== tech)); // Changed to technologies
   };
 
   const addTag = () => {
@@ -64,28 +88,36 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      toast.error('You must be logged in to save a project.');
+      return;
+    }
 
     setLoading(true);
     try {
-      const projectData = {
+      const projectDataToSave = {
         user_id: user.id,
         ...formData,
+        // Ensure arrays are not empty, default to empty array if null/undefined
+        technologies: formData.technologies || [],
+        tags: formData.tags || [],
+        // Convert empty string dates to null for Supabase
         completion_date: formData.completion_date || null,
+        time_spent_hours: formData.time_spent_hours || null,
       };
 
-      const { error } = projectId
-        ? await supabase.from('projects').update(projectData).eq('id', projectId)
-        : await supabase.from('projects').insert([projectData]);
-
-      if (error) throw error;
+      let result;
+      if (projectId) {
+        result = await dispatch(updateProjectThunk({ id: projectId, projectData: projectDataToSave })).unwrap();
+      } else {
+        result = await dispatch(addProject(projectDataToSave)).unwrap();
+      }
 
       toast.success(projectId ? 'Project updated successfully!' : 'Project added successfully!');
-      onSuccess?.();
+      onSuccess?.(result); // Pass the result back to the parent
     } catch (error) {
-      // Explicitly convert error to string for robust logging
-      console.error('Error saving project:', error.message ? String(error.message) : String(error));
-      toast.error('Failed to save project');
+      console.error('Error saving project:', error.message);
+      toast.error('Failed to save project: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -126,8 +158,8 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
             </div>
 
             <div>
-              <Label htmlFor="project_type">Project Type</Label>
-              <Select value={formData.project_type} onValueChange={(value) => updateFormData('project_type', value)}>
+              <Label htmlFor="category">Project Category</Label> {/* Changed label to Category */}
+              <Select value={formData.category} onValueChange={(value) => updateFormData('category', value)}> {/* Changed to category */}
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -136,6 +168,8 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
                   <SelectItem value="mobile">Mobile App</SelectItem>
                   <SelectItem value="backend">Backend/API</SelectItem>
                   <SelectItem value="data-science">Data Science</SelectItem>
+                  <SelectItem value="ai">AI/Machine Learning</SelectItem> {/* Added AI */}
+                  <SelectItem value="devops">DevOps</SelectItem> {/* Added DevOps */}
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -166,12 +200,12 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
             </div>
 
             <div>
-              <Label htmlFor="live_demo_url">Live Demo URL</Label>
+              <Label htmlFor="live_url">Live Demo URL</Label> {/* Changed label to Live URL */}
               <Input
-                id="live_demo_url"
+                id="live_url"
                 placeholder="https://myproject.vercel.app"
-                value={formData.live_demo_url}
-                onChange={(e) => updateFormData('live_demo_url', e.target.value)}
+                value={formData.live_url} // Changed to live_url
+                onChange={(e) => updateFormData('live_url', e.target.value)} // Changed to live_url
               />
             </div>
 
@@ -208,7 +242,7 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
           </div>
 
           <div>
-            <Label>Tech Stack</Label>
+            <Label>Technologies</Label> {/* Changed label to Technologies */}
             <div className="flex gap-2 mb-2">
               <Input
                 placeholder="Add technology (e.g., React, Python)"
@@ -221,7 +255,7 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
               </Button>
             </div>
             <div className="flex flex-wrap gap-2">
-              {formData.tech_stack.map((tech, index) => (
+              {formData.technologies.map((tech, index) => ( // Changed to technologies
                 <Badge key={index} variant="secondary" className="flex items-center gap-1">
                   {tech}
                   <X className="h-3 w-3 cursor-pointer" onClick={() => removeTechStack(tech)} />
@@ -303,6 +337,7 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
 
 ProjectForm.propTypes = {
   projectId: PropTypes.string,
+  initialData: PropTypes.object, // Added initialData propType
   onSuccess: PropTypes.func,
   onCancel: PropTypes.func,
 };
