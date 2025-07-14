@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
   Dialog,
@@ -42,26 +42,7 @@ export function AutoWorkLogShare({ project, onClose }) {
   const [optimizedContent, setOptimizedContent] = useState({});
   const [selectedPlatforms, setSelectedPlatforms] = useState(new Set(['twitter', 'linkedin']));
 
-  // Auto-fetch work log on component mount
-  useEffect(() => {
-    if (autoMode && project.github_url) {
-      fetchWorkLog();
-    }
-  }, [project.github_url, timeframe, autoMode]);
-
-  // Generate optimized content when work log or custom message changes
-  useEffect(() => {
-    if (project) {
-      const content = SocialContentOptimizer.generatePlatformContent(
-        project, 
-        workLog, 
-        customMessage
-      );
-      setOptimizedContent(content);
-    }
-  }, [project, workLog, customMessage]);
-
-  const fetchWorkLog = async () => {
+  const fetchWorkLog = useCallback(async () => {
     if (!project.github_url) {
       toast.error('No GitHub URL found for this project');
       return;
@@ -94,7 +75,26 @@ export function AutoWorkLogShare({ project, onClose }) {
     } finally {
       setLoadingWorkLog(false);
     }
-  };
+  }, [project.github_url, timeframe]);
+
+  // Auto-fetch work log on component mount
+  useEffect(() => {
+    if (autoMode && project.github_url) {
+      fetchWorkLog();
+    }
+  }, [autoMode, fetchWorkLog, project.github_url]);
+
+  // Generate optimized content when work log or custom message changes
+  useEffect(() => {
+    if (project) {
+      const content = SocialContentOptimizer.generatePlatformContent(
+        project, 
+        workLog, 
+        customMessage
+      );
+      setOptimizedContent(content);
+    }
+    }, [project, workLog, customMessage]);
 
   const copyToClipboard = async (text) => {
     try {

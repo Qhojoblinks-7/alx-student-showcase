@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
 import { supabase } from '../../lib/supabase'
@@ -24,13 +24,7 @@ export function ProjectList({ onEdit, onShare }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchProjects();
-    }
-  }, [user]);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -48,7 +42,13 @@ export function ProjectList({ onEdit, onShare }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    }
+  }, [user, fetchProjects]);
 
   const deleteProject = async (projectId) => {
     if (!confirm('Are you sure you want to delete this project?')) return;
