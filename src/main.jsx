@@ -5,8 +5,7 @@ import { store } from './store/index.js';
 import App from './App.jsx';
 import './index.css';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import { initializeAuth } from './services/auth-service.js'; // Import initializeAuth
-
+import { initializeAuth } from './service/auth-service.js';
 // Get the root DOM element where the React application will be mounted.
 const rootElement = document.getElementById('root');
 
