@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
   Dialog,
@@ -61,7 +61,7 @@ export function AutoWorkLogShare({ project, onClose }) {
     }
   }, [project, workLog, customMessage]);
 
-  const fetchWorkLog = async () => {
+  const fetchWorkLog = useCallback(async () => {
     if (!project.github_url) {
       toast.error('No GitHub URL found for this project');
       return;
@@ -94,7 +94,7 @@ export function AutoWorkLogShare({ project, onClose }) {
     } finally {
       setLoadingWorkLog(false);
     }
-  };
+  }, [project.github_url, timeframe]);
 
   const copyToClipboard = async (text) => {
     try {
