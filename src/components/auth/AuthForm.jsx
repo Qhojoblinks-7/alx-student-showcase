@@ -15,8 +15,27 @@ import PropTypes from 'prop-types';
  * @param {'sign_in' | 'sign_up' | 'forgot_password' | 'update_password'} [props.mode='sign_in'] - The specific authentication view to display.
  */
 export default function AuthForm({ mode = 'sign_in' }) {
+  // --- DEBUG LOGS START ---
+  console.log('--- AuthForm Debug Info (with Console Logs) ---');
+  console.log('1. supabase client:', supabase);
+  console.log('   Is supabase truthy?', !!supabase);
+  console.log('   Does supabase have .auth?', !!supabase?.auth);
+  console.log('2. ThemeSupa:', ThemeSupa);
+  console.log('   Is ThemeSupa truthy?', !!ThemeSupa);
+  console.log('   Type of ThemeSupa:', typeof ThemeSupa);
+  console.log('3. mode prop:', mode);
+  console.log('--- End AuthForm Debug Info ---');
+  // --- DEBUG LOGS END ---
+
+  // --- SUPABASE CLIENT CHECK START ---
+  if (!supabase || typeof supabase.auth === 'undefined' || !supabase.auth) {
+    console.error("CRITICAL ERROR: Supabase client is not properly initialized or missing its .auth object. Check lib/supabase.js and .env file.");
+    return <div className="text-red-600 text-center p-4">Error: Supabase client configuration failed. Please check console.</div>;
+  }
+  // --- SUPABASE CLIENT CHECK END ---
+
   return (
-    <Card className="w-full max-w-md mx-auto shadow-xl border-0 bg-white/90 backdrop-blur-sm"> {/* Reverted card background to white/90 for better contrast with text and buttons */}
+    <Card className="w-full max-w-md mx-auto shadow-xl border-0 bg-white/90 backdrop-blur-sm">
       <CardHeader className="text-center space-y-4">
         {/*
           Consider adding an icon or logo here for better branding, e.g.:
@@ -27,7 +46,7 @@ export default function AuthForm({ mode = 'sign_in' }) {
         <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent ">
           ALX Showcase
         </CardTitle>
-        <CardDescription className="text-base text-blue"> {/* Added a default text color for description */}
+        <CardDescription className="text-base text-blue">
           {mode === 'sign_in'
             ? 'Sign in to your account to continue'
             : 'Create an account to start showcasing your projects'
@@ -43,30 +62,17 @@ export default function AuthForm({ mode = 'sign_in' }) {
             variables: {
               default: {
                 colors: {
-                  // Using specific hex color values directly
-                  // Example: Tailwind's blue-600 and purple-600 hex codes
-                  brand: '#2563EB',        // A shade of blue, similar to Tailwind's blue-600
-                  brandAccent: '#7C3AED',  // A shade of purple, similar to Tailwind's purple-600
-                  // You can add other custom colors for specific elements if needed
-                  // inputBackground: '#FFFFFF',
-                  // inputBorder: '#D1D5DB',
-                  // inputText: '#1F2937',
-                  // messageText: '#EF4444', // For destructive messages
+                  brand: '#2563EB',
+                  brandAccent: '#7C3AED',
                 }
               }
             },
             className: {
-              // Overriding default CSS classes with Tailwind classes
-              // Use a specific color for anchors, matching your brand colors or a common link color
-              anchor: 'text-blue-600 hover:text-blue-700', // Adjusted to use a specific blue from Tailwind
-              button: 'bg-blue-600 hover:bg-blue-700 text-white', // Consistent with brand color
-              input: 'border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500', // More specific input styling
-              label: 'text-gray-700', // Label styling
-              message: 'text-red-500', // Error/success message styling (Tailwind red-500)
-              // You might want to add more classes for a complete custom look:
-              // container: 'space-y-6',
-              // divider: 'text-gray-400',
-              // inputDescription: 'text-gray-500',
+              anchor: 'text-blue-600 hover:text-blue-700',
+              button: 'bg-blue-600 hover:bg-blue-700 text-white',
+              input: 'border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500',
+              label: 'text-gray-700',
+              message: 'text-red-500',
             }
           }}
           providers={['github', 'google']}

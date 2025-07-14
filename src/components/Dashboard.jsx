@@ -1,40 +1,41 @@
+// src/components/Dashboard.jsx
 import { useDispatch, useSelector } from 'react-redux'
-import { useEffect } from 'react'
+import { useEffect, Suspense, lazy } from 'react' // Ensure Suspense and lazy are imported if used, though not directly in Dashboard
 import { useAuth } from './../hooks/use-auth'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 
-import { Button } from './ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { Badge } from './ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
+// ... (other imports remain the same) ...
 
-import {
-  Plus,
-  Github,
-  Zap,
-  Sparkle,
-  LogOut,
-  Target
-} from 'lucide-react'
-
-import { ProjectForm } from '../components/projects/ProjectForm'
-import { ProjectList } from '../components/projects/ProjectList.jsx'
-import { UserProfile } from '../components/profile/UserProfile.jsx'
-import { GitHubImportWizard } from '../components/github/GitHubImportWizard.jsx'
-
-// Redux actions
-import { setActiveTab, openModal, closeModal } from '@/store/slices/uiSlice.js'
-import { fetchProjectStats } from '@/store/slices/projectsSlice.js'
+// IMPORTANT: Re-include or ensure this safeLog is globally available or defined in this file if not
+function safeLog(label, value) {
+  try {
+    const serialized = JSON.stringify(value, null, 2);
+    console.log(`${label}:`, serialized);
+  } catch (err) {
+    console.log(`${label}: [Unserializable Object - ${err.message}]`); // More descriptive error
+  }
+}
 
 export function Dashboard() {
   const dispatch = useDispatch()
   const { user, signOut } = useAuth()
 
+  // --- ADD THESE DEBUG LOGS ---
+  safeLog("Dashboard: User data", user);
+  safeLog("Dashboard: user.email", user?.email);
+  // --- END DEBUG LOGS ---
+
   const activeTab = useSelector(state => state.ui.activeTab)
   const modals = useSelector(state => state.ui.modals)
   const projectStats = useSelector(state => state.projects.stats)
+
+  // --- ADD THESE DEBUG LOGS ---
+  safeLog("Dashboard: Project Stats from Redux", projectStats);
+  safeLog("Dashboard: projectStats.total", projectStats?.total);
+  safeLog("Dashboard: projectStats.public", projectStats?.public);
+  safeLog("Dashboard: projectStats.technologies", projectStats?.technologies);
+  // --- END DEBUG LOGS ---
 
   const handleSignOut = async () => {
     try {
@@ -125,121 +126,121 @@ export function Dashboard() {
         </header>
 
 
-          <Card className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">
-                    Welcome to your ALX Showcase! 🚀
-                  </h2>
-                  <p className="text-blue-100 mb-4">
-                    Document your coding journey and share your achievements with the world
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      className="bg-white text-blue-600 hover:bg-blue-50"
-                      onClick={openProjectForm}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Your First Project
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      className="bg-white/20 text-white hover:bg-white/30 border-white/20"
-                      onClick={openGitHubImport}
-                    >
-                      <Github className="h-4 w-4 mr-2" />
-                      <Zap className="h-4 w-4 mr-1" />
-                      Import from GitHub
-                    </Button>
-                  </div>
-                </div>
-                <div className="hidden md:block">
-                  <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
-                    <Target className="h-12 w-12 text-white" />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <TabsList className="mb-6 mt-6">
-            <TabsTrigger value="projects">Projects</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="projects" className="space-y-6">
+        <Card className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-semibold">Your Projects</h3>
-                <p className="text-muted-foreground">
-                  Manage and share your coding projects with the ALX community
+                <h2 className="text-2xl font-bold mb-2">
+                  Welcome to your ALX Showcase! 🚀
+                </h2>
+                <p className="text-blue-100 mb-4">
+                  Document your coding journey and share your achievements with the world
                 </p>
+                <div className="flex gap-2">
+                  <Button
+                    className="bg-white text-blue-600 hover:bg-blue-50"
+                    onClick={openProjectForm}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Your First Project
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="bg-white/20 text-white hover:bg-white/30 border-white/20"
+                    onClick={openGitHubImport}
+                  >
+                    <Github className="h-4 w-4 mr-2" />
+                    <Zap className="h-4 w-4 mr-1" />
+                    Import from GitHub
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="border-dashed"
-                  onClick={openGitHubImport}
-                >
-                  <Github className="h-4 w-4 mr-2" />
-                  <Zap className="h-4 w-4 mr-1" />
-                  Import from GitHub
-                </Button>
-                <Button onClick={openProjectForm}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Project
-                </Button>
+              <div className="hidden md:block">
+                <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
+                  <Target className="h-12 w-12 text-white" />
+                </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="grid grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{projectStats.total}</CardTitle>
-                  <CardDescription>Total Projects</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>{projectStats.public}</CardTitle>
-                  <CardDescription>Public Projects</CardDescription>
-                </CardHeader>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>{projectStats.technologies}</CardTitle>
-                  <CardDescription>Tech Stack Items</CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
+        <TabsList className="mb-6 mt-6">
+          <TabsTrigger value="projects">Projects</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+        </TabsList>
 
-            {modals.projectForm ? (
-              <ProjectForm
-                onProjectAdded={handleProjectAdded}
-                onEditComplete={closeProjectForm}
-              />
-            ) : (
-              <ProjectList />
-            )}
-          </TabsContent>
-
-          <TabsContent value="profile" className="space-y-6">
-            <div className="max-w-2xl">
-              <h3 className="text-xl font-semibold">Profile Settings</h3>
+        <TabsContent value="projects" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-semibold">Your Projects</h3>
               <p className="text-muted-foreground">
-                Update your profile information to showcase your ALX journey
+                Manage and share your coding projects with the ALX community
               </p>
-              <UserProfile />
             </div>
-          </TabsContent>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="border-dashed"
+                onClick={openGitHubImport}
+              >
+                <Github className="h-4 w-4 mr-2" />
+                <Zap className="h-4 w-4 mr-1" />
+                Import from GitHub
+              </Button>
+              <Button onClick={openProjectForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Project
+              </Button>
+            </div>
+          </div>
 
-          {modals.gitHubImport && (
-            <GitHubImportWizard
-              onClose={closeGitHubImport}
-              onImportComplete={handleGitHubImportComplete}
+          <div className="grid grid-cols-3 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>{projectStats.total}</CardTitle>
+                <CardDescription>Total Projects</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{projectStats.public}</CardTitle>
+                <CardDescription>Public Projects</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{projectStats.technologies}</CardTitle>
+                <CardDescription>Tech Stack Items</CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+
+          {modals.projectForm ? (
+            <ProjectForm
+              onProjectAdded={handleProjectAdded}
+              onEditComplete={closeProjectForm}
             />
+          ) : (
+            <ProjectList />
           )}
+        </TabsContent>
+
+        <TabsContent value="profile" className="space-y-6">
+          <div className="max-w-2xl">
+            <h3 className="text-xl font-semibold">Profile Settings</h3>
+            <p className="text-muted-foreground">
+              Update your profile information to showcase your ALX journey
+            </p>
+            <UserProfile />
+          </div>
+        </TabsContent>
+
+        {modals.gitHubImport && (
+          <GitHubImportWizard
+            onClose={closeGitHubImport}
+            onImportComplete={handleGitHubImportComplete}
+          />
+        )}
 
       </Tabs>
     </main>
