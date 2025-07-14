@@ -24,10 +24,6 @@ export function UserProfile() {
     avatar_url: '',
   });
 
-<<<<<<< HEAD
-  
-=======
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
   const fetchProfile = useCallback(async () => {
     if (!user) return;
 
@@ -40,7 +36,8 @@ export function UserProfile() {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
+        // Explicitly convert error to string for robust logging
+        console.error('Error fetching profile:', error.message ? String(error.message) : String(error));
         return;
       }
 
@@ -55,20 +52,18 @@ export function UserProfile() {
         });
       }
     } catch (error) {
-      console.error('Error:', error);
+      // Explicitly convert error to string for robust logging
+      console.error('Error:', error.message ? String(error.message) : String(error));
     } finally {
       setLoading(false);
     }
   }, [user]);
-<<<<<<< HEAD
-=======
 
   useEffect(() => {
     if (user) {
       fetchProfile();
     }
   }, [user, fetchProfile]);
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
 
   const handleSave = async () => {
     if (!user) return;
@@ -89,7 +84,8 @@ export function UserProfile() {
 
       toast.success('Profile updated successfully!');
     } catch (error) {
-      console.error('Error updating profile:', error);
+      // Explicitly convert error to string for robust logging
+      console.error('Error updating profile:', error.message ? String(error.message) : String(error));
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
@@ -203,3 +199,7 @@ export function UserProfile() {
     </Card>
   );
 }
+
+UserProfile.propTypes = {
+  // No specific props for this component, but PropTypes can be defined if needed later
+};

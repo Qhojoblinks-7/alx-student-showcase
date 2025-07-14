@@ -10,6 +10,7 @@ const initialState = {
     workLogGenerator: false,
     userProfile: false,
   },
+  modalData: {}, // Added to store data passed to modals
   
   // Active tab states
   activeTab: 'projects',
@@ -136,6 +137,7 @@ export const {
 
 // Selectors
 export const selectModals = (state) => state.ui.modals;
+export const selectModalData = (state) => state.ui.modalData; // New selector for modal data
 export const selectActiveTab = (state) => state.ui.activeTab;
 export const selectNotifications = (state) => state.ui.notifications;
 export const selectLoading = (state) => state.ui.loading;

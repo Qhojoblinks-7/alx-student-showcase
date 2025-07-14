@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
   Dialog,
@@ -106,8 +106,9 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
         setWorkLog(null);
       }
     } catch (error) {
-      console.error('Error fetching work log:', error);
-      toast.error('Failed to fetch work log: ' + error.message);
+      // Explicitly convert error to string for robust logging
+      console.error('Error fetching work log:', error.message ? String(error.message) : String(error));
+      toast.error('Failed to fetch work log: ' + (error.message || 'Unknown error'));
       setWorkLog(null);
       setRepoInfo(null);
     } finally {
@@ -120,7 +121,8 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
       await navigator.clipboard.writeText(text);
       toast.success('Copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err);
+      // Explicitly convert error to string for robust logging
+      console.error('Failed to copy:', err.message ? String(err.message) : String(err));
       toast.error('Failed to copy to clipboard');
     }
   };

@@ -42,7 +42,6 @@ export function AutoWorkLogShare({ project, onClose }) {
   const [optimizedContent, setOptimizedContent] = useState({});
   const [selectedPlatforms, setSelectedPlatforms] = useState(new Set(['twitter', 'linkedin']));
 
-<<<<<<< HEAD
   // Auto-fetch work log on component mount
   useEffect(() => {
     if (autoMode && project.github_url) {
@@ -62,8 +61,6 @@ export function AutoWorkLogShare({ project, onClose }) {
     }
   }, [project, workLog, customMessage]);
 
-=======
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
   const fetchWorkLog = useCallback(async () => {
     if (!project.github_url) {
       toast.error('No GitHub URL found for this project');
@@ -91,42 +88,22 @@ export function AutoWorkLogShare({ project, onClose }) {
         setWorkLog(null);
       }
     } catch (error) {
-      console.error('Error fetching work log:', error);
-      toast.error('Failed to fetch work log: ' + error.message);
+      // Explicitly convert error to string for robust logging
+      console.error('Error fetching work log:', error.message ? String(error.message) : String(error));
+      toast.error('Failed to fetch work log: ' + (error.message || 'Unknown error'));
       setWorkLog(null);
     } finally {
       setLoadingWorkLog(false);
     }
   }, [project.github_url, timeframe]);
-<<<<<<< HEAD
-=======
-
-  // Auto-fetch work log on component mount
-  useEffect(() => {
-    if (autoMode && project.github_url) {
-      fetchWorkLog();
-    }
-  }, [autoMode, fetchWorkLog, project.github_url]);
-
-  // Generate optimized content when work log or custom message changes
-  useEffect(() => {
-    if (project) {
-      const content = SocialContentOptimizer.generatePlatformContent(
-        project, 
-        workLog, 
-        customMessage
-      );
-      setOptimizedContent(content);
-    }
-    }, [project, workLog, customMessage]);
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
 
   const copyToClipboard = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
       toast.success('Copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err);
+      // Explicitly convert error to string for robust logging
+      console.error('Failed to copy:', err.message ? String(err.message) : String(err));
       toast.error('Failed to copy to clipboard');
     }
   };
@@ -364,13 +341,13 @@ export function AutoWorkLogShare({ project, onClose }) {
               <div className="flex gap-2 text-sm">
                 {project.github_url && (
                   <a href={project.github_url} target="_blank" rel="noopener noreferrer" 
-                     className="text-blue-600 hover:underline">
+                      className="text-blue-600 hover:underline">
                     GitHub
                   </a>
                 )}
                 {project.live_url && (
                   <a href={project.live_url} target="_blank" rel="noopener noreferrer" 
-                     className="text-blue-600 hover:underline">
+                      className="text-blue-600 hover:underline">
                     Live Demo
                   </a>
                 )}

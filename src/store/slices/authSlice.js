@@ -1,80 +1,37 @@
+// authSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { supabase } from '@/lib/supabase.js';
-
-// Async thunks for auth operations
-export const signInWithEmail = createAsyncThunk(
-  'auth/signInWithEmail',
-  async ({ email, password }, { rejectWithValue }) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) throw error;
-      return data.user;
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
-export const signUpWithEmail = createAsyncThunk(
-  'auth/signUpWithEmail',
-  async ({ email, password }, { rejectWithValue }) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      
-      if (error) throw error;
-      return data.user;
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
-export const signOut = createAsyncThunk(
-  'auth/signOut',
+import { AuthService } from '../../service/auth-service'
+// Async Thunks
+export const loadUser = createAsyncThunk(
+  'auth/loadUser',
   async (_, { rejectWithValue }) => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      return null;
+      const user = await AuthService.getCurrentUser();
+      return user;
     } catch (error) {
       return rejectWithValue(error.message);
     }
   }
 );
 
-export const checkAuthStatus = createAsyncThunk(
-  'auth/checkAuthStatus',
+export const signInAnonymously = createAsyncThunk(
+  'auth/signInAnonymously',
   async (_, { rejectWithValue }) => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      return session?.user || null;
+      const user = await AuthService.signInAnonymously();
+      return user;
     } catch (error) {
       return rejectWithValue(error.message);
     }
   }
 );
 
-// User profile operations
-export const fetchUserProfile = createAsyncThunk(
-  'auth/fetchUserProfile',
-  async (userId, { rejectWithValue }) => {
+export const signOutUser = createAsyncThunk(
+  'auth/signOutUser',
+  async (_, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (error) throw error;
-      return data;
+      await AuthService.signOut();
+      return null; // On successful sign out, user becomes null
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -83,221 +40,101 @@ export const fetchUserProfile = createAsyncThunk(
 
 export const updateUserProfile = createAsyncThunk(
   'auth/updateUserProfile',
-  async ({ userId, profileData }, { rejectWithValue }) => {
+  async ({ userId, updates }, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .update(profileData)
-        .eq('id', userId)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+      const updatedProfile = await AuthService.updateUserProfile(userId, updates);
+      return updatedProfile;
     } catch (error) {
       return rejectWithValue(error.message);
     }
   }
 );
 
-export const uploadAvatar = createAsyncThunk(
-  'auth/uploadAvatar',
-  async ({ userId, file }, { rejectWithValue }) => {
-    try {
-      // Upload file to storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      // Update user profile with avatar URL
-      const { data, error } = await supabase
-        .from('users')
-        .update({ avatar_url: urlData.publicUrl })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
-const initialState = {
-  user: null,
-  profile: null,
-  isAuthenticated: false,
-  isLoading: false,
-  isUpdatingProfile: false,
-  isUploadingAvatar: false,
-  error: null,
-  profileError: null,
-  isInitialized: false,
-};
 
 const authSlice = createSlice({
   name: 'auth',
-  initialState,
+  initialState: {
+    user: null, // Stores user object if authenticated
+    isLoading: false,
+    error: null,
+  },
   reducers: {
-    clearError: (state) => {
-      state.error = null;
-      state.profileError = null;
-    },
+    // Reducer to manually set user (e.g., from onAuthStateChange listener in service)
     setUser: (state, action) => {
       state.user = action.payload;
-      state.isAuthenticated = !!action.payload;
-      state.isInitialized = true;
+      state.isLoading = false;
+      state.error = null;
     },
-    clearUser: (state) => {
-      state.user = null;
-      state.profile = null;
-      state.isAuthenticated = false;
-    },
-    setProfile: (state, action) => {
-      state.profile = action.payload;
-    },
-    clearProfile: (state) => {
-      state.profile = null;
-    },
-    updateProfileField: (state, action) => {
-      const { field, value } = action.payload;
-      if (state.profile) {
-        state.profile[field] = value;
-      }
-    },
+    clearAuthError: (state) => {
+      state.error = null;
+    }
   },
   extraReducers: (builder) => {
     builder
-      // Sign in with email
-      .addCase(signInWithEmail.pending, (state) => {
+      // loadUser
+      .addCase(loadUser.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(signInWithEmail.fulfilled, (state, action) => {
+      .addCase(loadUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload;
-        state.isAuthenticated = true;
-        state.error = null;
       })
-      .addCase(signInWithEmail.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-        state.isAuthenticated = false;
-      })
-      
-      // Sign up with email
-      .addCase(signUpWithEmail.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(signUpWithEmail.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = action.payload;
-        state.isAuthenticated = !!action.payload;
-        state.error = null;
-      })
-      .addCase(signUpWithEmail.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-      })
-      
-      // Sign out
-      .addCase(signOut.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(signOut.fulfilled, (state) => {
+      .addCase(loadUser.rejected, (state, action) => {
         state.isLoading = false;
         state.user = null;
-        state.isAuthenticated = false;
+        state.error = action.payload;
+      })
+      // signInAnonymously
+      .addCase(signInAnonymously.pending, (state) => {
+        state.isLoading = true;
         state.error = null;
       })
-      .addCase(signOut.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-      })
-      
-      // Check auth status
-      .addCase(checkAuthStatus.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(checkAuthStatus.fulfilled, (state, action) => {
+      .addCase(signInAnonymously.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload;
-        state.isAuthenticated = !!action.payload;
-        state.isInitialized = true;
       })
-      .addCase(checkAuthStatus.rejected, (state, action) => {
+      .addCase(signInAnonymously.rejected, (state, action) => {
+        state.isLoading = false;
+        state.user = null;
+        state.error = action.payload;
+      })
+      // signOutUser
+      .addCase(signOutUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(signOutUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = null; // User is null after sign out
+      })
+      .addCase(signOutUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
-        state.isInitialized = true;
       })
-      
-      // Fetch user profile
-      .addCase(fetchUserProfile.pending, (state) => {
-        state.isLoading = true;
-        state.profileError = null;
-      })
-      .addCase(fetchUserProfile.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.profile = action.payload;
-        state.profileError = null;
-      })
-      .addCase(fetchUserProfile.rejected, (state, action) => {
-        state.isLoading = false;
-        state.profileError = action.payload;
-      })
-      
-      // Update user profile
+      // updateUserProfile
       .addCase(updateUserProfile.pending, (state) => {
-        state.isUpdatingProfile = true;
-        state.profileError = null;
+        state.isLoading = true;
+        state.error = null;
       })
       .addCase(updateUserProfile.fulfilled, (state, action) => {
-        state.isUpdatingProfile = false;
-        state.profile = action.payload;
-        state.profileError = null;
+        state.isLoading = false;
+        // Optionally update the user object in state if the payload contains the full user data
+        // state.user = { ...state.user, ...action.payload }; 
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
-        state.isUpdatingProfile = false;
-        state.profileError = action.payload;
-      })
-      
-      // Upload avatar
-      .addCase(uploadAvatar.pending, (state) => {
-        state.isUploadingAvatar = true;
-        state.profileError = null;
-      })
-      .addCase(uploadAvatar.fulfilled, (state, action) => {
-        state.isUploadingAvatar = false;
-        state.profile = action.payload;
-        state.profileError = null;
-      })
-      .addCase(uploadAvatar.rejected, (state, action) => {
-        state.isUploadingAvatar = false;
-        state.profileError = action.payload;
+        state.isLoading = false;
+        state.error = action.payload;
       });
   },
 });
 
-export const { 
-  clearError, 
-  setUser, 
-  clearUser, 
-  setProfile, 
-  clearProfile, 
-  updateProfileField 
-} = authSlice.actions;
+export const { setUser, clearAuthError } = authSlice.actions;
+
+// Selectors
+// Ensure these selectors are explicitly exported
+export const selectUser = (state) => state.auth.user;
+export const selectAuthLoading = (state) => state.auth.isLoading;
+export const selectAuthError = (state) => state.auth.error;
+
 export default authSlice.reducer;

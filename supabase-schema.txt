@@ -1,6 +1,15 @@
 -- ALX Student Showcase Database Schema
 -- Run this in your Supabase SQL Editor to set up the database
 
+-- Drop existing functions if they exist
+DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
+DROP FUNCTION IF EXISTS public.handle_updated_at CASCADE;
+
+-- Drop existing triggers if they exist
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users CASCADE;
+DROP TRIGGER IF EXISTS handle_updated_at_users ON public.users CASCADE;
+DROP TRIGGER IF EXISTS handle_updated_at_projects ON public.projects CASCADE;
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

@@ -17,18 +17,20 @@ import PropTypes from 'prop-types';
 export default function AuthForm({ mode = 'sign_in' }) {
   // --- DEBUG LOGS START ---
   console.log('--- AuthForm Debug Info (with Console Logs) ---');
-  console.log('1. supabase client:', supabase);
-  console.log('   Is supabase truthy?', !!supabase);
-  console.log('   Does supabase have .auth?', !!supabase?.auth);
-  console.log('2. ThemeSupa:', ThemeSupa);
-  console.log('   Is ThemeSupa truthy?', !!ThemeSupa);
-  console.log('   Type of ThemeSupa:', typeof ThemeSupa);
-  console.log('3. mode prop:', mode);
+  // Explicitly convert objects to string for robust logging
+  console.log('1. supabase client:', supabase ? JSON.stringify(supabase.auth ? { auth: true } : {}) : 'null');
+  console.log('   Is supabase truthy?', String(!!supabase));
+  console.log('   Does supabase have .auth?', String(!!supabase?.auth));
+  console.log('2. ThemeSupa:', ThemeSupa ? JSON.stringify(ThemeSupa) : 'null');
+  console.log('   Is ThemeSupa truthy?', String(!!ThemeSupa));
+  console.log('   Type of ThemeSupa:', String(typeof ThemeSupa));
+  console.log('3. mode prop:', String(mode));
   console.log('--- End AuthForm Debug Info ---');
   // --- DEBUG LOGS END ---
 
   // --- SUPABASE CLIENT CHECK START ---
   if (!supabase || typeof supabase.auth === 'undefined' || !supabase.auth) {
+    // Ensure error message is a string
     console.error("CRITICAL ERROR: Supabase client is not properly initialized or missing its .auth object. Check lib/supabase.js and .env file.");
     return <div className="text-red-600 text-center p-4">Error: Supabase client configuration failed. Please check console.</div>;
   }

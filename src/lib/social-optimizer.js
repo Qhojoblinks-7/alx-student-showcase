@@ -23,7 +23,8 @@ export class GitHubCommitsService extends GitHubService {
         url: commit.html_url
       }));
     } catch (error) {
-      console.error('Error fetching commits:', error);
+      // Explicitly convert error to string for robust logging
+      console.error('Error fetching commits:', error.message ? String(error.message) : String(error));
       return [];
     }
   }
@@ -56,7 +57,8 @@ export class GitHubCommitsService extends GitHubService {
         commits: recentCommits.slice(0, 5) // Latest 5 commits
       };
     } catch (error) {
-      console.error('Error generating work log:', error);
+      // Explicitly convert error to string for robust logging
+      console.error('Error generating work log:', error.message ? String(error.message) : String(error));
       return null;
     }
   }
@@ -532,7 +534,7 @@ export class SocialContentOptimizer {
     
     if (platform === 'twitter') {
       // Ultra-compact for Twitter
-      if (commitCount > 20) return `${commitCount}c in ${timeframe} 🔥`;
+      if (commitCount > 20) return `${commitCount}c in ${timeframe} �`;
       if (commitCount > 10) return `${commitCount}c ${timeframe} 💪`;
       if (commitCount > 5) return `${commitCount}c last ${timeframe}`;
       return `${commitCount}c`;

@@ -1,7 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, forwardRef, createContext, useContext } from 'react'; // Added createContext, useContext, forwardRef
+import { useDispatch, useSelector } from 'react-redux'; // Import useDispatch and useSelector
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
-import { supabase } from '../../lib/supabase'
+import { toast } from 'sonner';
+import { cn } from '../../lib/utils'; // Assuming cn utility is here or accessible
+
+// Import Redux thunks and selectors
+import { 
+  fetchProjects, 
+  deleteProject, 
+  updateProject // For toggleVisibility
+} from '../../store/slices/projectsSlice.js';
+
 import { Button } from '../ui/button.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
 import { Badge } from '../ui/badge.jsx';
@@ -15,79 +25,144 @@ import {
   EyeOff,
   Share2,
   Edit,
-  Trash2
+  Trash2,
+  AlertTriangle // Added AlertTriangle for error display
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+// --- Tabs Component Refactor (from tabs.jsx) ---
+const TabsContext = createContext(null);
+
+const Tabs = forwardRef(({ className, value, onValueChange, ...props }, ref) => (
+  <TabsContext.Provider value={{ value, onValueChange }}>
+    <div ref={ref} className={cn('w-full', className)} {...props} />
+  </TabsContext.Provider>
+));
+Tabs.displayName = 'Tabs';
+
+const TabsList = forwardRef(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
+      className
+    )}
+    role="tablist" // Added for accessibility
+    {...props}
+  />
+));
+TabsList.displayName = 'TabsList';
+
+const TabsTrigger = forwardRef(({ className, value, ...props }, ref) => {
+  const context = useContext(TabsContext);
+  const isActive = context.value === value;
+
+  return (
+    <button
+      ref={ref}
+      className={cn(
+        'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+        isActive ? 'bg-background text-foreground shadow-sm' : 'data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground', // Dynamically apply active/inactive styles
+        className
+      )}
+      data-state={isActive ? 'active' : 'inactive'} // Set data-state attribute
+      onClick={() => context.onValueChange?.(value)} // Call onValueChange from context
+      role="tab" // Added for accessibility
+      aria-selected={isActive} // Added for accessibility
+      {...props}
+    />
+  );
+});
+TabsTrigger.displayName = 'TabsTrigger';
+
+const TabsContent = forwardRef(({ className, value, ...props }, ref) => {
+  const context = useContext(TabsContext);
+  const isActive = context.value === value;
+
+  if (!isActive) return null; // Only render content if it's the active tab
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        className
+      )}
+      role="tabpanel" // Added for accessibility
+      {...props}
+    />
+  );
+});
+TabsContent.displayName = 'TabsContent';
+
+// PropTypes for the refactored Tabs components
+Tabs.propTypes = {
+  className: PropTypes.string,
+  value: PropTypes.string.isRequired,
+  onValueChange: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired, // Ensure children are passed
+};
+
+TabsList.propTypes = {
+  className: PropTypes.string,
+  children: PropTypes.node.isRequired,
+};
+
+TabsTrigger.propTypes = {
+  className: PropTypes.string,
+  value: PropTypes.string.isRequired, // Value is now required for trigger
+  children: PropTypes.node.isRequired,
+};
+
+TabsContent.propTypes = {
+  className: PropTypes.string,
+  value: PropTypes.string.isRequired, // Value is now required for content
+  children: PropTypes.node.isRequired,
+};
+// --- End Tabs Component Refactor ---
+
+
 export function ProjectList({ onEdit, onShare }) {
-  const { user } = useAuth();
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
+  const { user } = useAuth(); // Get user from your auth hook
 
-<<<<<<< HEAD
-  
+  // Get projects, loading, and error states from Redux store using direct useSelector
+  const projects = useSelector(state => state.projects.projects);
+  const loading = useSelector(state => state.projects.isLoading);
+  const error = useSelector(state => state.projects.error); // Get error state
 
-=======
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
-  const fetchProjects = useCallback(async () => {
-    if (!user) return;
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-    } finally {
-      setLoading(false);
-    }
-<<<<<<< HEAD
-  },[user]);
-=======
-  }, [user]);
-
+  // Fetch projects on component mount or when user changes
   useEffect(() => {
-    if (user) {
-      fetchProjects();
+    if (user && !loading) { // Only fetch if user exists and not already loading
+      dispatch(fetchProjects(user.id));
     }
-  }, [user, fetchProjects]);
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
+  }, [user, dispatch, loading]); // Added loading to dependencies for proper re-fetch logic
 
-  const deleteProject = async (projectId) => {
-    if (!confirm('Are you sure you want to delete this project?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', projectId);
-
-      if (error) throw error;
-      setProjects(projects.filter(p => p.id !== projectId));
-    } catch (error) {
-      console.error('Error deleting project:', error);
-    }
+  const handleDeleteProject = async (projectId) => {
+    toast('Are you sure you want to delete this project?', {
+      action: {
+        label: 'Confirm',
+        onClick: async () => {
+          try {
+            await dispatch(deleteProject(projectId)).unwrap();
+            toast.success('Project deleted successfully!');
+          } catch (err) {
+            toast.error('Failed to delete project: ' + (err.message || 'Unknown error'));
+            console.error('Error deleting project:', err);
+          }
+        },
+      },
+      duration: 5000, 
+    });
   };
 
-  const toggleVisibility = async (projectId, isPublic) => {
+  const handleToggleVisibility = async (projectId, isPublic) => {
     try {
-      const { error } = await supabase
-        .from('projects')
-        .update({ is_public: !isPublic })
-        .eq('id', projectId);
-
-      if (error) throw error;
-      setProjects(projects.map(p => 
-        p.id === projectId ? { ...p, is_public: !isPublic } : p
-      ));
-    } catch (error) {
-      console.error('Error updating project visibility:', error);
+      await dispatch(updateProject({ id: projectId, projectData: { is_public: !isPublic } })).unwrap();
+      toast.success(`Project visibility set to ${!isPublic ? 'public' : 'private'}`);
+    } catch (err) {
+      toast.error('Failed to update visibility: ' + (err.message || 'Unknown error'));
+      console.error('Error updating project visibility:', err);
     }
   };
 
@@ -136,6 +211,21 @@ export function ProjectList({ onEdit, onShare }) {
     );
   }
 
+  if (error) {
+    return (
+      <Card className="text-center py-12 bg-red-50 border border-red-200 text-red-800">
+        <CardContent>
+          <AlertTriangle className="h-12 w-12 mx-auto text-red-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Error Loading Projects</h3>
+          <p className="text-sm">{error}</p>
+          <Button onClick={() => user && dispatch(fetchProjects(user.id))} className="mt-4">
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (projects.length === 0) {
     return (
       <Card className="text-center py-12">
@@ -175,7 +265,7 @@ export function ProjectList({ onEdit, onShare }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => toggleVisibility(project.id, project.is_public)}
+                  onClick={() => handleToggleVisibility(project.id, project.is_public)}
                 >
                   {project.is_public ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -196,7 +286,7 @@ export function ProjectList({ onEdit, onShare }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => deleteProject(project.id)}
+                  onClick={() => handleDeleteProject(project.id)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -224,14 +314,14 @@ export function ProjectList({ onEdit, onShare }) {
               <Badge className={getProjectTypeColor(project.project_type)}>
                 {project.project_type}
               </Badge>
-              {project.tech_stack.map((tech, index) => (
+              {project.technologies?.map((tech, index) => ( // Use technologies instead of tech_stack
                 <Badge key={index} variant="secondary">
                   {tech}
                 </Badge>
               ))}
             </div>
 
-            {project.tags.length > 0 && (
+            {project.tags?.length > 0 && ( // Check if tags exist and have length
               <div className="flex flex-wrap gap-2">
                 {project.tags.map((tag, index) => (
                   <Badge key={index} variant="outline">
@@ -265,9 +355,9 @@ export function ProjectList({ onEdit, onShare }) {
                   </a>
                 </Button>
               )}
-              {project.live_demo_url && (
+              {project.live_url && ( // Use live_url instead of live_demo_url
                 <Button size="sm" variant="outline" asChild>
-                  <a href={project.live_demo_url} target="_blank" rel="noopener noreferrer">
+                  <a href={project.live_url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Live Demo
                   </a>

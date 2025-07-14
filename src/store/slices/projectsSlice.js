@@ -28,6 +28,25 @@ export const fetchProjects = createAsyncThunk(
   }
 );
 
+// New async thunk to fetch a single project by ID
+export const fetchSingleProject = createAsyncThunk(
+  'projects/fetchSingleProject',
+  async (projectId, { rejectWithValue }) => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 export const createProject = createAsyncThunk(
   'projects/createProject',
   async (projectData, { rejectWithValue }) => {
@@ -189,7 +208,9 @@ const initialState = {
   isUpdating: false,
   isDeleting: false,
   isImporting: false,
+  isFetchingSingleProject: false, // New loading state for single project fetch
   error: null,
+  singleProjectError: null, // New error state for single project fetch
 };
 
 const projectsSlice = createSlice({
@@ -198,6 +219,7 @@ const projectsSlice = createSlice({
   reducers: {
     clearError: (state) => {
       state.error = null;
+      state.singleProjectError = null; // Clear new error state
     },
     setCurrentProject: (state, action) => {
       state.currentProject = action.payload;
@@ -248,6 +270,22 @@ const projectsSlice = createSlice({
         state.error = action.payload;
       })
       
+      // Fetch single project
+      .addCase(fetchSingleProject.pending, (state) => {
+        state.isFetchingSingleProject = true;
+        state.singleProjectError = null;
+        state.currentProject = null; // Clear current project while fetching new one
+      })
+      .addCase(fetchSingleProject.fulfilled, (state, action) => {
+        state.isFetchingSingleProject = false;
+        state.currentProject = action.payload;
+        state.singleProjectError = null;
+      })
+      .addCase(fetchSingleProject.rejected, (state, action) => {
+        state.isFetchingSingleProject = false;
+        state.singleProjectError = action.payload;
+      })
+
       // Create project
       .addCase(createProject.pending, (state) => {
         state.isCreating = true;

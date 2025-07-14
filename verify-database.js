@@ -2,8 +2,8 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Load environment variables or fallback to defaults
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://test-project.supabase.co'
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'test-key-for-debugging'
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://jzydkrylxptfxqvtfeva.supabase.co'
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp6eWRrcnlseHB0ZnhxdnRmZXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxMTQxNjMsImV4cCI6MjA1OTY5MDE2M30.cyB0i7YTOGXqQQvd-skIcvDzRBi9JU72qaiaifZDJ5Q'
 
 console.log('🔍 Database Verification Script')
 console.log('================================')

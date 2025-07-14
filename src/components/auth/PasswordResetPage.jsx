@@ -38,7 +38,8 @@ export function PasswordResetPage() {
       toast.success('Password reset email sent! Check your inbox.');
       setResetEmail('');
     } catch (error) {
-      console.error('Password reset error:', error);
+      // Explicitly convert error to string for robust logging
+      console.error('Password reset error:', error.message ? String(error.message) : String(error));
       toast.error(error.message || 'Failed to send reset email');
     } finally {
       setLoading(false);
@@ -102,3 +103,7 @@ export function PasswordResetPage() {
     </div>
   );
 }
+
+PasswordResetPage.propTypes = {
+  // No specific props for this component, but PropTypes can be defined if needed later
+};

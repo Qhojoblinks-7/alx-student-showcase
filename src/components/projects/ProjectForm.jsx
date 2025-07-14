@@ -83,7 +83,8 @@ export function ProjectForm({ projectId, onSuccess, onCancel }) {
       toast.success(projectId ? 'Project updated successfully!' : 'Project added successfully!');
       onSuccess?.();
     } catch (error) {
-      console.error('Error saving project:', error);
+      // Explicitly convert error to string for robust logging
+      console.error('Error saving project:', error.message ? String(error.message) : String(error));
       toast.error('Failed to save project');
     } finally {
       setLoading(false);

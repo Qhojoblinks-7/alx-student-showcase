@@ -1,41 +1,50 @@
 // src/components/Dashboard.jsx
+import { useEffect, useCallback } from 'react' // Separated useEffect and useCallback imports
+
 import { useDispatch, useSelector } from 'react-redux'
-import { useEffect, Suspense, lazy } from 'react' // Ensure Suspense and lazy are imported if used, though not directly in Dashboard
 import { useAuth } from './../hooks/use-auth'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase' // Keep supabase if it's used elsewhere in Dashboard logic not shown
 import { toast } from 'sonner'
 
-// ... (other imports remain the same) ...
+// Import actions from slices
+import { closeModal, openModal, setActiveTab } from '../store/slices/uiSlice'
+import { fetchProjectStats } from '../store/slices/projectsSlice'
 
-// IMPORTANT: Re-include or ensure this safeLog is globally available or defined in this file if not
-function safeLog(label, value) {
-  try {
-    const serialized = JSON.stringify(value, null, 2);
-    console.log(`${label}:`, serialized);
-  } catch (err) {
-    console.log(`${label}: [Unserializable Object - ${err.message}]`); // More descriptive error
-  }
-}
+// Import UI components (assuming these are from shadcn/ui or similar)
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { Button } from '../components/ui/button'
+import { Tabs, TabsList, TabsContent, TabsTrigger } from '../components/ui/tabs'
+import { Avatar, AvatarFallback } from './ui/avatar'
+import { Badge } from '../components/ui/badge'
+
+// Import icons (assuming these are from lucide-react)
+import { Plus, Github, Zap, LogOut, Sparkle, Target } from 'lucide-react'
+
+// Import other components (assuming these paths are correct)
+import { ProjectForm } from '../components/projects/ProjectForm'
+import { ProjectList } from '../components/projects/ProjectList'
+import { UserProfile } from '../components/profile/UserProfile'
+import {GitHubImportWizard} from '../components/github/GitHubImportWizard'
+
+
+// src/components/Dashboard.jsx
+
+// Import actions from slices
+import { useAppDispatch, useAppSelector } from '../store/redux-hooks'
+
+
+
+
+
+
 
 export function Dashboard() {
   const dispatch = useDispatch()
   const { user, signOut } = useAuth()
 
-  // --- ADD THESE DEBUG LOGS ---
-  safeLog("Dashboard: User data", user);
-  safeLog("Dashboard: user.email", user?.email);
-  // --- END DEBUG LOGS ---
-
   const activeTab = useSelector(state => state.ui.activeTab)
   const modals = useSelector(state => state.ui.modals)
   const projectStats = useSelector(state => state.projects.stats)
-
-  // --- ADD THESE DEBUG LOGS ---
-  safeLog("Dashboard: Project Stats from Redux", projectStats);
-  safeLog("Dashboard: projectStats.total", projectStats?.total);
-  safeLog("Dashboard: projectStats.public", projectStats?.public);
-  safeLog("Dashboard: projectStats.technologies", projectStats?.technologies);
-  // --- END DEBUG LOGS ---
 
   const handleSignOut = async () => {
     try {
@@ -50,6 +59,7 @@ export function Dashboard() {
     dispatch(closeModal('projectForm'))
     if (user) {
       dispatch(fetchProjectStats(user.id))
+      dispatch(fetchProjects(user.id));
     }
   }
 
@@ -57,13 +67,15 @@ export function Dashboard() {
     dispatch(closeModal('gitHubImport'))
     if (user) {
       dispatch(fetchProjectStats(user.id))
+      dispatch(fetchProjects(user.id));
     }
     toast.success(`Successfully imported ${importedProjects.length} projects from GitHub!`)
   }
 
-  const handleTabChange = (newTab) => {
+  // Wrapped handleTabChange in useCallback to prevent unnecessary re-renders of Tabs
+  const handleTabChange = useCallback((newTab) => {
     dispatch(setActiveTab(newTab))
-  }
+  }, [dispatch]); // Dependency array includes dispatch, which is stable
 
   const openProjectForm = () => {
     dispatch(openModal({ modalName: 'projectForm' }))

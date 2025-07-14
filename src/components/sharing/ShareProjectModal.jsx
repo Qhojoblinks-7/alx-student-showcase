@@ -30,7 +30,7 @@ export function ShareProjectModal({ project, onClose }) {
       twitter: `${baseMessage}\n\n${project.description.slice(0, 100)}...\n\n${hashtags}\n\n${projectUrl}`,
       linkedin: `${baseMessage}\n\n${project.description}\n\nTech Stack: ${project.technologies?.join(', ') || 'Various technologies'}\n\n${projectUrl}\n\n${hashtags} #ALXStudents #SoftwareEngineering`,
       facebook: `${baseMessage}\n\n${project.description}\n\nI used: ${project.technologies?.join(', ') || 'Various technologies'}\n\n${projectUrl ? `Check it out: ${projectUrl}` : ''}`,
-      discord: `🎉 **${project.title}** is live!\n\n${project.description}\n\n**Tech Stack:** ${project.technologies?.join(', ') || 'Various technologies'}\n\n${projectUrl ? `🔗 ${projectUrl}` : ''}`
+      discord: `🎉 **${project.title}** is live!\n\n**${project.description}**\n\n**Tech Stack:** ${project.technologies?.join(', ') || 'Various technologies'}\n\n${projectUrl ? `🔗 ${projectUrl}` : ''}`
     };
     
     return templates[platform];
@@ -41,7 +41,8 @@ export function ShareProjectModal({ project, onClose }) {
       await navigator.clipboard.writeText(text);
       toast.success('Copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err);
+      // Explicitly convert error to string for robust logging
+      console.error('Failed to copy:', err.message ? String(err.message) : String(err));
       toast.error('Failed to copy to clipboard');
     }
   };
@@ -117,13 +118,13 @@ export function ShareProjectModal({ project, onClose }) {
               <div className="flex gap-2 text-sm">
                 {project.github_url && (
                   <a href={project.github_url} target="_blank" rel="noopener noreferrer" 
-                     className="text-blue-600 hover:underline">
+                      className="text-blue-600 hover:underline">
                     GitHub
                   </a>
                 )}
                 {project.live_url && (
                   <a href={project.live_url} target="_blank" rel="noopener noreferrer" 
-                     className="text-blue-600 hover:underline">
+                      className="text-blue-600 hover:underline">
                     Live Demo
                   </a>
                 )}

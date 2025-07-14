@@ -6,9 +6,8 @@ import { Input } from '../ui/input.jsx';
 import { Label } from '../ui/label.jsx';
 import { Badge } from '../ui/badge.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs.jsx';
-import { GitHubService, ALXProjectDetector } from '../../lib/github-service'
-import { useAuth } from '../../hooks/use-auth'
-import { supabase } from '../../lib/supabase.js';
+import { useAuth } from '../../hooks/use-auth' // Still needed for user.id for profile update
+import { supabase } from '../../lib/supabase.js'; // Still needed for direct user profile update
 import { toast } from 'sonner';
 import { 
   Github, 
@@ -24,118 +23,127 @@ import {
   Zap
 } from 'lucide-react';
 
-export function GitHubImportWizard({ onClose, onImportComplete }) {
-  const { user } = useAuth();
-  const [currentStep, setCurrentStep] = useState('username');
-  const [githubUsername, setGithubUsername] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [repositories, setRepositories] = useState([]);
-  const [alxProjects, setAlxProjects] = useState([]);
-  const [selectedProjects, setSelectedProjects] = useState(new Set());
-  const [importing, setImporting] = useState(false);
+// Import Redux hooks and actions/selectors
+import { useSelector, useDispatch } from 'react-redux';
+import { 
+  fetchUserRepositories, 
+  detectALXProjects, 
+  importSelectedProjects, 
+  toggleProjectSelection, 
+  selectAllALXProjects, 
+  clearSelection, 
+  setWizardStep, 
+  selectRepositories, 
+  selectALXProjects, 
+  selectSelectedProjects, 
+  selectGitHubLoading, 
+  selectGitHubErrors, 
+  selectWizardStep 
+} from '../../store/slices/githubSlice'
 
-  // Step 1: Fetch GitHub repositories
+export function GitHubImportWizard({ onClose, onImportComplete }) {
+  const dispatch = useDispatch();
+  const { user } = useAuth(); // Get user from auth hook for profile update
+
+  // Local state for username input
+  const [githubUsername, setGithubUsername] = useState('');
+
+  // Select state from Redux store
+  const currentStep = useSelector(selectWizardStep);
+  const repositories = useSelector(selectRepositories);
+  const alxProjects = useSelector(selectALXProjects);
+  const selectedProjectsRedux = useSelector(selectSelectedProjects); // Array from Redux
+  const { 
+    repositories: isLoadingRepositories, 
+    detecting: isDetectingALX, 
+    importing: isImporting 
+  } = useSelector(selectGitHubLoading);
+  const { repository: repositoryError, import: importError } = useSelector(selectGitHubErrors);
+
+  // Convert selectedProjects array from Redux to a Set for efficient lookups
+  const selectedProjectsSet = new Set(selectedProjectsRedux);
+
+  // Step 1: Fetch GitHub repositories and detect ALX projects
   const handleFetchRepositories = async () => {
     if (!githubUsername.trim()) {
       toast.error('Please enter a GitHub username');
       return;
     }
 
-    setLoading(true);
+    // Set wizard step to 'select' immediately, loading state handled by thunk
+    dispatch(setWizardStep('select')); 
+
     try {
-      const repos = await GitHubService.fetchUserRepositories(githubUsername.trim());
-      setRepositories(repos);
+      // Dispatch thunk to fetch repositories
+      const fetchReposResult = await dispatch(fetchUserRepositories(githubUsername.trim())).unwrap();
       
-      // Detect ALX projects
-      const detectedProjects = await ALXProjectDetector.detectALXProjects(repos, githubUsername.trim());
-      setAlxProjects(detectedProjects);
+      // Dispatch thunk to detect ALX projects using the fetched repositories
+      const detectedProjectsResult = await dispatch(detectALXProjects({ 
+        repositories: fetchReposResult, 
+        username: githubUsername.trim() 
+      })).unwrap();
       
-      if (detectedProjects.length === 0) {
+      if (detectedProjectsResult.length === 0) {
         toast.warning('No ALX projects detected. You can still browse all repositories.');
       } else {
-        toast.success(`Found ${detectedProjects.length} ALX projects!`);
+        toast.success(`Found ${detectedProjectsResult.length} ALX projects!`);
       }
       
-      setCurrentStep('select');
     } catch (error) {
-      console.error('Error fetching repositories:', error);
-      toast.error(error.message || 'Failed to fetch GitHub repositories');
-    } finally {
-      setLoading(false);
+      // Explicitly convert error to string for robust logging
+      console.error('Error fetching repositories:', error.message ? String(error.message) : String(error));
+      toast.error(repositoryError || error.message || 'Failed to fetch GitHub repositories');
     }
   };
 
-  // Toggle project selection
-  const toggleProjectSelection = (projectId) => {
-    const newSelected = new Set(selectedProjects);
-    if (newSelected.has(projectId)) {
-      newSelected.delete(projectId);
-    } else {
-      newSelected.add(projectId);
-    }
-    setSelectedProjects(newSelected);
+  // Toggle project selection (dispatches Redux action)
+  const handleToggleProjectSelection = (projectId) => {
+    dispatch(toggleProjectSelection(projectId));
   };
 
-  // Select all ALX projects
-  const selectAllALXProjects = () => {
-    const alxIds = new Set(alxProjects.map(p => p.id));
-    setSelectedProjects(alxIds);
+  // Select all ALX projects (dispatches Redux action)
+  const handleSelectAllALXProjects = () => {
+    dispatch(selectAllALXProjects());
   };
 
-  // Clear all selections
-  const clearAllSelections = () => {
-    setSelectedProjects(new Set());
+  // Clear all selections (dispatches Redux action)
+  const handleClearAllSelections = () => {
+    dispatch(clearSelection());
   };
 
   // Step 2: Import selected projects
   const handleImportProjects = async () => {
-    if (selectedProjects.size === 0) {
+    if (selectedProjectsSet.size === 0) {
       toast.error('Please select at least one project to import');
       return;
     }
 
-    setImporting(true);
     try {
-      const selectedRepos = [...repositories, ...alxProjects]
-        .filter(repo => selectedProjects.has(repo.id));
-      
-      const projectsToCreate = [];
-      
-      // Generate project data for each selected repository
-      for (const repo of selectedRepos) {
-        const projectData = await ALXProjectDetector.generateProjectData(repo, githubUsername);
-        projectsToCreate.push({
-          ...projectData,
-          user_id: user.id
-        });
-      }
+      // Dispatch thunk to import selected projects (handles data generation and DB insertion)
+      const importedData = await dispatch(importSelectedProjects({ 
+        selectedProjects: Array.from(selectedProjectsSet), // Convert Set back to Array for dispatch
+        repositories: repositories, // Pass current repos from Redux state
+        username: githubUsername // Pass username
+      })).unwrap();
 
-      // Bulk insert projects
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(projectsToCreate)
-        .select();
-
-      if (error) throw error;
-
-      toast.success(`Successfully imported ${data.length} projects!`);
+      toast.success(`Successfully imported ${importedData.length} projects!`);
       
-      // Update user profile with GitHub username
+      // Update user profile with GitHub username (still direct Supabase call for profile)
+      // This part could also be moved into a user-specific Redux slice if desired for full Redux management.
       await supabase
         .from('users')
         .upsert({
-          id: user.id,
+          id: user.id, // user from useAuth()
           github_username: githubUsername.trim(),
           updated_at: new Date().toISOString()
         });
 
-      onImportComplete?.(data);
+      onImportComplete?.(importedData);
       onClose?.();
     } catch (error) {
-      console.error('Error importing projects:', error);
-      toast.error('Failed to import projects. Please try again.');
-    } finally {
-      setImporting(false);
+      // Explicitly convert error to string for robust logging
+      console.error('Error importing projects:', error.message ? String(error.message) : String(error));
+      toast.error(importError || error.message || 'Failed to import projects. Please try again.');
     }
   };
 
@@ -189,7 +197,9 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
           <div className="flex items-center gap-4">
             {project.language && (
               <div className="flex items-center gap-1">
-                <div className={`w-3 h-3 rounded-full bg-${project.language.toLowerCase()}-500`}></div>
+                {/* Note: Tailwind does not have dynamic background colors like bg-${project.language.toLowerCase()}-500 by default. 
+                    You would need to pre-define these classes in your Tailwind config or use inline styles if dynamic colors are crucial. */}
+                <div className={`w-3 h-3 rounded-full bg-gray-500`}></div> {/* Placeholder color */}
                 {project.language}
               </div>
             )}
@@ -273,11 +283,11 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
 
                   <Button 
                     onClick={handleFetchRepositories}
-                    disabled={loading || !githubUsername.trim()}
+                    disabled={isLoadingRepositories || !githubUsername.trim()}
                     className="w-full"
                     size="lg"
                   >
-                    {loading ? (
+                    {isLoadingRepositories ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Discovering Projects...
@@ -321,19 +331,19 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                   
                   <div className="flex gap-2">
                     {alxProjects.length > 0 && (
-                      <Button variant="outline" onClick={selectAllALXProjects}>
+                      <Button variant="outline" onClick={handleSelectAllALXProjects}>
                         <Zap className="mr-2 h-4 w-4" />
                         Select All ALX
                       </Button>
                     )}
-                    <Button variant="outline" onClick={clearAllSelections}>
+                    <Button variant="outline" onClick={handleClearAllSelections}>
                       Clear All
                     </Button>
                     <Button 
                       onClick={handleImportProjects}
-                      disabled={selectedProjects.size === 0 || importing}
+                      disabled={selectedProjectsSet.size === 0 || isImporting}
                     >
-                      {importing ? (
+                      {isImporting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Importing...
@@ -341,7 +351,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                       ) : (
                         <>
                           <Download className="mr-2 h-4 w-4" />
-                          Import {selectedProjects.size} Project{selectedProjects.size !== 1 ? 's' : ''}
+                          Import {selectedProjectsSet.size} Project{selectedProjectsSet.size !== 1 ? 's' : ''}
                         </>
                       )}
                     </Button>
@@ -371,8 +381,8 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                           <ProjectCard
                             key={project.id}
                             project={project}
-                            isSelected={selectedProjects.has(project.id)}
-                            onToggle={toggleProjectSelection}
+                            isSelected={selectedProjectsSet.has(project.id)}
+                            onToggle={handleToggleProjectSelection}
                           />
                         ))}
                       </div>
@@ -397,8 +407,8 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                         <ProjectCard
                           key={project.id}
                           project={project}
-                          isSelected={selectedProjects.has(project.id)}
-                          onToggle={toggleProjectSelection}
+                          isSelected={selectedProjectsSet.has(project.id)}
+                          onToggle={handleToggleProjectSelection}
                         />
                       ))}
                     </div>
