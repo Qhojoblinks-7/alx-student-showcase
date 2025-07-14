@@ -3,6 +3,7 @@ import React, { useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuth } from './hooks/use-auth'
+import { DatabaseErrorHandler } from './components/DatabaseErrorHandler'
 
 // ✅ Lazy-loaded route components
 const SignInPage = lazy(() => import('./components/auth/SignInPage'))
@@ -53,29 +54,31 @@ export default function App() {
   }, [])
 
   return (
-    <Router>
-      <AuthStatusHandler />
-      <Suspense fallback={<div className="p-8 text-center">Loading page...</div>}>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/signin" element={<SignInPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
-          <Route path="/reset-password" element={<PasswordResetPage />} />
-          <Route path="/reset-password-confirm" element={<SetNewPasswordPage />} />
-          <Route path="/" element={<SignInPage />} />
+    <DatabaseErrorHandler>
+      <Router>
+        <AuthStatusHandler />
+        <Suspense fallback={<div className="p-8 text-center">Loading page...</div>}>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/reset-password" element={<PasswordResetPage />} />
+            <Route path="/reset-password-confirm" element={<SetNewPasswordPage />} />
+            <Route path="/" element={<SignInPage />} />
 
-          {/* Protected Route */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Suspense>
-      <Toaster position="bottom-right" richColors />
-    </Router>
+            {/* Protected Route */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
+        <Toaster position="bottom-right" richColors />
+      </Router>
+    </DatabaseErrorHandler>
   )
 }
