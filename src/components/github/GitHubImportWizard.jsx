@@ -33,14 +33,14 @@ import {
   detectALXProjects,
   importSelectedProjects,
   setWizardStep,
-  updateWizardData, // Corrected import name: updateWizardData
+  updateWizardData,
   toggleProjectSelection,
   resetWizard,
   clearGitHubErrors,
   clearSelection,
 } from '@/store/slices/githubSlice.js';
 import { useAuth } from '@/hooks/use-auth.js';
-import { GitHubService } from '@/lib/github-service.js'; // Assuming this path is correct
+import { GitHubService, ALXProjectDetector } from '@/lib/github-service.js'; // Import ALXProjectDetector
 
 export function GitHubImportWizard({ onClose, onImportComplete }) {
   const dispatch = useDispatch();
@@ -77,7 +77,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       return;
     }
     dispatch(clearGitHubErrors()); // Clear previous errors
-    dispatch(updateWizardData({ username: usernameInput.trim() })); // Corrected usage: updateWizardData
+    dispatch(updateWizardData({ username: usernameInput.trim() }));
     try {
       await dispatch(fetchUserRepositories(usernameInput.trim())).unwrap();
       dispatch(setWizardStep('select_repos'));
@@ -117,12 +117,13 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       // Generate full project data for each selected ALX project
       const generatedProjects = await Promise.all(
         projectsToImport.map(async (repo) => {
-          return await GitHubService.generateProjectData(repo, wizardData.username);
+          // Corrected: Use ALXProjectDetector.generateProjectData
+          return await ALXProjectDetector.generateProjectData(repo, wizardData.username);
         })
       );
 
       const result = await dispatch(
-        importSelectedProjects({ projectsToImport: generatedProjects, userId: user.id })
+        importSelectedProjects({ selectedProjects: generatedProjects, repositories, username: wizardData.username }) // Pass correct parameters to thunk
       ).unwrap();
       toast.success(`Successfully imported ${result.length} projects!`);
       onImportComplete(result); // Callback to parent
@@ -130,7 +131,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
     } catch (err) {
       toast.error('Failed to import projects: ' + (err.message || 'Unknown error'));
     }
-  }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose, wizardData.username]);
+  }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose, repositories, wizardData.username]);
 
   const handleToggleProject = useCallback(
     (projectId) => {
@@ -272,7 +273,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                     checked={selectedProjects.includes(project.id || project.full_name)}
                     onCheckedChange={() => handleToggleProject(project.id || project.full_name)}
                   />
-                  <Label htmlFor={`alx-project-${project.id || project.full_1name}`} className="flex-1 cursor-pointer">
+                  <Label htmlFor={`alx-project-${project.id || project.full_name}`} className="flex-1 cursor-pointer">
                     <span className="font-medium">{project.name}</span>
                     <p className="text-sm text-muted-foreground">{project.description}</p>
                     <div className="flex items-center gap-2 text-xs mt-1">
