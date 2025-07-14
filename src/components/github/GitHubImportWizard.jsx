@@ -40,7 +40,6 @@ import {
   selectGitHubErrors, 
   selectWizardStep 
 } from '../../store/slices/githubSlice'
-
 export function GitHubImportWizard({ onClose, onImportComplete }) {
   const dispatch = useDispatch();
   const { user } = useAuth(); // Get user from auth hook for profile update
@@ -129,11 +128,12 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       toast.success(`Successfully imported ${importedData.length} projects!`);
       
       // Update user profile with GitHub username (still direct Supabase call for profile)
-      // This part could also be moved into a user-specific Redux slice if desired for full Redux management.
+      // IMPORTANT: Include user.email to satisfy NOT NULL constraint if a new user row is inserted
       await supabase
         .from('users')
         .upsert({
           id: user.id, // user from useAuth()
+          email: user.email, // <-- ADDED THIS LINE
           github_username: githubUsername.trim(),
           updated_at: new Date().toISOString()
         });
@@ -196,24 +196,36 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
         <div className="flex items-center justify-between text-sm text-gray-500">
           <div className="flex items-center gap-4">
             {project.language && (
-              <div className="flex items-center gap-1">
-                {/* Note: Tailwind does not have dynamic background colors like bg-${project.language.toLowerCase()}-500 by default. 
-                    You would need to pre-define these classes in your Tailwind config or use inline styles if dynamic colors are crucial. */}
+              // Corrected: Wrap sibling elements in a div
+              <div className="flex items-center gap-1"> 
                 <div className={`w-3 h-3 rounded-full bg-gray-500`}></div> {/* Placeholder color */}
                 {project.language}
               </div>
             )}
+            {project.fork ? (
+              <Badge variant="outline" className="text-xs">
+                <GitBranch className="h-3 w-3 mr-1" />
+                Forked
+              </Badge>
+            ) : (
+              <Badge variant="solid" className="text-xs bg-blue-100 text-blue-600">
+                <GitBranch className="h-3 w-3 mr-1" />
+                Original
+              </Badge>
+            )}
+          </div>
+          {/* Moved these two elements into a single div to correctly align them within the flex container */}
+          <div className="flex items-center gap-4"> {/* Use gap-4 for spacing between these two elements */}
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               {new Date(project.updated_at).toLocaleDateString()}
             </div>
+            {project.alx_category && (
+              <Badge variant="outline" className="text-xs">
+                {project.alx_category}
+              </Badge>
+            )}
           </div>
-          
-          {project.alx_category && (
-            <Badge variant="outline" className="text-xs">
-              {project.alx_category}
-            </Badge>
-          )}
         </div>
 
         {project.detected_features && project.detected_features.length > 0 && (

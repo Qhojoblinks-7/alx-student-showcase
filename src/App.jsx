@@ -1,86 +1,65 @@
 // src/App.jsx
-import React, { useEffect } from 'react' // Removed Suspense, lazy
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
-import { Toaster } from 'sonner'
-import { useAuth } from './hooks/use-auth'
-// import { DatabaseErrorHandler } from './components/DatabaseErrorHandler' // Removed DatabaseErrorHandler import
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import { useAuth } from './hooks/use-auth'; // Your useAuth hook
 
 // Directly import route components
-import {SignInPage} from './components/auth/SignInPage'
-import {SignUpPage} from './components/auth/SignUpPage'
-import {PasswordResetPage} from './components/auth/PasswordResetPage'
-import AuthForm from './components/auth/AuthForm'
-import { ProtectedRoute } from './components/auth/ProtectedRoute' // Direct import for named export
-import { Dashboard } from './components/Dashboard' // Direct import for named export
+import { SignInPage } from './components/auth/SignInPage';
+import { SignUpPage } from './components/auth/SignUpPage';
+import { PasswordResetPage } from './components/auth/PasswordResetPage';
+import AuthForm from './components/auth/AuthForm';
+import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Direct import for named export
+import { AuthRedirect } from './components/AuthRedirect'
+import { Dashboard } from './components/Dashboard'; // Direct import for named export
+import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state in ProtectedRoute/AuthRedirect
 
 const SetNewPasswordPage = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
     <h2 className="text-2xl font-bold mb-4 text-center">Set Your New Password</h2>
-    {/* Removed Suspense wrapper */}
     <AuthForm mode="update_password" />
   </div>
-)
+);
 
-// safeLog function (keep as is)
-function safeLog(label, value) {
-  let logValue;
-  try {
-    logValue = JSON.stringify(value, null, 2);
-  } catch (err) {
-    // Ensure err is converted to string for safety
-    logValue = `[Unserializable Object - ${String(err)}]`; 
-  }
-  console.log(`${label}:`, logValue);
-}
-
-// AuthStatusHandler (keep as is)
-function AuthStatusHandler() {
-  const navigate = useNavigate()
-  const { isAuthenticated, isLoading, isInitialized } = useAuth()
-
-  useEffect(() => {
-    safeLog("Auth state", { isAuthenticated, isLoading, isInitialized })
-
-    if (isInitialized && !isLoading) {
-      const currentPath = window.location.pathname
-      const authPaths = ['/signin', '/signup', '/reset-password', '/reset-password-confirm']
-      safeLog("Current path", currentPath)
-
-      if (isAuthenticated) {
-        if (authPaths.includes(currentPath) || currentPath === '/') {
-          navigate('/dashboard', { replace: true })
-        }
-      } else {
-        if (!authPaths.includes(currentPath)) {
-          navigate('/signin', { replace: true })
-        }
-      }
-    }
-  }, [isAuthenticated, isLoading, isInitialized, navigate])
-
-  return null
-}
+// Removed safeLog function as it's no longer needed for debugging.
 
 export default function App() {
+  // Use useAuth to get the initialization status for the whole app
+  const { isInitialized } = useAuth();
+
   useEffect(() => {
-    const theme = localStorage.getItem('theme') || 'light'
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    safeLog("Theme preference", theme)
-  }, [])
+    const theme = localStorage.getItem('theme') || 'light';
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, []);
+
+  // Show a global loading indicator until authentication state is initialized
+  // This prevents content flickering and ensures routing decisions are made
+  // only when the auth state is fully known.
+  if (!isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <span className="ml-2 text-lg text-gray-600">Loading application...</span>
+      </div>
+    );
+  }
 
   return (
     <Router>
-      <AuthStatusHandler />
-      {/* Removed Suspense wrapper */}
       <Routes>
-        {/* Public Routes */}
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
-        <Route path="/reset-password" element={<PasswordResetPage />} />
-        <Route path="/reset-password-confirm" element={<SetNewPasswordPage />} />
-        <Route path="/" element={<SignInPage />} />
+        {/* Public Routes - Wrapped with AuthRedirect to redirect authenticated users */}
+        {/* These routes should only be accessible if the user is NOT authenticated */}
+        <Route path="/signin" element={<AuthRedirect><SignInPage /></AuthRedirect>} />
+        <Route path="/signup" element={<AuthRedirect><SignUpPage /></AuthRedirect>} />
+        <Route path="/reset-password" element={<AuthRedirect><PasswordResetPage /></AuthRedirect>} />
+        <Route path="/reset-password-confirm" element={<AuthRedirect><SetNewPasswordPage /></AuthRedirect>} />
+        
+        {/* The root path "/" should also be protected and lead to the dashboard for authenticated users,
+            or to signin for unauthenticated users. This replaces the previous AuthRedirect on "/". */}
+        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
-        {/* Protected Route */}
+        {/* Protected Route - Wrapped with ProtectedRoute to guard access */}
+        {/* These routes should only be accessible if the user IS authenticated */}
         <Route
           path="/dashboard"
           element={
@@ -89,8 +68,13 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        
+        {/* Fallback route for any unmatched paths.
+            It will attempt to render the Dashboard, and ProtectedRoute will handle
+            redirection to signin if the user is not authenticated. */}
+        <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
       <Toaster position="bottom-right" richColors />
     </Router>
-  )
+  );
 }

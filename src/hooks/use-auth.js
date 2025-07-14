@@ -2,7 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseInstance } from '../service/auth-service'
 import { useDispatch, useSelector } from 'react-redux';
-import { setUser, selectUser, selectAuthLoading, selectAuthError } from '../store/slices/authSlice';
+import { 
+  setUser, 
+  selectUser, 
+  selectAuthLoading, 
+  selectAuthError,
+  updateUserProfile // Import the updateUserProfile thunk
+} from '../store/slices/authSlice';
 
 export function useAuth() {
   const dispatch = useDispatch();
@@ -72,11 +78,30 @@ export function useAuth() {
     dispatch(setUser(null));
   }, [dispatch]);
 
+  // Memoize updateProfile function to prevent unnecessary re-renders
+  const updateProfile = useCallback(async (updates) => {
+    if (!user?.id) {
+      console.error("Cannot update profile: User not authenticated.");
+      throw new Error("User not authenticated.");
+    }
+    try {
+      // Dispatch the updateUserProfile thunk
+      const result = await dispatch(updateUserProfile({ userId: user.id, updates })).unwrap();
+      // Optionally, if the thunk returns the updated user, update local Redux state
+      // dispatch(setUser(result)); // Uncomment if updateUserProfile thunk returns the full updated user object
+      return result;
+    } catch (error) {
+      console.error("Error updating profile via useAuth:", error.message ? String(error.message) : String(error));
+      throw error;
+    }
+  }, [dispatch, user]); // Depend on dispatch and user to get the current user.id
+
   return {
     user,
     isLoading,
     isInitialized,
     error: authError,
     signOut,
+    updateProfile, // Expose the new updateProfile function
   };
 }
