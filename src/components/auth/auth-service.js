@@ -1,5 +1,4 @@
 // auth-service.js
-import { meta } from '@eslint/js';
 import { createClient } from '@supabase/supabase-js';
 
 // Global Supabase client instance and user ID
@@ -8,7 +7,7 @@ let currentUserId = null;
 let authInitializedPromise = null;
 
 // Function to initialize Supabase and handle authentication
-export const initializeSupabase = async () => {
+export const initializeSupabase = async () => { // Exported for use in lib/supabase.js
   if (authInitializedPromise) {
     return authInitializedPromise; // Return existing promise if already initializing
   }
@@ -28,13 +27,11 @@ export const initializeSupabase = async () => {
     }
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-    // Supabase URL and Anon Key are extracted from the platformConfig.
-    // IMPORTANT: If the above `platformConfig` does NOT provide these,
-    // you MUST replace 'YOUR_SUPABASE_URL' and 'YOUR_SUPABASE_ANON_KEY'
-    // with your actual Supabase Project URL and Public Anon Key.
-    // You can find these in your Supabase project settings under "API".
-    const supabaseUrl =  import.meta.env.VITE_SUPABASE_URL; // <-- REPLACE THIS WITH YOUR ACTUAL SUPABASE URL
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY; // <-- REPLACE THIS WITH YOUR ACTUAL SUPABASE ANON KEY
+    // Supabase URL and Anon Key are extracted from the platformConfig
+    // IMPORTANT: Replace with your actual Supabase URL and Anon Key if they are not provided via __firebase_config
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
 
     if (!supabaseUrl || supabaseUrl === 'YOUR_SUPABASE_URL') {
       console.error("Supabase URL is not configured. Please update auth-service.js with your Supabase URL.");

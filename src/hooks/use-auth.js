@@ -1,6 +1,6 @@
 // src/hooks/use-auth.js
 import { useState, useEffect, useCallback } from 'react';
-import { getSupabaseInstance } from '../service/auth-service'
+import { getSupabaseInstance } from '../components/auth/auth-service'; // Corrected import path for getSupabaseInstance
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   setUser, 
@@ -15,6 +15,9 @@ export function useAuth() {
   const user = useSelector(selectUser);
   const isLoading = useSelector(selectAuthLoading);
   const authError = useSelector(selectAuthError);
+
+  // Derive isAuthenticated directly from the user object
+  const isAuthenticated = !!user; // True if user object exists, false otherwise
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -98,6 +101,7 @@ export function useAuth() {
 
   return {
     user,
+    isAuthenticated, // Now correctly exported
     isLoading,
     isInitialized,
     error: authError,

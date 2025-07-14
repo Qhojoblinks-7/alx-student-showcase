@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from './../lib/supabase.js'; // Added supabase import
 import { 
-  checkAuthStatus, 
+  // Removed checkAuthStatus as it's no longer exported or needed here
   signOut as signOutAction, 
   setUser, 
   clearUser 
@@ -34,28 +34,32 @@ export const useAuth = () => {
   const { user, isAuthenticated, isLoading, error, isInitialized } = useSelector(state => state.auth);
 
   useEffect(() => {
-    // 1. Dispatch initial auth status check immediately on mount
-    // This will set isLoading to true, then false, and isInitialized to true in the Redux store.
-    dispatch(checkAuthStatus());
+    // The initial auth status check and listener setup are now handled
+    // by the initializeSupabase function in auth-service.js and the
+    // useAuth hook in src/hooks/use-auth.js.
+    // This useEffect in custom-redux-hooks is no longer needed for auth initialization.
 
     // 2. Set up the Supabase auth state change listener
     // This listener should only be set up once and cleaned up on unmount.
     // It dispatches Redux actions to keep the store in sync with real-time auth changes.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Dispatch Redux actions to update the store based on auth state changes
-      if (session?.user) {
-        dispatch(setUser(session.user));
-      } else {
-        dispatch(clearUser());
-      }
-    });
+    // Ensure supabase is initialized before attaching listener
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        // Dispatch Redux actions to update the store based on auth state changes
+        if (session?.user) {
+          dispatch(setUser(session.user));
+        } else {
+          dispatch(clearUser());
+        }
+      });
 
-    // Cleanup function: unsubscribe from the auth listener when the component unmounts
-    return () => {
-      if (subscription && typeof subscription.unsubscribe === 'function') {
-        subscription.unsubscribe();
-      }
-    };
+      // Cleanup function: unsubscribe from the auth listener when the component unmounts
+      return () => {
+        if (subscription && typeof subscription.unsubscribe === 'function') {
+          subscription.unsubscribe();
+        }
+      };
+    }
   }, [dispatch]); // `dispatch` is stable, so this effect effectively runs once on mount.
 
   const signOut = async () => {

@@ -1,6 +1,7 @@
 // authSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { AuthService } from '../../service/auth-service'
+import { AuthService } from '../../components/auth/auth-service.js'; // Adjust the import path as needed
+
 // Async Thunks
 export const loadUser = createAsyncThunk(
   'auth/loadUser',
@@ -26,6 +27,22 @@ export const signInAnonymously = createAsyncThunk(
   }
 );
 
+
+
+//clearUser
+export const clearUser = createAsyncThunk(
+  'auth/clearUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      await AuthService.signOut();
+      return null; // Return null to indicate user is cleared
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+//signOutUser
 export const signOutUser = createAsyncThunk(
   'auth/signOutUser',
   async (_, { rejectWithValue }) => {
@@ -36,6 +53,19 @@ export const signOutUser = createAsyncThunk(
       return rejectWithValue(error.message);
     }
   }
+);
+
+// signout
+export const signOut = createAsyncThunk(
+  'auth/signOut',
+  async (_, { rejectWithValue }) => {
+    try {
+      await AuthService.signOut();
+      return null; // Return null to indicate user is signed out
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  } 
 );
 
 export const updateUserProfile = createAsyncThunk(
@@ -51,13 +81,15 @@ export const updateUserProfile = createAsyncThunk(
 );
 
 
+export const initialState = { // Added export here
+  user: null, // Stores user object if authenticated
+  isLoading: false,
+  error: null,
+};
+
 const authSlice = createSlice({
   name: 'auth',
-  initialState: {
-    user: null, // Stores user object if authenticated
-    isLoading: false,
-    error: null,
-  },
+  initialState,
   reducers: {
     // Reducer to manually set user (e.g., from onAuthStateChange listener in service)
     setUser: (state, action) => {

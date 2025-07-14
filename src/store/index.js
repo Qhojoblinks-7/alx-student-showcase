@@ -18,6 +18,7 @@ export const store = configureStore({
     ui: uiSlice,          // Controls UI-related states (modals, tabs, notifications, theme)
     sharing: sharingSlice,    // Manages data and state related to social sharing features
     github: githubSlice,    // Handles GitHub import and related states
+    
   },
   // Custom middleware setup
   middleware: (getDefaultMiddleware) =>

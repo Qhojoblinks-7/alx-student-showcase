@@ -1,12 +1,19 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { createSelector } from 'reselect'; // Import createSelector
+import { initialState as uiInitialState } from '../store/slices/uiSlice.js'; // Import UI slice initial state
+import { initialState as authInitialState } from '../store/slices/authSlice.js'; // Import Auth slice initial state
+import { initialState as projectsInitialState } from '../store/slices/projectsSlice.js'; // Import Projects slice initial state
+import { initialState as githubInitialState } from '../store/slices/githubSlice.js'; // Import GitHub slice initial state
+import { initialState as sharingInitialState } from '../store/slices/sharingSlice.js'; // Import Sharing slice initial state
+
 
 // Core Redux hooks
 export const useAppDispatch = () => useDispatch();
 export const useAppSelector = useSelector;
 
 // Auth selectors
-const getAuthState = (state) => state.auth;
+// More robust check for the entire state object
+const getAuthState = (state) => (state && state.auth) ? state.auth : authInitialState; 
 
 export const useAuth = createSelector(
   getAuthState,
@@ -35,10 +42,24 @@ export const useAuthError = createSelector(
   })
 );
 
-export const useUserProfile = (state) => state.auth.profile;
+// Corrected to use createSelector for memoization
+export const useUserProfile = createSelector(
+  getAuthState,
+  (auth) => {
+    const user = auth.user;
+    if (!user) return null;
+    
+    return {
+      ...auth.profile, // Use the profile from the auth state
+      initials: user.email ? user.email.substring(0, 2).toUpperCase() : '??',
+      displayName: user.user_metadata?.full_name || user.email,
+    };
+  }
+);
 
 // Project selectors
-const getProjectsState = (state) => state.projects;
+// More robust check for the entire state object
+const getProjectsState = (state) => (state && state.projects) ? state.projects : projectsInitialState; 
 
 export const useProjects = createSelector(getProjectsState, (projectsState) => projectsState.projects);
 export const useCurrentProject = createSelector(getProjectsState, (projectsState) => projectsState.currentProject);
@@ -50,6 +71,7 @@ export const useProjectsLoading = createSelector(
     isUpdating: projectsState.isUpdating,
     isDeleting: projectsState.isDeleting,
     isImporting: projectsState.isImporting,
+    isFetchingSingleProject: projectsState.isFetchingSingleProject, // Added this
   })
 );
 export const useProjectsError = createSelector(getProjectsState, (projectsState) => projectsState.error);
@@ -62,7 +84,7 @@ export const useFilteredProjects = createSelector(
   (projectsState) => {
     const { projects, filters } = projectsState;
     
-    return projects.filter(project => {
+    return (projects || []).filter(project => { // Defensive check for projects
       // Filter by category
       if (filters.category !== 'all' && project.category !== filters.category) {
         return false;
@@ -98,7 +120,7 @@ export const useFilteredProjects = createSelector(
 export const useProjectsByCategory = createSelector(
   getProjectsState,
   (projectsState) => {
-    const projects = projectsState.projects;
+    const projects = projectsState.projects || []; // Defensive check for projects
     const grouped = {};
     
     projects.forEach(project => {
@@ -116,7 +138,7 @@ export const useProjectsByCategory = createSelector(
 export const useALXProjects = createSelector(
   getProjectsState,
   (projectsState) => 
-    projectsState.projects.filter(project => 
+    (projectsState.projects || []).filter(project => // Defensive check for projects
       project.alx_confidence && project.alx_confidence > 0.5
     )
 );
@@ -124,19 +146,21 @@ export const useALXProjects = createSelector(
 export const usePublicProjects = createSelector(
   getProjectsState,
   (projectsState) => 
-    projectsState.projects.filter(project => project.is_public)
+    (projectsState.projects || []).filter(project => project.is_public) // Defensive check for projects
 );
 
 export const usePrivateProjects = createSelector(
   getProjectsState,
   (projectsState) => 
-    projectsState.projects.filter(project => !project.is_public)
+    (projectsState.projects || []).filter(project => !project.is_public) // Defensive check for projects
 );
 
 // UI selectors
-const getUIState = (state) => state.ui;
+// More robust check for the entire state object
+const getUIState = (state) => (state && state.ui) ? state.ui : uiInitialState; 
 
-export const useModals = createSelector(getUIState, (ui) => ui.modals);
+export const useModals = createSelector(getUIState, (ui) => ui?.modals || {}); // Defensive check for ui.modals
+export const useModalData = createSelector(getUIState, (ui) => ui.modalData); // Added this
 export const useActiveTab = createSelector(getUIState, (ui) => ui.activeTab);
 export const useNotifications = createSelector(getUIState, (ui) => ui.notifications);
 export const useTheme = createSelector(getUIState, (ui) => ui.theme);
@@ -144,7 +168,8 @@ export const useUILoading = createSelector(getUIState, (ui) => ui.loading);
 export const useSidebarOpen = createSelector(getUIState, (ui) => ui.sidebarOpen);
 
 // GitHub selectors
-const getGitHubState = (state) => state.github;
+// More robust check for the entire state object
+const getGitHubState = (state) => (state && state.github) ? state.github : githubInitialState; 
 
 export const useGitHubRepositories = createSelector(getGitHubState, (github) => github.repositories);
 export const useALXProjectCandidates = createSelector(getGitHubState, (github) => github.alxProjects);
@@ -177,7 +202,8 @@ export const useGitHubWizard = createSelector(
 );
 
 // Sharing selectors
-const getSharingState = (state) => state.sharing;
+// More robust check for the entire state object
+const getSharingState = (state) => (state && state.sharing) ? state.sharing : sharingInitialState; 
 
 export const useWorkLog = createSelector(getSharingState, (sharing) => sharing.currentWorkLog);
 export const useRepositoryInfo = createSelector(getSharingState, (sharing) => sharing.repositoryInfo);
@@ -251,13 +277,13 @@ export const useFullAppState = createSelector(
 // Memoized selectors for better performance
 export const createProjectSelector = (projectId) => createSelector(
   getProjectsState,
-  (projectsState) => projectsState.projects.find(project => project.id === projectId)
+  (projectsState) => (projectsState.projects || []).find(project => project.id === projectId) // Defensive check
 );
 
 export const createFilteredProjectsSelector = (filter) => createSelector(
   getProjectsState,
   (projectsState) => {
-    const projects = projectsState.projects;
+    const projects = projectsState.projects || []; // Defensive check
     
     switch (filter.type) {
       case 'category':
@@ -328,82 +354,81 @@ export const selectAllLoading = createSelector(
   })
 );
 
-// User profile selector with computed fields
-export const selectUserProfile = createSelector(
-  getAuthState,
-  (auth) => {
-    const user = auth.user;
-    if (!user) return null;
-    
-    return {
-      ...user,
-      initials: user.email ? user.email.substring(0, 2).toUpperCase() : '??',
-      displayName: user.user_metadata?.full_name || user.email,
-    };
-  }
-);
-
-// Project statistics with computed metrics
-export const selectProjectMetrics = createSelector(
+// Project specific selectors (already defined earlier, removing duplicates)
+export const selectProjects = createSelector(
   getProjectsState,
-  (projectsState) => {
-    const projects = projectsState.projects;
-    const stats = projectsState.stats;
-    
-    // Calculate additional metrics
-    const categoryCounts = projects.reduce((acc, project) => {
-      acc[project.category] = (acc[project.category] || 0) + 1;
-      return acc;
-    }, {});
-    
-    const techCounts = projects.reduce((acc, project) => {
-      project.technologies?.forEach(tech => {
-        acc[tech] = (acc[tech] || 0) + 1;
-      });
-      return acc;
-    }, {});
-    
-    const topTechnologies = Object.entries(techCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([tech, count]) => ({ name: tech, count }));
-    
-    return {
-      ...stats,
-      categoryCounts,
-      topTechnologies,
-      avgProjectsPerCategory: Object.keys(categoryCounts).length > 0 
-        ? projects.length / Object.keys(categoryCounts).length 
-        : 0,
-    };
-  }
+  (projectsState) => projectsState.projects
+);
+export const selectProjectById = (projectId) => createSelector(
+    getProjectsState,
+    (projectsState) => (projectsState.projects || []).find(project => project.id === projectId) // Defensive check
 );
 
-// GitHub integration status
+export const selectProjectMetrics = createSelector(
+    getProjectsState,
+    (projectsState) => {
+        const projects = projectsState.projects || []; // Defensive check: Ensure projects is an array
+        const stats = projectsState.stats || {}; // Defensive check: Ensure stats is an object
+
+        // Calculate additional metrics
+        const categoryCounts = projects.reduce((acc, project) => {
+            acc[project.category] = (acc[project.category] || 0) + 1;
+            return acc;
+        }, {});
+
+        const techCounts = projects.reduce((acc, project) => {
+            project.technologies?.forEach(tech => {
+                acc[tech] = (acc[tech] || 0) + 1;
+            });
+            return acc;
+        }, {});
+
+        const topTechnologies = Object.entries(techCounts)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 5)
+            .map(([tech, count]) => ({ name: tech, count }));
+
+        return {
+            ...stats,
+            total: projects.length,
+            public: projects.filter(p => p.is_public).length,
+            private: projects.filter(p => !p.is_public).length,
+            technologies: Object.keys(techCounts).length,
+            alxProjects: projects.filter(p => p.alx_confidence && p.alx_confidence > 0.5).length,
+            categoryCounts,
+            topTechnologies,
+            avgProjectsPerCategory: Object.keys(categoryCounts).length > 0 
+                ? projects.length / Object.keys(categoryCounts).length 
+                : 0,
+        };
+    }
+);
+
+// GitHub integration status (already defined earlier, removing duplicates)
 export const selectGitHubStatus = createSelector(
   getGitHubState,
   (github) => ({
     isConnected: !!github.currentUser,
-    hasRepositories: github.repositories.length > 0,
-    hasALXProjects: github.alxProjects.length > 0,
-    selectedCount: github.selectedProjects.length,
+    hasRepositories: (github.repositories || []).length > 0, // Defensive check
+    hasALXProjects: (github.alxProjects || []).length > 0, // Defensive check
+    selectedCount: (github.selectedProjects || []).length, // Defensive check
     wizardStep: github.wizardStep,
   })
 );
 
-// Sharing workflow status
+// Sharing workflow status (already defined earlier, removing duplicates)
 export const selectSharingStatus = createSelector(
   getSharingState,
   (sharing) => ({
     hasWorkLog: !!sharing.currentWorkLog,
-    hasContent: Object.values(sharing.socialContent).some(content => !!content),
-    selectedPlatforms: sharing.settings.selectedPlatforms,
+    hasContent: Object.values(sharing.socialContent || {}).some(content => !!content), // Defensive check
+    selectedPlatforms: sharing.settings?.selectedPlatforms || [], // Defensive check
     isReady: !!sharing.currentWorkLog && 
-             Object.values(sharing.socialContent).some(content => !!content),
+             Object.values(sharing.socialContent || {}).some(content => !!content), // Defensive check
   })
 );
 
-// UI state helpers
+// UI state helpers (already defined earlier, removing duplicates)
 export const selectModalState = (modalName) => createSelector(
   getUIState,
   (ui) => ui.modals[modalName]
@@ -419,42 +444,7 @@ export const selectActiveFeatures = createSelector(
   })
 );
 
-// Action creators with validation
-export const createValidatedAction = (actionCreator, validator) => (payload) => {
-  if (validator && !validator(payload)) {
-    throw new Error('Invalid action payload');
-  }
-  return actionCreator(payload);
-};
-
-// Batch action creator for multiple operations
-export const createBatchAction = (actions) => ({
-  type: 'BATCH_ACTIONS',
-  payload: actions,
-});
-
-// Middleware for handling batch actions
-export const batchActionsMiddleware = (store) => (next) => (action) => {
-  if (action.type === 'BATCH_ACTIONS') {
-    action.payload.forEach(batchedAction => next(batchedAction));
-    return;
-  }
-  return next(action);
-};
-
-// Common validators
-export const validators = {
-  email: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-  githubUrl: (url) => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(url),
-  notEmpty: (value) => value && value.trim().length > 0,
-  projectTitle: (title) => title && title.trim().length >= 3,
-};
-
-// Performance optimization helpers
-export const shouldUpdateComponent = (prevProps, nextProps, keys) => {
-  return keys.some(key => prevProps[key] !== nextProps[key]);
-};
-
+// Performance optimization helpers (already defined earlier, removing duplicates)
 export const memoizeSelector = (selector) => {
   let lastState;
   let lastResult;

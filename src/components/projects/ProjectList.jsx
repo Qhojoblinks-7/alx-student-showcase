@@ -1,17 +1,8 @@
-import { useEffect, forwardRef, createContext, useContext } from 'react'; // Added createContext, useContext, forwardRef
-import { useDispatch, useSelector } from 'react-redux'; // Import useDispatch and useSelector
+import { useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { useAuth } from '../../hooks/use-auth.js';
-import { toast } from 'sonner';
-import { cn } from '../../lib/utils'; // Assuming cn utility is here or accessible
-
-// Import Redux thunks and selectors
-import { 
-  fetchProjects, 
-  deleteProject, 
-  updateProject // For toggleVisibility
-} from '../../store/slices/projectsSlice.js';
-
+import { useAppDispatch, useAppSelector } from '../../hooks/redux-hooks'
+import { fetchProjects, deleteProject, toggleProjectVisibility} from '../../store/slices/projectsSlice.js'; // Import thunks and selectors
+import { supabase } from '../../lib/supabase'; // Still needed for direct DB operations like delete/toggle
 import { Button } from '../ui/button.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
 import { Badge } from '../ui/badge.jsx';
@@ -25,146 +16,54 @@ import {
   EyeOff,
   Share2,
   Edit,
-  Trash2,
-  AlertTriangle // Added AlertTriangle for error display
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
-// --- Tabs Component Refactor (from tabs.jsx) ---
-const TabsContext = createContext(null);
+import { selectProjects, useProjectsLoading } from '../../lib/redux-selectors.js'; // Import selectors from redux-selectors
 
-const Tabs = forwardRef(({ className, value, onValueChange, ...props }, ref) => (
-  <TabsContext.Provider value={{ value, onValueChange }}>
-    <div ref={ref} className={cn('w-full', className)} {...props} />
-  </TabsContext.Provider>
-));
-Tabs.displayName = 'Tabs';
-
-const TabsList = forwardRef(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
-      className
-    )}
-    role="tablist" // Added for accessibility
-    {...props}
-  />
-));
-TabsList.displayName = 'TabsList';
-
-const TabsTrigger = forwardRef(({ className, value, ...props }, ref) => {
-  const context = useContext(TabsContext);
-  const isActive = context.value === value;
-
-  return (
-    <button
-      ref={ref}
-      className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-        isActive ? 'bg-background text-foreground shadow-sm' : 'data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground', // Dynamically apply active/inactive styles
-        className
-      )}
-      data-state={isActive ? 'active' : 'inactive'} // Set data-state attribute
-      onClick={() => context.onValueChange?.(value)} // Call onValueChange from context
-      role="tab" // Added for accessibility
-      aria-selected={isActive} // Added for accessibility
-      {...props}
-    />
-  );
-});
-TabsTrigger.displayName = 'TabsTrigger';
-
-const TabsContent = forwardRef(({ className, value, ...props }, ref) => {
-  const context = useContext(TabsContext);
-  const isActive = context.value === value;
-
-  if (!isActive) return null; // Only render content if it's the active tab
-
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        className
-      )}
-      role="tabpanel" // Added for accessibility
-      {...props}
-    />
-  );
-});
-TabsContent.displayName = 'TabsContent';
-
-// PropTypes for the refactored Tabs components
-Tabs.propTypes = {
-  className: PropTypes.string,
-  value: PropTypes.string.isRequired,
-  onValueChange: PropTypes.func.isRequired,
-  children: PropTypes.node.isRequired, // Ensure children are passed
-};
-
-TabsList.propTypes = {
-  className: PropTypes.string,
-  children: PropTypes.node.isRequired,
-};
-
-TabsTrigger.propTypes = {
-  className: PropTypes.string,
-  value: PropTypes.string.isRequired, // Value is now required for trigger
-  children: PropTypes.node.isRequired,
-};
-
-TabsContent.propTypes = {
-  className: PropTypes.string,
-  value: PropTypes.string.isRequired, // Value is now required for content
-  children: PropTypes.node.isRequired,
-};
-// --- End Tabs Component Refactor ---
 
 
 export function ProjectList({ onEdit, onShare }) {
-  const dispatch = useDispatch();
-  const { user } = useAuth(); // Get user from your auth hook
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector(state => state.auth); // Get user from auth slice
+  const projects = useAppSelector(selectProjects); // Get projects from Redux store
+  const { isLoading, isDeleting, isUpdating } = useAppSelector(useProjectsLoading); // Get loading states
 
-  // Get projects, loading, and error states from Redux store using direct useSelector
-  const projects = useSelector(state => state.projects.projects);
-  const loading = useSelector(state => state.projects.isLoading);
-  const error = useSelector(state => state.projects.error); // Get error state
-
-  // Fetch projects on component mount or when user changes
+  // Fetch projects when user is available or when component mounts
+  // The actual dispatch of fetchProjects for initial load should ideally happen in Dashboard.jsx
+  // This useEffect here ensures that if projects are not in store, they are fetched.
   useEffect(() => {
-    if (user && !loading) { // Only fetch if user exists and not already loading
+    if (user?.id && projects.length === 0 && !isLoading) {
       dispatch(fetchProjects(user.id));
     }
-  }, [user, dispatch, loading]); // Added loading to dependencies for proper re-fetch logic
+  }, [user, projects.length, isLoading, dispatch]);
 
-  const handleDeleteProject = async (projectId) => {
-    toast('Are you sure you want to delete this project?', {
-      action: {
-        label: 'Confirm',
-        onClick: async () => {
-          try {
-            await dispatch(deleteProject(projectId)).unwrap();
-            toast.success('Project deleted successfully!');
-          } catch (err) {
-            toast.error('Failed to delete project: ' + (err.message || 'Unknown error'));
-            console.error('Error deleting project:', err);
-          }
-        },
-      },
-      duration: 5000, 
-    });
-  };
+  const handleDeleteProject = useCallback(async (projectId) => {
+    // In a real app, use a custom modal for confirmation.
+    // For this example, we'll use a simple window.confirm for immediate functionality.
+    const confirmDelete = window.confirm('Are you sure you want to delete this project? This action cannot be undone.');
+    if (!confirmDelete) return;
 
-  const handleToggleVisibility = async (projectId, isPublic) => {
     try {
-      await dispatch(updateProject({ id: projectId, projectData: { is_public: !isPublic } })).unwrap();
-      toast.success(`Project visibility set to ${!isPublic ? 'public' : 'private'}`);
-    } catch (err) {
-      toast.error('Failed to update visibility: ' + (err.message || 'Unknown error'));
-      console.error('Error updating project visibility:', err);
+      await dispatch(deleteProject(projectId)).unwrap();
+      toast.success('Project deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting project:', error.message ? String(error.message) : String(error));
+      toast.error('Failed to delete project: ' + (error.message || 'Unknown error'));
     }
-  };
+  }, [dispatch]);
+
+  const handleToggleVisibility = useCallback(async (projectId, isPublic) => {
+    try {
+      await dispatch(toggleProjectVisibility({ id: projectId, is_public: !isPublic })).unwrap();
+      toast.success(`Project visibility set to ${!isPublic ? 'public' : 'private'}`);
+    } catch (error) {
+      console.error('Error updating project visibility:', error.message ? String(error.message) : String(error));
+      toast.error('Failed to update visibility: ' + (error.message || 'Unknown error'));
+    }
+  }, [dispatch]);
 
   const getDifficultyColor = (level) => {
     switch (level) {
@@ -181,11 +80,14 @@ export function ProjectList({ onEdit, onShare }) {
       case 'mobile': return 'bg-purple-100 text-purple-800';
       case 'backend': return 'bg-orange-100 text-orange-800';
       case 'data-science': return 'bg-pink-100 text-pink-800';
+      case 'ai': return 'bg-teal-100 text-teal-800'; // Added AI category
+      case 'devops': return 'bg-indigo-100 text-indigo-800'; // Added DevOps category
+      case 'other': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         {[...Array(3)].map((_, i) => (
@@ -208,21 +110,6 @@ export function ProjectList({ onEdit, onShare }) {
           </Card>
         ))}
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="text-center py-12 bg-red-50 border border-red-200 text-red-800">
-        <CardContent>
-          <AlertTriangle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Error Loading Projects</h3>
-          <p className="text-sm">{error}</p>
-          <Button onClick={() => user && dispatch(fetchProjects(user.id))} className="mt-4">
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
     );
   }
 
@@ -266,8 +153,9 @@ export function ProjectList({ onEdit, onShare }) {
                   size="sm"
                   variant="outline"
                   onClick={() => handleToggleVisibility(project.id, project.is_public)}
+                  disabled={isUpdating}
                 >
-                  {project.is_public ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : (project.is_public ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />)}
                 </Button>
                 <Button
                   size="sm"
@@ -287,8 +175,9 @@ export function ProjectList({ onEdit, onShare }) {
                   size="sm"
                   variant="outline"
                   onClick={() => handleDeleteProject(project.id)}
+                  disabled={isDeleting}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -308,20 +197,25 @@ export function ProjectList({ onEdit, onShare }) {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <Badge className={getDifficultyColor(project.difficulty_level)}>
-                {project.difficulty_level}
-              </Badge>
-              <Badge className={getProjectTypeColor(project.project_type)}>
-                {project.project_type}
-              </Badge>
-              {project.technologies?.map((tech, index) => ( // Use technologies instead of tech_stack
+              {/* Ensure project_type and difficulty_level exist before rendering badges */}
+              {project.difficulty_level && (
+                <Badge className={getDifficultyColor(project.difficulty_level)}>
+                  {project.difficulty_level}
+                </Badge>
+              )}
+              {project.category && ( // Changed from project_type to category
+                <Badge className={getProjectTypeColor(project.category)}>
+                  {project.category}
+                </Badge>
+              )}
+              {project.technologies?.map((tech, index) => ( // Changed from tech_stack to technologies
                 <Badge key={index} variant="secondary">
                   {tech}
                 </Badge>
               ))}
             </div>
 
-            {project.tags?.length > 0 && ( // Check if tags exist and have length
+            {project.tags?.length > 0 && ( // Added optional chaining for tags
               <div className="flex flex-wrap gap-2">
                 {project.tags.map((tag, index) => (
                   <Badge key={index} variant="outline">
@@ -355,7 +249,7 @@ export function ProjectList({ onEdit, onShare }) {
                   </a>
                 </Button>
               )}
-              {project.live_url && ( // Use live_url instead of live_demo_url
+              {project.live_url && ( // Changed from live_demo_url to live_url
                 <Button size="sm" variant="outline" asChild>
                   <a href={project.live_url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="h-4 w-4 mr-2" />

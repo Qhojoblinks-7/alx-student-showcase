@@ -76,7 +76,7 @@ export const fetchRepositoryInfo = createAsyncThunk(
   }
 );
 
-const initialState = {
+export const initialState = { // Export initialState
   // Work log data
   currentWorkLog: null,
   repositoryInfo: null,

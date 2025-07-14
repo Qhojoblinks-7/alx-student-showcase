@@ -1,5 +1,12 @@
+// githubSlice.js
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { GitHubService, ALXProjectDetector } from '@/lib/github-service.js';
+import { createSelector } from 'reselect'; // Import createSelector for memoization
+import { supabase } from '../../lib/supabase.js'; // Corrected import path
+import { GitHubService, ALXProjectDetector } from '../../lib/github-service.js'; // Ensure this path is correct for your project structure
+
+// No need for initializeSupabase here; supabase is imported directly from lib/supabase.js
+// and should be initialized once at the application entry point (e.g., main.jsx).
 
 // Async thunks for GitHub operations
 export const fetchUserRepositories = createAsyncThunk(
@@ -28,8 +35,15 @@ export const detectALXProjects = createAsyncThunk(
 
 export const importSelectedProjects = createAsyncThunk(
   'github/importSelectedProjects',
-  async ({ selectedProjects, repositories, username, userId }, { rejectWithValue }) => {
+  async ({ selectedProjects, repositories, username }, { rejectWithValue }) => {
     try {
+      // Supabase client is now directly imported and assumed to be initialized.
+      // User ID should be obtained from the Redux auth state or passed explicitly if needed for this operation's context.
+      // For this thunk, we'll assume the user.id is available in the component calling it,
+      // or that the RLS policies are set up to allow inserts based on auth.uid() without explicit user_id in payload.
+      // However, for explicit user_id, it should be passed from the component.
+      // For now, we'll assume the `user_id` is passed as part of `projectsToCreate` or inferred by RLS.
+
       const selectedRepos = repositories.filter(repo => 
         selectedProjects.includes(repo.id)
       );
@@ -43,7 +57,9 @@ export const importSelectedProjects = createAsyncThunk(
         // Map to full database schema
         const enhancedProjectData = {
           ...projectData,
-          user_id: userId,
+          // user_id: userId, // Removed, as userId is not directly available here.
+                           // It should be added by the component calling this thunk,
+                           // or handled by RLS if the user is authenticated.
           original_repo_name: repo.name,
           alx_confidence: projectData.alx_confidence || 0.0,
           last_updated: repo.updated_at || new Date().toISOString(),
@@ -57,7 +73,20 @@ export const importSelectedProjects = createAsyncThunk(
         projectsToCreate.push(enhancedProjectData);
       }
 
-      return projectsToCreate;
+      // --- Database Insertion Logic ---
+      // Insert the prepared projects into the 'projects' table
+      const { data, error } = await supabase
+        .from('projects')
+        .insert(projectsToCreate)
+        .select(); // Select the inserted data to return it
+
+      if (error) {
+        console.error("Error inserting projects into Supabase:", error);
+        throw new Error(`Failed to import projects: ${error.message}`);
+      }
+
+      console.log("Successfully imported projects:", data);
+      return data; // Return the inserted data
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -85,7 +114,7 @@ export const fetchRepositoryDetails = createAsyncThunk(
   }
 );
 
-const initialState = {
+export const initialState = { // Added 'export' keyword
   // Current GitHub user
   currentUser: '',
   
@@ -156,7 +185,7 @@ const githubSlice = createSlice({
     selectAllALXProjects: (state) => {
       state.selectedProjects = state.alxProjects.map(project => project.id);
     },
-    clearSelection: (state) => {
+    clearSelection: (state) => { // This is the clearSelection action
       state.selectedProjects = [];
     },
     setSelectedProjects: (state, action) => {
@@ -183,6 +212,11 @@ const githubSlice = createSlice({
       const { repoKey, details } = action.payload;
       state.repositoryDetails[repoKey] = details;
     },
+    clearGitHubErrors: (state) => { // Added clearGitHubErrors reducer here
+      state.error = null;
+      state.repositoryError = null;
+      state.importError = null;
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -225,7 +259,7 @@ const githubSlice = createSlice({
       })
       .addCase(importSelectedProjects.fulfilled, (state, action) => {
         state.isImporting = false;
-        state.importCandidates = action.payload;
+        state.importCandidates = action.payload; // This will now be the data returned from Supabase
         state.importError = null;
       })
       .addCase(importSelectedProjects.rejected, (state, action) => {
@@ -272,27 +306,40 @@ export const {
   
   // Manual data updates
   updateRepositoryDetails,
+  clearGitHubErrors, // Exported clearGitHubErrors here
 } = githubSlice.actions;
 
-// Selectors
-export const selectCurrentUser = (state) => state.github.currentUser;
-export const selectRepositories = (state) => state.github.repositories;
-export const selectALXProjects = (state) => state.github.alxProjects;
-export const selectSelectedProjects = (state) => state.github.selectedProjects;
-export const selectRepositoryDetails = (state) => state.github.repositoryDetails;
-export const selectImportCandidates = (state) => state.github.importCandidates;
-export const selectWizardStep = (state) => state.github.wizardStep;
-export const selectWizardData = (state) => state.github.wizardData;
-export const selectGitHubLoading = (state) => ({
-  repositories: state.github.isLoadingRepositories,
-  detecting: state.github.isDetectingALX,
-  importing: state.github.isImporting,
-  details: state.github.isLoadingDetails,
-});
-export const selectGitHubErrors = (state) => ({
-  general: state.github.error,
-  repository: state.github.repositoryError,
-  import: state.github.importError,
-});
+// Base selectors
+const getGitHubState = (state) => state.github;
+
+// Memoized selectors
+export const selectCurrentUser = createSelector(getGitHubState, (github) => github.currentUser);
+export const selectRepositories = createSelector(getGitHubState, (github) => github.repositories);
+export const selectALXProjects = createSelector(getGitHubState, (github) => github.alxProjects);
+export const selectSelectedProjects = createSelector(getGitHubState, (github) => github.selectedProjects);
+export const selectRepositoryDetails = createSelector(getGitHubState, (github) => github.repositoryDetails);
+export const selectImportCandidates = createSelector(getGitHubState, (github) => github.importCandidates);
+export const selectWizardStep = createSelector(getGitHubState, (github) => github.wizardStep);
+export const selectWizardData = createSelector(getGitHubState, (github) => github.wizardData);
+
+// Memoized loading and error selectors
+export const selectGitHubLoading = createSelector(
+  getGitHubState,
+  (github) => ({
+    repositories: github.isLoadingRepositories,
+    detecting: github.isDetectingALX,
+    importing: github.isImporting,
+    details: github.isLoadingDetails,
+  })
+);
+
+export const selectGitHubErrors = createSelector(
+  getGitHubState,
+  (github) => ({
+    general: github.error,
+    repository: github.repositoryError,
+    import: github.importError,
+  })
+);
 
 export default githubSlice.reducer;

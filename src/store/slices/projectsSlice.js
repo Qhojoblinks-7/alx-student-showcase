@@ -1,15 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { supabase } from '@/lib/supabase.js';
+import { supabase } from '@/lib/supabase.js'; // Assuming supabase is initialized elsewhere
 
-// Project category validation
-const VALID_CATEGORIES = ['web', 'mobile', 'data', 'ai', 'backend', 'devops', 'other'];
-
-// Validation helper
-const validateCategory = (category) => {
-  return VALID_CATEGORIES.includes(category) ? category : 'other';
-};
-
-// Async thunks for project operations
+// Async Thunks
 export const fetchProjects = createAsyncThunk(
   'projects/fetchProjects',
   async (userId, { rejectWithValue }) => {
@@ -19,25 +11,6 @@ export const fetchProjects = createAsyncThunk(
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
-// New async thunk to fetch a single project by ID
-export const fetchSingleProject = createAsyncThunk(
-  'projects/fetchSingleProject',
-  async (projectId, { rejectWithValue }) => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
-        .single();
 
       if (error) throw error;
       return data;
@@ -51,25 +24,13 @@ export const createProject = createAsyncThunk(
   'projects/createProject',
   async (projectData, { rejectWithValue }) => {
     try {
-      // Validate and sanitize project data
-      const sanitizedData = {
-        ...projectData,
-        category: validateCategory(projectData.category || 'other'),
-        is_public: projectData.is_public !== undefined ? projectData.is_public : true,
-        technologies: projectData.technologies || [],
-        alx_confidence: projectData.alx_confidence || null,
-        original_repo_name: projectData.original_repo_name || null,
-        last_updated: projectData.last_updated || new Date().toISOString(),
-      };
-
       const { data, error } = await supabase
         .from('projects')
-        .insert([sanitizedData])
-        .select()
-        .single();
-      
+        .insert([projectData])
+        .select();
+
       if (error) throw error;
-      return data;
+      return data[0];
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -80,26 +41,14 @@ export const updateProject = createAsyncThunk(
   'projects/updateProject',
   async ({ id, projectData }, { rejectWithValue }) => {
     try {
-      // Validate and sanitize project data
-      const sanitizedData = { ...projectData };
-      
-      // Validate category if provided
-      if (projectData.category) {
-        sanitizedData.category = validateCategory(projectData.category);
-      }
-      
-      // Set last_updated timestamp
-      sanitizedData.last_updated = new Date().toISOString();
-
       const { data, error } = await supabase
         .from('projects')
-        .update(sanitizedData)
+        .update(projectData)
         .eq('id', id)
-        .select()
-        .single();
-      
+        .select();
+
       if (error) throw error;
-      return data;
+      return data[0];
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -114,26 +63,9 @@ export const deleteProject = createAsyncThunk(
         .from('projects')
         .delete()
         .eq('id', projectId);
-      
-      if (error) throw error;
-      return projectId;
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
 
-export const importProjectsFromGitHub = createAsyncThunk(
-  'projects/importFromGitHub',
-  async (projectsData, { rejectWithValue }) => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(projectsData)
-        .select();
-      
       if (error) throw error;
-      return data;
+      return projectId; // Return the ID of the deleted project
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -141,45 +73,39 @@ export const importProjectsFromGitHub = createAsyncThunk(
 );
 
 export const fetchProjectStats = createAsyncThunk(
-  'projects/fetchStats',
+  'projects/fetchProjectStats',
   async (userId, { rejectWithValue }) => {
     try {
-      const { data: projects, error } = await supabase
+      const { data, error } = await supabase
         .from('projects')
-        .select('technologies, is_public, category, alx_confidence')
+        .select('is_public, technologies, project_type') // Select only necessary fields for stats
         .eq('user_id', userId);
 
       if (error) throw error;
 
-      const allTechnologies = new Set();
-      const categories = {};
-      let publicCount = 0;
-      let alxProjectsCount = 0;
+      const total = data.length;
+      const publicCount = data.filter(p => p.is_public).length;
+      const privateCount = total - publicCount;
       
-      projects.forEach(project => {
-        // Count technologies
-        project.technologies?.forEach(tech => allTechnologies.add(tech));
-        
-        // Count public projects
-        if (project.is_public) publicCount++;
-        
-        // Count by category
-        const category = project.category || 'other';
-        categories[category] = (categories[category] || 0) + 1;
-        
-        // Count ALX projects (confidence > 0.5)
-        if (project.alx_confidence && project.alx_confidence > 0.5) {
-          alxProjectsCount++;
-        }
+      const uniqueTechnologies = new Set();
+      data.forEach(project => {
+        project.technologies?.forEach(tech => uniqueTechnologies.add(tech));
       });
 
+      const technologiesCount = uniqueTechnologies.size;
+
+      const categoryCounts = data.reduce((acc, project) => {
+        const category = project.project_type || 'other';
+        acc[category] = (acc[category] || 0) + 1;
+        return acc;
+      }, {});
+
       return {
-        total: projects.length,
+        total,
         public: publicCount,
-        private: projects.length - publicCount,
-        technologies: allTechnologies.size,
-        categories,
-        alxProjects: alxProjectsCount,
+        private: privateCount,
+        technologies: technologiesCount,
+        categoryCounts,
       };
     } catch (error) {
       return rejectWithValue(error.message);
@@ -187,75 +113,67 @@ export const fetchProjectStats = createAsyncThunk(
   }
 );
 
-const initialState = {
+//toggleProjectVisibility
+export const toggleProjectVisibility = createAsyncThunk(
+  'projects/toggleProjectVisibility',
+  async ({ projectId, isPublic }, { rejectWithValue }) => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ is_public: isPublic })
+        .eq('id', projectId)
+        .select();
+
+      if (error) throw error;
+      return data[0]; // Return the updated project
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const initialState = { // Export initialState
   projects: [],
   currentProject: null,
+  isLoading: false,
+  isCreating: false,
+  isUpdating: false,
+  isDeleting: false,
+  error: null,
   stats: {
     total: 0,
     public: 0,
     private: 0,
     technologies: 0,
-    categories: {},
-    alxProjects: 0,
+    categoryCounts: {},
   },
   filters: {
     category: 'all',
     isPublic: 'all',
     searchTerm: '',
   },
-  isLoading: false,
-  isCreating: false,
-  isUpdating: false,
-  isDeleting: false,
-  isImporting: false,
-  isFetchingSingleProject: false, // New loading state for single project fetch
-  error: null,
-  singleProjectError: null, // New error state for single project fetch
 };
 
 const projectsSlice = createSlice({
   name: 'projects',
   initialState,
   reducers: {
-    clearError: (state) => {
-      state.error = null;
-      state.singleProjectError = null; // Clear new error state
+    setProjects: (state, action) => {
+      state.projects = action.payload;
     },
     setCurrentProject: (state, action) => {
       state.currentProject = action.payload;
     },
-    clearCurrentProject: (state) => {
-      state.currentProject = null;
+    setProjectFilters: (state, action) => {
+      state.filters = { ...state.filters, ...action.payload };
     },
-    clearProjects: (state) => {
-      state.projects = [];
-      state.stats = { total: 0, public: 0, private: 0, technologies: 0, categories: {}, alxProjects: 0 };
-    },
-    
-    // Filter actions
-    setFilter: (state, action) => {
-      const { filterType, value } = action.payload;
-      state.filters[filterType] = value;
-    },
-    clearFilters: (state) => {
-      state.filters = {
-        category: 'all',
-        isPublic: 'all',
-        searchTerm: '',
-      };
-    },
-    
-    // Project visibility actions
-    toggleProjectVisibility: (state, action) => {
-      const project = state.projects.find(p => p.id === action.payload);
-      if (project) {
-        project.is_public = !project.is_public;
-      }
+    clearProjectsError: (state) => {
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch projects
+      // Fetch Projects
       .addCase(fetchProjects.pending, (state) => {
         state.isLoading = true;
         state.error = null;
@@ -263,119 +181,70 @@ const projectsSlice = createSlice({
       .addCase(fetchProjects.fulfilled, (state, action) => {
         state.isLoading = false;
         state.projects = action.payload;
-        state.error = null;
       })
       .addCase(fetchProjects.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       })
-      
-      // Fetch single project
-      .addCase(fetchSingleProject.pending, (state) => {
-        state.isFetchingSingleProject = true;
-        state.singleProjectError = null;
-        state.currentProject = null; // Clear current project while fetching new one
-      })
-      .addCase(fetchSingleProject.fulfilled, (state, action) => {
-        state.isFetchingSingleProject = false;
-        state.currentProject = action.payload;
-        state.singleProjectError = null;
-      })
-      .addCase(fetchSingleProject.rejected, (state, action) => {
-        state.isFetchingSingleProject = false;
-        state.singleProjectError = action.payload;
-      })
-
-      // Create project
+      // Create Project
       .addCase(createProject.pending, (state) => {
         state.isCreating = true;
         state.error = null;
       })
       .addCase(createProject.fulfilled, (state, action) => {
         state.isCreating = false;
-        state.projects.unshift(action.payload);
-        state.error = null;
+        state.projects.unshift(action.payload); // Add new project to the beginning
       })
       .addCase(createProject.rejected, (state, action) => {
         state.isCreating = false;
         state.error = action.payload;
       })
-      
-      // Update project
+      // Update Project
       .addCase(updateProject.pending, (state) => {
         state.isUpdating = true;
         state.error = null;
       })
       .addCase(updateProject.fulfilled, (state, action) => {
         state.isUpdating = false;
-        const index = state.projects.findIndex(p => p.id === action.payload.id);
+        const updatedProject = action.payload;
+        const index = state.projects.findIndex(p => p.id === updatedProject.id);
         if (index !== -1) {
-          state.projects[index] = action.payload;
+          state.projects[index] = updatedProject;
         }
-        if (state.currentProject?.id === action.payload.id) {
-          state.currentProject = action.payload;
-        }
-        state.error = null;
       })
       .addCase(updateProject.rejected, (state, action) => {
         state.isUpdating = false;
         state.error = action.payload;
       })
-      
-      // Delete project
+      // Delete Project
       .addCase(deleteProject.pending, (state) => {
         state.isDeleting = true;
         state.error = null;
       })
       .addCase(deleteProject.fulfilled, (state, action) => {
         state.isDeleting = false;
-        state.projects = state.projects.filter(p => p.id !== action.payload);
-        if (state.currentProject?.id === action.payload) {
-          state.currentProject = null;
-        }
-        state.error = null;
+        state.projects = state.projects.filter(project => project.id !== action.payload);
       })
       .addCase(deleteProject.rejected, (state, action) => {
         state.isDeleting = false;
         state.error = action.payload;
       })
-      
-      // Import from GitHub
-      .addCase(importProjectsFromGitHub.pending, (state) => {
-        state.isImporting = true;
+      // Fetch Project Stats
+      .addCase(fetchProjectStats.pending, (state) => {
+        state.isLoading = true; // Use a general loading for stats fetch
         state.error = null;
       })
-      .addCase(importProjectsFromGitHub.fulfilled, (state, action) => {
-        state.isImporting = false;
-        state.projects = [...action.payload, ...state.projects];
-        state.error = null;
-      })
-      .addCase(importProjectsFromGitHub.rejected, (state, action) => {
-        state.isImporting = false;
-        state.error = action.payload;
-      })
-      
-      // Fetch stats
       .addCase(fetchProjectStats.fulfilled, (state, action) => {
+        state.isLoading = false;
         state.stats = action.payload;
       })
       .addCase(fetchProjectStats.rejected, (state, action) => {
+        state.isLoading = false;
         state.error = action.payload;
       });
   },
 });
 
-export const { 
-  clearError, 
-  setCurrentProject, 
-  clearCurrentProject, 
-  clearProjects,
-  setFilter,
-  clearFilters,
-  toggleProjectVisibility,
-} = projectsSlice.actions;
-
-// Export validation constants and helper
-export { VALID_CATEGORIES, validateCategory };
+export const { setProjects, setCurrentProject, setProjectFilters, clearProjectsError } = projectsSlice.actions;
 
 export default projectsSlice.reducer;
