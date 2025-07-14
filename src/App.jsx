@@ -3,6 +3,7 @@ import React, { useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuth } from './hooks/use-auth'
+import { DatabaseErrorHandler } from './components/DatabaseErrorHandler'
 
 // Lazy-loaded route components
 const SignInPage = lazy(() => import('./components/auth/SignInPage'))
@@ -69,6 +70,7 @@ export default function App() {
     safeLog("Theme preference", theme)
   }, [])
 
+<<<<<<< HEAD
   return (
     <Router>
       <AuthStatusHandler />
@@ -92,4 +94,34 @@ export default function App() {
       <Toaster position="bottom-right" richColors={true} />
     </Router>
   )
+=======
+  return (
+    <DatabaseErrorHandler>
+      <Router>
+        <AuthStatusHandler />
+        <Suspense fallback={<div className="p-8 text-center">Loading page...</div>}>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/reset-password" element={<PasswordResetPage />} />
+            <Route path="/reset-password-confirm" element={<SetNewPasswordPage />} />
+            <Route path="/" element={<SignInPage />} />
+
+            {/* Protected Route */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
+        <Toaster position="bottom-right" richColors />
+      </Router>
+    </DatabaseErrorHandler>
+  )
+>>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
 }

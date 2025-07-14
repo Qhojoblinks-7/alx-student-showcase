@@ -24,7 +24,10 @@ export function UserProfile() {
     avatar_url: '',
   });
 
+<<<<<<< HEAD
   
+=======
+>>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
   const fetchProfile = useCallback(async () => {
     if (!user) return;
 
@@ -57,6 +60,15 @@ export function UserProfile() {
       setLoading(false);
     }
   }, [user]);
+<<<<<<< HEAD
+=======
+
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    }
+  }, [user, fetchProfile]);
+>>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
 
   const handleSave = async () => {
     if (!user) return;

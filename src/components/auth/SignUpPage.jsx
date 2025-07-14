@@ -1,6 +1,10 @@
 // src/pages/SignUpPage.jsx
 import { Link } from 'react-router-dom';
+<<<<<<< HEAD
 import  AuthForm  from './AuthForm'
+=======
+import AuthForm from './AuthForm'
+>>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
 
 export function SignUpPage() {
   return (

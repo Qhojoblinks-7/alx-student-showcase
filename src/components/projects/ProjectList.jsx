@@ -24,8 +24,11 @@ export function ProjectList({ onEdit, onShare }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
+<<<<<<< HEAD
   
 
+=======
+>>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
   const fetchProjects = useCallback(async () => {
     if (!user) return;
 
@@ -44,7 +47,17 @@ export function ProjectList({ onEdit, onShare }) {
     } finally {
       setLoading(false);
     }
+<<<<<<< HEAD
   },[user]);
+=======
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    }
+  }, [user, fetchProjects]);
+>>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
 
   const deleteProject = async (projectId) => {
     if (!confirm('Are you sure you want to delete this project?')) return;
