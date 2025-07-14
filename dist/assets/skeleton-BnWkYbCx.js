@@ -1,1 +1,0 @@
-import{j as a,f as t,P as n}from"./index-ClCAHUo_.js";function o({className:s,...e}){return a.jsx("div",{"data-slot":"skeleton",className:t("bg-accent animate-pulse rounded-md",s),...e})}o.propTypes={className:n.string};export{o as S};
