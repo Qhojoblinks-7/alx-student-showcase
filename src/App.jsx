@@ -70,7 +70,7 @@ export default function App() {
     safeLog("Theme preference", theme)
   }, [])
 
-<<<<<<< HEAD
+
   return (
     <Router>
       <AuthStatusHandler />
@@ -94,7 +94,7 @@ export default function App() {
       <Toaster position="bottom-right" richColors={true} />
     </Router>
   )
-=======
+
   return (
     <DatabaseErrorHandler>
       <Router>
@@ -123,5 +123,5 @@ export default function App() {
       </Router>
     </DatabaseErrorHandler>
   )
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
+
 }

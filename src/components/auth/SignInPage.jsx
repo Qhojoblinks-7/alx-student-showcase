@@ -1,10 +1,6 @@
 // src/pages/SignInPage.jsx
 import { Link } from 'react-router-dom';
-<<<<<<< HEAD
 import  AuthForm  from './AuthForm'; // Import the new AuthForm component
-=======
-import AuthForm from './AuthForm'; // Import the new AuthForm component
->>>>>>> 6ec6261e759395dd9f49a69591a7d1f20bf29527
 
 export function SignInPage() {
   return (
