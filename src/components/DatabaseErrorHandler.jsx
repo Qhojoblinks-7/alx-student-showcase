@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Alert, AlertDescription } from './ui/alert';
 import { AlertTriangle, Database, RefreshCw, CheckCircle } from 'lucide-react';
 
 export function DatabaseErrorHandler({ children }) {
@@ -96,12 +95,12 @@ export function DatabaseErrorHandler({ children }) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
+            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5" />
+              <div className="text-sm text-red-800">
                 {dbStatus.error || 'Unknown database error'}
-              </AlertDescription>
-            </Alert>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <h4 className="font-semibold">Troubleshooting Steps:</h4>
@@ -142,12 +141,12 @@ export function DatabaseErrorHandler({ children }) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
+            <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+              <div className="text-sm text-yellow-800">
                 The database schema needs to be initialized. Please run the setup script.
-              </AlertDescription>
-            </Alert>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <h4 className="font-semibold">Required Actions:</h4>
@@ -183,12 +182,12 @@ export function DatabaseErrorHandler({ children }) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
+            <div className="flex items-start gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+              <div className="text-sm text-yellow-800">
                 There may be issues with authentication configuration.
-              </AlertDescription>
-            </Alert>
+              </div>
+            </div>
 
             <Button onClick={checkDatabaseHealth} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
