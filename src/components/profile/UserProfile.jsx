@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
 import { supabase } from '../../lib/supabase.js';
@@ -28,9 +28,9 @@ export function UserProfile() {
     if (user) {
       fetchProfile();
     }
-  }, [user]);
+  }, [user, fetchProfile]);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -61,7 +61,7 @@ export function UserProfile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
