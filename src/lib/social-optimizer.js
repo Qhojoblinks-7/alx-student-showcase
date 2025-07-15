@@ -160,11 +160,31 @@ export class SocialContentOptimizer {
       timestamp: new Date()
     };
 
+    const twitterContent = this.generateTwitterContent(baseData);
+    const linkedinContent = this.generateLinkedInContent(baseData);
+    const facebookContent = this.generateFacebookContent(baseData);
+    const discordContent = this.generateDiscordContent(baseData);
+
+    // Add a fallback if content is unexpectedly empty
+    const defaultMessage = `Check out my project: ${project.title || 'A new project'}!`;
+
     return {
-      twitter: this.generateTwitterContent(baseData),
-      linkedin: this.generateLinkedInContent(baseData),
-      facebook: this.generateFacebookContent(baseData),
-      discord: this.generateDiscordContent(baseData)
+      twitter: {
+        ...twitterContent,
+        content: twitterContent.content || defaultMessage + (project.github_url ? ` ${project.github_url}` : '')
+      },
+      linkedin: {
+        ...linkedinContent,
+        content: linkedinContent.content || defaultMessage + (project.live_url || project.github_url ? ` Learn more: ${project.live_url || project.github_url}` : '')
+      },
+      facebook: {
+        ...facebookContent,
+        content: facebookContent.content || defaultMessage + (project.live_url || project.github_url ? ` Find it here: ${project.live_url || project.github_url}` : '')
+      },
+      discord: {
+        ...discordContent,
+        content: discordContent.content || defaultMessage + (project.live_url || project.github_url ? ` Link: ${project.live_url || project.github_url}` : '')
+      }
     };
   }
 
@@ -534,7 +554,7 @@ export class SocialContentOptimizer {
     
     if (platform === 'twitter') {
       // Ultra-compact for Twitter
-      if (commitCount > 20) return `${commitCount}c in ${timeframe} �`;
+      if (commitCount > 20) return `${commitCount}c in ${timeframe} 🔥`;
       if (commitCount > 10) return `${commitCount}c ${timeframe} 💪`;
       if (commitCount > 5) return `${commitCount}c last ${timeframe}`;
       return `${commitCount}c`;
@@ -659,7 +679,9 @@ export class SocialContentOptimizer {
     const reflections = [
       `This project reinforced my passion for software engineering and problem-solving. Can't wait to tackle the next challenge! 💪`,
       `Every project teaches me something new. Grateful for the ALX program and the amazing learning journey. 🙏`,
-      `Building projects like this reminds me why I love coding. The satisfaction of seeing your ideas come to life is unmatched! ✨`
+      `Building projects like this reminds me why I love coding. The satisfaction of seeing your ideas come to life is unmatched! ✨`,
+      `The journey through this project was a testament to perseverance and continuous learning. Excited for what's next!`,
+      `Proud to add this project to my portfolio, showcasing growth and dedication in my ALX journey.`
     ];
 
     return reflections[Math.floor(Math.random() * reflections.length)];

@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { closeModal, openModal, setActiveTab, toggleTheme } from '../store/slices/uiSlice'
 import { fetchProjectStats, fetchProjects } from '../store/slices/projectsSlice' // Ensure fetchProjects is imported
 import { setWizardStep } from '../store/slices/githubSlice'; // Import setWizardStep
+import { useAppSelector } from '../lib/redux-selectors'; // Import useAppSelector
 
 // Import UI components (assuming these are from shadcn/ui or similar)
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -31,6 +32,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx';
+import { Separator } from '@/components/ui/separator.jsx'; // Import Separator
+import { Skeleton } from '@/components/ui/skeleton.jsx'; // Import Skeleton
 
 
 // Import icons (assuming these are from lucide-react)
@@ -45,89 +48,84 @@ import { ShareProjectModal } from '../components/sharing/ShareProjectModal';
 import { AutoWorkLogShare } from '../components/sharing/AutoWorkLogShare';
 import { WorkLogGenerator } from '../components/sharing/WorkLogGenerator';
 import { DashboardStats } from '../components/DashboardStats'
-import { Separator } from './ui/separator'
+
+
+import { 
+  useProjects, // Selector for projects array
+  useGitHubLoading, // Selector for GitHub loading states
+  useProjectsLoading, // Selector for projects loading states
+  useModals, // Selector for UI modals state
+  useActiveTab, // Selector for active tab state
+  useTheme // Selector for theme state
+} from '../lib/redux-selectors'; // Corrected import path for UI selectors
+
+
+
 
 
 
 
 
 export function Dashboard() {
-  const dispatch = useDispatch()
-  const { user, signOut, loading: authLoading, isInitialized } = useAuth() // Get isInitialized from useAuth
+  const dispatch = useDispatch();
+  const { user, signOut, loading: authLoading } = useAuth(); // Get user and signOut from useAuth
+  
+  // Get UI state values using their respective selectors
+  const activeTab = useActiveTab();
+  const modals = useModals();
+  const theme = useTheme();
 
-  const activeTab = useSelector(state => state.ui.activeTab)
-  const modals = useSelector(state => state.ui.modals)
-  const theme = useSelector(state => state.ui.theme); // Get theme from Redux store
-  const projectStats = useSelector(state => state.projects.stats)
-  const githubLoadingRepositories = useSelector(state => state.github.isLoadingRepositories);
-
+  // Get other state values
+  const projects = useProjects(); // projects is directly the array from the selector
+  const { isLoading: projectsListLoading } = useProjectsLoading(); // Get specific loading state for project list fetching
+  const { repositories: githubLoadingRepositories } = useGitHubLoading(); // Destructure 'repositories' directly
 
   const [editingProject, setEditingProject] = useState(null);
   const [sharingProject, setSharingProject] = useState(null);
   const [showAutoWorkLogShare, setShowAutoWorkLogShare] = useState(false);
   const [showWorkLogGenerator, setShowWorkLogGenerator] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false); // State to control Sheet visibility
+  const [showOnboarding, setShowOnboarding] = useState(false); // State for onboarding dialog
 
+  // Fetch projects and stats when user is available and on component mount
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(fetchProjects(user.id));
+      dispatch(fetchProjectStats(user.id));
+    }
+  }, [user, dispatch]);
+
+  // Onboarding logic: Check localStorage for new user flag
+  useEffect(() => {
+    const isNewUser = localStorage.getItem('isNewUser');
+    if (isNewUser === 'true') {
+      setShowOnboarding(true);
+      localStorage.removeItem('isNewUser'); // Clear the flag after showing
+    }
+  }, []);
 
   const handleSignOut = async () => {
     try {
-      await signOut()
-      toast.success('Signed out successfully')
+      await signOut();
+      toast.success('Signed out successfully!');
     } catch (error) {
-      toast.error('Failed to sign out: ' + (error.message || 'Unknown error'))
+      toast.error('Failed to sign out: ' + (error.message || 'Unknown error'));
     }
-  }
+  };
 
-  const handleProjectAdded = () => {
-    dispatch(closeModal('projectForm'))
-    if (user) {
-      dispatch(fetchProjectStats(user.id))
-      dispatch(fetchProjects(user.id));
-    }
-  }
-
-  const handleGitHubImportComplete = (importedProjects) => {
-    dispatch(closeModal('gitHubImport'))
-    dispatch(setWizardStep('username')); // Reset wizard step
-    if (user) {
-      dispatch(fetchProjectStats(user.id))
-      dispatch(fetchProjects(user.id));
-    }
-    toast.success(`Successfully imported ${importedProjects.length} projects from GitHub!`)
-  }
-
-  const handleTabChange = useCallback((newTab) => {
-    dispatch(setActiveTab(newTab))
-  }, [dispatch]);
-
-  // Renamed openProjectForm to handleAddProjectClick
   const handleAddProjectClick = () => {
     setEditingProject(null); // Clear any existing project for "Add New"
-    dispatch(openModal({ modalName: 'projectForm' }))
-  }
-
-  const openGitHubImport = () => {
-    dispatch(openModal({ modalName: 'gitHubImport' }))
-  }
-
-  const closeProjectForm = () => {
-    dispatch(closeModal('projectForm'))
-    setEditingProject(null); // Clear editing project on close
-  }
-
-  const closeGitHubImport = () => {
-    dispatch(closeModal('gitHubImport'))
-    dispatch(setWizardStep('username')); // Reset wizard step on close
-  }
+    dispatch(openModal({ modalName: 'projectForm' })); // Dispatch openModal action
+  };
 
   const handleEditProject = (project) => {
     setEditingProject(project);
-    dispatch(openModal({ modalName: 'projectForm', data: project }));
+    dispatch(openModal({ modalName: 'projectForm', data: project })); // Dispatch openModal action with data
   };
 
   const handleShareProject = (project) => {
     setSharingProject(project);
-    dispatch(openModal({ modalName: 'shareProject', data: project }));
+    dispatch(openModal({ modalName: 'shareProject', data: project })); // Dispatch openModal action with data
   };
 
   const handleOpenAutoWorkLogShare = (project) => {
@@ -148,39 +146,79 @@ export function Dashboard() {
     setShowWorkLogGenerator(false);
   };
 
-  const handleShareModalClose = () => {
-    dispatch(closeModal('shareProject'));
-    setSharingProject(null);
+  const handleGitHubImportComplete = () => {
+    dispatch(closeModal('gitHubImport')); // Dispatch closeModal action
+    dispatch(setWizardStep('username')); // Reset wizard step
+    if (user?.id) {
+      dispatch(fetchProjects(user.id)); // Re-fetch projects after import
+      dispatch(fetchProjectStats(user.id)); // Re-fetch stats after import
+    }
+    toast.success('GitHub projects imported successfully!');
   };
 
-  // Define handleProjectFormSuccess and handleProjectFormCancel as they are used
   const handleProjectFormSuccess = () => {
-    dispatch(closeModal('projectForm'));
+    dispatch(closeModal('projectForm')); // Dispatch closeModal action
     setEditingProject(null);
     if (user?.id) {
-      dispatch(fetchProjects(user.id));
-      dispatch(fetchProjectStats(user.id));
+      dispatch(fetchProjects(user.id)); // Re-fetch projects after add/edit
+      dispatch(fetchProjectStats(user.id)); // Re-fetch stats after add/edit
     }
   };
 
   const handleProjectFormCancel = () => {
-    dispatch(closeModal('projectForm'));
+    dispatch(closeModal('projectForm')); // Dispatch closeModal action
     setEditingProject(null);
   };
 
+  const handleShareModalClose = () => {
+    dispatch(closeModal('shareProject')); // Dispatch closeModal action
+    setSharingProject(null);
+  };
 
-  // Fetch project stats and projects only when user is initialized and available
-  useEffect(() => {
-    if (isInitialized && user?.id) {
-      dispatch(fetchProjectStats(user.id))
-      dispatch(fetchProjects(user.id)); // Also fetch the list of projects
+  const handleOpenUserProfile = () => {
+    dispatch(openModal({ modalName: 'userProfile' })); // Dispatch openModal action
+  };
+
+  const handleCloseUserProfile = () => {
+    dispatch(closeModal('userProfile')); // Dispatch closeModal action
+  };
+
+  const handleOpenGitHubImport = () => {
+    dispatch(openModal({ modalName: 'gitHubImport' })); // Dispatch openModal action
+  };
+
+  const handleCloseGitHubImport = () => {
+    dispatch(closeModal('gitHubImport')); // Dispatch closeModal action
+    dispatch(setWizardStep('username')); // Reset wizard step on close
+  };
+
+  // Handle actions from the OnboardingDialog
+  const handleOnboardingAction = (actionType) => {
+    setShowOnboarding(false); // Close onboarding dialog
+    setIsSheetOpen(false); // Close mobile sheet if open
+
+    switch (actionType) {
+      case 'addProject':
+        handleAddProjectClick();
+        break;
+      case 'importGithub':
+        handleOpenGitHubImport();
+        break;
+      case 'viewProfile':
+        dispatch(setActiveTab('profile'));
+        break;
+      case 'viewStats':
+        dispatch(setActiveTab('stats'));
+        break;
+      default:
+        break;
     }
-  }, [user, dispatch, isInitialized]); // Add isInitialized to dependencies
+  };
 
-  // Render nothing or a loading spinner until auth is initialized
-  if (!isInitialized || authLoading) {
+  // Render loading state if auth is still loading
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
         <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
         <span className="ml-4 text-xl text-gray-700">Loading user data...</span>
       </div>
@@ -215,15 +253,11 @@ export function Dashboard() {
                   <User className="mr-3 h-5 w-5" />
                   Profile
                 </Button>
-                <Button variant="ghost" className="justify-start" onClick={() => { dispatch(setActiveTab('stats')); setIsSheetOpen(false); }}>
-                  <BarChart2 className="mr-3 h-5 w-5" />
-                  Stats
-                </Button>
                 <Button variant="ghost" className="justify-start" onClick={() => { handleOpenWorkLogGenerator(); setIsSheetOpen(false); }}>
                   <CalendarDays className="mr-3 h-5 w-5" />
                   Work Log
                 </Button>
-                <Button variant="ghost" className="justify-start" onClick={() => { openGitHubImport(); setIsSheetOpen(false); }}>
+                <Button variant="ghost" className="justify-start" onClick={() => { handleOpenGitHubImport(); setIsSheetOpen(false); }}>
                   <Github className="mr-3 h-5 w-5" />
                   Import from GitHub
                 </Button>
@@ -237,13 +271,31 @@ export function Dashboard() {
           </h1>
         </div>
 
-        {/* Right side: Add Project, GitHub Import, Theme Toggle, User Dropdown */}
+        {/* Desktop Tabs */}
+        <Tabs value={activeTab} onValueChange={(value) => dispatch(setActiveTab(value))} className="hidden lg:block">
+          <TabsList>
+            <TabsTrigger value="projects">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Projects
+            </TabsTrigger>
+            <TabsTrigger value="profile">
+              <User className="mr-2 h-4 w-4" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="stats">
+              <BarChart2 className="mr-2 h-4 w-4" />
+              Stats
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Right side: Add Project, GitHub Import, User Dropdown */}
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={handleAddProjectClick} className="hidden sm:flex">
+          <Button variant="outline" onClick={handleAddProjectClick}>
             <Plus className="mr-2 h-4 w-4" />
             Add Project
           </Button>
-          <Button variant="outline" onClick={openGitHubImport} disabled={githubLoadingRepositories} className="hidden sm:flex">
+          <Button variant="outline" onClick={handleOpenGitHubImport} disabled={githubLoadingRepositories}>
             {githubLoadingRepositories ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -291,24 +343,22 @@ export function Dashboard() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-        {/* Centralized Tabs component for both desktop and mobile (via Sheet) */}
         <Tabs value={activeTab} onValueChange={(value) => dispatch(setActiveTab(value))}>
-          <div className="flex justify-center mb-6"> {/* Centering the tabs list */}
-            <TabsList className="grid w-full max-w-md grid-cols-3"> {/* Adjusted width for better centering */}
-              <TabsTrigger value="projects">
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                Projects
-              </TabsTrigger>
-              <TabsTrigger value="profile">
-                <User className="mr-2 h-4 w-4" />
-                Profile
-              </TabsTrigger>
-              <TabsTrigger value="stats">
-                <BarChart2 className="mr-2 h-4 w-4" />
-                Stats
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          {/* TabsList is hidden on mobile, shown on desktop */}
+          <TabsList className="hidden lg:grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="projects">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Projects
+            </TabsTrigger>
+            <TabsTrigger value="profile">
+              <User className="mr-2 h-4 w-4" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="stats">
+              <BarChart2 className="mr-2 h-4 w-4" />
+              Stats
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="projects">
             <div className="flex items-center justify-between mb-6">
@@ -322,7 +372,7 @@ export function Dashboard() {
                 <Button
                   variant="outline"
                   className="border-dashed"
-                  onClick={openGitHubImport}
+                  onClick={handleOpenGitHubImport}
                 >
                   <Github className="h-4 w-4 mr-2" />
                   <Zap className="h-4 w-4 mr-1" />
@@ -338,13 +388,8 @@ export function Dashboard() {
             <DashboardStats /> {/* Use the dedicated DashboardStats component */}
             <Separator className="my-6" />
 
-            {/* ProjectList loading state */}
-            {/* projectsListLoading is not defined in this scope.
-                It should be retrieved from Redux state using useSelector. */}
-            {/* For now, I'll assume a placeholder or add a selector if available. */}
-            {/* If you have a selector like `selectProjectsLoading`, use it here. */}
-            {/* For this fix, I'll temporarily define it as false to resolve the error. */}
-            {false ? ( // Placeholder for projectsListLoading
+            {/* Conditionally render ProjectList or Skeleton based on projectsListLoading */}
+            {projectsListLoading ? (
               <div className="space-y-6">
                 {[...Array(3)].map((_, i) => (
                   <Card key={i}>
@@ -389,7 +434,7 @@ export function Dashboard() {
 
       {/* Modals */}
       {modals.projectForm && (
-        <Sheet open={modals.projectForm} onOpenChange={closeProjectForm}>
+        <Sheet open={modals.projectForm} onOpenChange={() => handleProjectFormCancel()}>
           <SheetContent className="w-full max-w-2xl overflow-y-auto">
             <SheetHeader>
               <SheetTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</SheetTitle>
@@ -398,7 +443,7 @@ export function Dashboard() {
               projectId={editingProject?.id}
               initialData={editingProject} // Pass initialData for editing
               onSuccess={handleProjectFormSuccess}
-              onCancel={closeProjectForm}
+              onCancel={handleProjectFormCancel}
             />
           </SheetContent>
         </Sheet>
@@ -406,7 +451,7 @@ export function Dashboard() {
 
       {modals.gitHubImport && (
         <GitHubImportWizard
-          onClose={closeGitHubImport}
+          onClose={handleCloseGitHubImport}
           onImportComplete={handleGitHubImportComplete}
         />
       )}
@@ -430,6 +475,13 @@ export function Dashboard() {
           onClose={handleCloseWorkLogGenerator}
         />
       )}
+
+      {/* Onboarding Dialog */}
+      <OnboardingDialog
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onAction={handleOnboardingAction}
+      />
 
     </div>
   );

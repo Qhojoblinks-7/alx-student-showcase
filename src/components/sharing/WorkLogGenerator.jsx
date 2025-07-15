@@ -60,6 +60,12 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
         customMessage
       );
       setOptimizedContent(content);
+      // --- DEBUG LOG ---
+      console.log('WorkLogGenerator - Optimized Content:', content);
+      // --- END DEBUG LOG ---
+    } else if (!workLog && !customMessage) {
+      // Clear optimized content if no work log and no custom message
+      setOptimizedContent({});
     }
   }, [workLog, customMessage, repoInfo, githubUrl]);
 
@@ -96,11 +102,15 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
           stars: repoData.stargazers_count,
           forks: repoData.forks_count
         });
+        console.log('WorkLogGenerator - Fetched Repo Info:', repoData); // DEBUG LOG
+      } else {
+        console.error('WorkLogGenerator - Failed to fetch repo info:', repoResponse.statusText); // DEBUG LOG
       }
 
       if (log) {
         setWorkLog(log);
         toast.success(`Generated work log with ${log.commitCount} commits from the last ${timeframe} days`);
+        console.log('WorkLogGenerator - Generated Work Log:', log); // DEBUG LOG
       } else {
         toast.warning(`No commits found in the last ${timeframe} days`);
         setWorkLog(null);
@@ -157,7 +167,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
     ];
   };
 
-  const PlatformCard = ({ platform, icon: Icon, title, content, length, limit }) => {
+  const PlatformCard = ({ platform, icon: Icon, title, content, length, limit, isOptimized }) => {
     const warningThreshold = limit ? limit * 0.9 : 1000;
     const isNearLimit = length > warningThreshold;
     
@@ -169,10 +179,18 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
               <Icon className="h-5 w-5" />
               <h3 className="font-semibold">{title}</h3>
             </div>
-            <div className={`text-xs px-2 py-1 rounded ${
-              isNearLimit ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
-            }`}>
-              {length}{limit ? `/${limit}` : ''} chars
+            <div className="flex items-center gap-2"> {/* Added flex container for badge and length */}
+              {isOptimized && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                  <Zap className="h-3 w-3 mr-1" />
+                  Optimized
+                </Badge>
+              )}
+              <div className={`text-xs px-2 py-1 rounded ${
+                isNearLimit ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {length}{limit ? `/${limit}` : ''} chars
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -215,7 +233,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <BarChart3 className="h-5 w-5 text-blue-600" />
-            <h3 className="font-semibold text-blue-900">{repoInfo.name} - Work Log</h3>
+            <h3 className="font-semibold text-blue-900 break-words">{repoInfo.name} - Work Log</h3> {/* Added break-words */}
             <Badge variant="outline" className="bg-blue-100 text-blue-800">
               Last {timeframe} days
             </Badge>
@@ -241,10 +259,10 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
           </div>
 
           {repoInfo && (
-            <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-              <span>{repoInfo.language}</span>
-              <span>⭐ {repoInfo.stars}</span>
-              <span>🍴 {repoInfo.forks}</span>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3"> {/* Added flex-wrap */}
+              {repoInfo.language && <span>{repoInfo.language}</span>}
+              {repoInfo.stars !== undefined && <span>⭐ {repoInfo.stars}</span>}
+              {repoInfo.forks !== undefined && <span>🍴 {repoInfo.forks}</span>}
             </div>
           )}
 
@@ -254,7 +272,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                 <GitCommit className="h-4 w-4 text-gray-500" />
                 <span className="text-sm font-medium">Latest commit:</span>
               </div>
-              <p className="text-sm text-gray-700 truncate">{latestCommit.message}</p>
+              <p className="text-sm text-gray-700 break-words">{latestCommit.message}</p> {/* Changed truncate to break-words */}
               <p className="text-xs text-gray-500 mt-1">
                 {new Date(latestCommit.date).toLocaleDateString()}
               </p>
@@ -267,7 +285,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-6xl max-h-[90vh] overflow-y-auto"> {/* Added w-full */}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -282,7 +300,8 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="github-url">GitHub Repository URL</Label>
-                  <div className="flex gap-2 mt-1">
+                  {/* Changed to flex-col on mobile, then flex on sm and up */}
+                  <div className="flex flex-col sm:flex-row gap-2 mt-1"> 
                     <Input
                       id="github-url"
                       placeholder="https://github.com/username/repository"
@@ -291,7 +310,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                       className="flex-1"
                     />
                     <Select value={timeframe} onValueChange={setTimeframe}>
-                      <SelectTrigger className="w-32">
+                      <SelectTrigger className="w-full sm:w-32"> {/* Adjusted width for mobile */}
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -305,6 +324,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                     <Button
                       onClick={fetchWorkLog}
                       disabled={loadingWorkLog || !githubUrl.trim()}
+                      className="w-full sm:w-auto" /* Adjusted width for mobile */
                     >
                       {loadingWorkLog ? (
                         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -337,7 +357,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                     <button
                       key={index}
                       onClick={() => setCustomMessage(template)}
-                      className="text-left p-2 rounded border hover:bg-gray-50 text-sm"
+                      className="text-left p-2 rounded border hover:bg-gray-50 text-sm break-words" /* Added break-words */
                     >
                       {template}
                     </button>
@@ -376,6 +396,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                   icon={Twitter}
                   title="Twitter/X"
                   content={optimizedContent.twitter?.content || ''}
+                  isOptimized={optimizedContent.twitter?.optimized}
                   length={optimizedContent.twitter?.length || 0}
                   limit={280}
                 />
@@ -384,6 +405,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                   icon={Linkedin}
                   title="LinkedIn"
                   content={optimizedContent.linkedin?.content || ''}
+                  isOptimized={optimizedContent.linkedin?.optimized}
                   length={optimizedContent.linkedin?.length || 0}
                   limit={1300}
                 />
@@ -392,6 +414,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                   icon={Facebook}
                   title="Facebook"
                   content={optimizedContent.facebook?.content || ''}
+                  isOptimized={optimizedContent.facebook?.optimized}
                   length={optimizedContent.facebook?.length || 0}
                   limit={400}
                 />
@@ -400,6 +423,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                   icon={MessageSquare}
                   title="Discord"
                   content={optimizedContent.discord?.content || ''}
+                  isOptimized={optimizedContent.discord?.optimized}
                   length={optimizedContent.discord?.length || 0}
                   limit={2000}
                 />

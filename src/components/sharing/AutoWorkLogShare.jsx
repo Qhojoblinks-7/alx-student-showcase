@@ -41,29 +41,52 @@ export function AutoWorkLogShare({ project, onClose }) {
   const [timeframe, setTimeframe] = useState('7');
   const [optimizedContent, setOptimizedContent] = useState({});
   const [selectedPlatforms, setSelectedPlatforms] = useState(new Set(['twitter', 'linkedin']));
+  const [activeTab, setActiveTab] = useState('auto'); // State to control active tab
 
   // Auto-fetch work log on component mount
   useEffect(() => {
+    console.log('[AutoWorkLogShare Debug] useEffect: autoMode changed or project.github_url changed. autoMode:', autoMode, 'github_url:', project.github_url);
     if (autoMode && project.github_url) {
       fetchWorkLog();
+    } else if (!autoMode) {
+      console.log('[AutoWorkLogShare Debug] Auto mode is off. Not fetching work log.');
+      setWorkLog(null); // Clear work log if auto mode is off
+    } else if (!project.github_url) {
+      console.log('[AutoWorkLogShare Debug] No GitHub URL provided. Cannot fetch work log.');
+      setWorkLog(null);
     }
   }, [project.github_url, timeframe, autoMode]);
 
   // Generate optimized content when work log or custom message changes
   useEffect(() => {
-    if (project) {
+    console.log('[AutoWorkLogShare Debug] useEffect: workLog or customMessage changed.');
+    console.log('[AutoWorkLogShare Debug] Current workLog:', workLog);
+    console.log('[AutoWorkLogShare Debug] Current customMessage:', customMessage);
+
+    // Ensure project and workLog are available before generating content
+    if (project && (workLog || customMessage)) { // Generate if workLog exists OR if there's a custom message
+      console.log('[AutoWorkLogShare Debug] Generating optimized content...');
       const content = SocialContentOptimizer.generatePlatformContent(
         project, 
         workLog, 
         customMessage
       );
       setOptimizedContent(content);
+      // This log is crucial! Check your browser's console for this output.
+      // If you see content here, it means the generation is working, but rendering is not.
+      console.log('[AutoWorkLogShare Debug] Optimized Content:', content);
+    } else if (!workLog && !customMessage) {
+      console.log('[AutoWorkLogShare Debug] No work log or custom message, clearing optimized content.');
+      // Clear optimized content if no work log and no custom message
+      setOptimizedContent({});
     }
   }, [project, workLog, customMessage]);
 
   const fetchWorkLog = useCallback(async () => {
+    console.log('[AutoWorkLogShare Debug] fetchWorkLog called.');
     if (!project.github_url) {
       toast.error('No GitHub URL found for this project');
+      console.log('[AutoWorkLogShare Debug] No GitHub URL, returning.');
       return;
     }
 
@@ -73,6 +96,7 @@ export function AutoWorkLogShare({ project, onClose }) {
       if (!githubInfo) {
         throw new Error('Invalid GitHub URL');
       }
+      console.log('[AutoWorkLogShare Debug] Parsed GitHub Info:', githubInfo);
 
       const log = await GitHubCommitsService.generateWorkLog(
         githubInfo.username, 
@@ -83,17 +107,20 @@ export function AutoWorkLogShare({ project, onClose }) {
       if (log) {
         setWorkLog(log);
         toast.success(`Fetched ${log.commitCount} commits from the last ${timeframe} days`);
+        console.log('[AutoWorkLogShare Debug] Work log fetched successfully:', log);
       } else {
         toast.warning(`No commits found in the last ${timeframe} days`);
         setWorkLog(null);
+        console.log('[AutoWorkLogShare Debug] No commits found for work log.');
       }
     } catch (error) {
       // Explicitly convert error to string for robust logging
-      console.error('Error fetching work log:', error.message ? String(error.message) : String(error));
+      console.error('[AutoWorkLogShare Debug] Error fetching work log:', error.message ? String(error.message) : String(error));
       toast.error('Failed to fetch work log: ' + (error.message || 'Unknown error'));
       setWorkLog(null);
     } finally {
       setLoadingWorkLog(false);
+      console.log('[AutoWorkLogShare Debug] setLoadingWorkLog(false)');
     }
   }, [project.github_url, timeframe]);
 
@@ -109,6 +136,7 @@ export function AutoWorkLogShare({ project, onClose }) {
   };
 
   const shareToSocial = (platform, content) => {
+    console.log(`[AutoWorkLogShare Debug] Attempting to share to ${platform} with content:`, content);
     const encodedContent = encodeURIComponent(content);
     const projectUrl = project.live_url || project.github_url || '';
     
@@ -124,6 +152,7 @@ export function AutoWorkLogShare({ project, onClose }) {
   };
 
   const togglePlatform = (platform) => {
+    console.log(`[AutoWorkLogShare Debug] Toggling platform selection for: ${platform}`);
     const newSelected = new Set(selectedPlatforms);
     if (newSelected.has(platform)) {
       newSelected.delete(platform);
@@ -134,6 +163,7 @@ export function AutoWorkLogShare({ project, onClose }) {
   };
 
   const shareToAllSelected = () => {
+    console.log('[AutoWorkLogShare Debug] Sharing to all selected platforms.');
     selectedPlatforms.forEach(platform => {
       if (optimizedContent[platform] && platform !== 'discord') {
         setTimeout(() => {
@@ -144,10 +174,14 @@ export function AutoWorkLogShare({ project, onClose }) {
     toast.success(`Opened ${selectedPlatforms.size} sharing windows`);
   };
 
+  // This is the component that renders each social media card.
+  // It receives the content from the 'optimizedContent' state.
   const PlatformCard = ({ platform, icon: Icon, title, content, isOptimized, length, limit }) => {
     const isSelected = selectedPlatforms.has(platform);
     const warningThreshold = limit ? limit * 0.9 : 1000;
     const isNearLimit = length > warningThreshold;
+    
+    console.log(`[AutoWorkLogShare Debug] Rendering PlatformCard for ${platform}. Content length: ${length}, Is selected: ${isSelected}`);
     
     return (
       <Card className={`transition-all ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
@@ -198,7 +232,7 @@ export function AutoWorkLogShare({ project, onClose }) {
                 size="sm"
                 onClick={() => shareToSocial(platform, content)}
                 className="flex-1"
-                disabled={!isSelected}
+                disabled={!isSelected} // This button is disabled if the platform is not selected
               >
                 Share
               </Button>
@@ -250,7 +284,8 @@ export function AutoWorkLogShare({ project, onClose }) {
                 <GitCommit className="h-4 w-4 text-gray-500" />
                 <span className="text-sm font-medium">Latest commit:</span>
               </div>
-              <p className="text-sm text-gray-700 truncate">{latestCommit.message}</p>
+              {/* Removed 'truncate' and added 'break-words' to ensure full message wraps */}
+              <p className="text-sm text-gray-700 break-words">{latestCommit.message}</p>
               <p className="text-xs text-gray-500 mt-1">
                 {new Date(latestCommit.date).toLocaleDateString()}
               </p>
@@ -328,8 +363,9 @@ export function AutoWorkLogShare({ project, onClose }) {
 
           {/* Project Overview */}
           <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-lg mb-2">{project.title}</h3>
-            <p className="text-gray-700 mb-2">{project.description}</p>
+            {/* Added 'break-words' to title and description */}
+            <h3 className="font-semibold text-lg mb-2 break-words">{project.title}</h3>
+            <p className="text-gray-700 mb-2 break-words">{project.description}</p>
             <div className="flex flex-wrap gap-1 mb-2">
               {project.technologies?.map((tech, index) => (
                 <Badge key={index} variant="secondary" className="text-xs">
@@ -355,13 +391,15 @@ export function AutoWorkLogShare({ project, onClose }) {
             )}
           </div>
 
-          <Tabs defaultValue="auto" className="w-full">
+          {/* This is the Tabs component where the social media cards should appear */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full"> {/* Changed to controlled component */}
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="auto">Auto-Generated Content</TabsTrigger>
               <TabsTrigger value="custom">Custom Message</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="auto" className="space-y-4">
+            {/* Content for Auto-Generated Tab */}
+            <TabsContent value="auto" className="space-y-4 rounded-md min-h-[200px]"> {/* Removed temporary background */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
@@ -374,11 +412,16 @@ export function AutoWorkLogShare({ project, onClose }) {
                   disabled={selectedPlatforms.size === 0}
                   className="flex items-center gap-2"
                 >
-                  <TrendingUp className="h-4 w-4" />
-                  Share to Selected ({selectedPlatforms.size})
+                  
+                  Share ({selectedPlatforms.size})
                 </Button>
               </div>
 
+              {/* Debugging log before rendering PlatformCards */}
+              {console.log('[AutoWorkLogShare Debug] Rendering PlatformCards. Optimized content keys:', Object.keys(optimizedContent))}
+
+              {/* These are the PlatformCards that should be visible */}
+              {/* They will only render if optimizedContent has data for them */}
               <div className="grid gap-4 md:grid-cols-2">
                 <PlatformCard
                   platform="twitter"
@@ -419,7 +462,8 @@ export function AutoWorkLogShare({ project, onClose }) {
               </div>
             </TabsContent>
             
-            <TabsContent value="custom" className="space-y-4">
+            {/* Content for Custom Message Tab */}
+            <TabsContent value="custom" className="space-y-4 rounded-md min-h-[200px]"> {/* Removed temporary background */}
               <div>
                 <Label className="block text-sm font-medium mb-2">
                   Custom Message
@@ -432,6 +476,7 @@ export function AutoWorkLogShare({ project, onClose }) {
                 />
               </div>
               
+              {/* These PlatformCards will only show if a customMessage is present */}
               {customMessage && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <PlatformCard

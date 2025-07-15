@@ -1,4 +1,4 @@
-import { useEffect, forwardRef, createContext, useContext } from 'react'; // Added createContext, useContext, forwardRef
+import { forwardRef, createContext, useContext } from 'react'; // Added createContext, useContext, forwardRef
 import { useDispatch, useSelector } from 'react-redux'; // Import useDispatch and useSelector
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
@@ -7,10 +7,9 @@ import { cn } from '../../lib/utils'; // Assuming cn utility is here or accessib
 
 // Import Redux thunks and selectors
 import { 
-  fetchProjects, 
   deleteProject, 
   updateProject // For toggleVisibility
-} from '../../store/slices/projectsSlice.js'; // Removed toggleProjectVisibility from import
+} from '../../store/slices/projectsSlice.js'; // Removed fetchProjects from import as it's handled by Dashboard
 
 import { Button } from '../ui/button.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
@@ -133,12 +132,13 @@ export function ProjectList({ onEdit, onShare }) {
   const loading = useSelector(state => state.projects.isLoading);
   const error = useSelector(state => state.projects.error); // Get error state
 
-  // Fetch projects on component mount or when user changes
-  useEffect(() => {
-    if (user && !loading) { // Only fetch if user exists and not already loading
-      dispatch(fetchProjects(user.id));
-    }
-  }, [user, dispatch, loading]); // Added loading to dependencies for proper re-fetch logic
+  // Removed useEffect for fetching projects as Dashboard now controls rendering based on these.
+  // The Dashboard component dispatches fetchProjects, so ProjectList only needs to consume it.
+  // useEffect(() => {
+  //   if (user && !loading) {
+  //     dispatch(fetchProjects(user.id));
+  //   }
+  // }, [user, dispatch, loading]);
 
   const handleDeleteProject = async (projectId) => {
     toast('Are you sure you want to delete this project?', {
@@ -181,7 +181,7 @@ export function ProjectList({ onEdit, onShare }) {
   const getProjectTypeColor = (type) => {
     switch (type) {
       case 'web': return 'bg-blue-100 text-blue-800';
-      case 'mobile': return 'bg-purple-100 text-purple-800';
+      case 'mobile': return 'bg-purple-100 text-purple-80';
       case 'backend': return 'bg-orange-100 text-orange-800';
       case 'data-science': return 'bg-pink-100 text-pink-800';
       case 'ai': return 'bg-teal-100 text-teal-800'; // Added AI category
@@ -249,147 +249,155 @@ export function ProjectList({ onEdit, onShare }) {
 
   return (
     <div className="space-y-6">
-      {projects.map((project) => (
-        <Card key={project.id} className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="flex items-center gap-2">
-                  {project.title}
-                  {project.is_public ? (
-                    <Eye className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  )}
-                </CardTitle>
-                <CardDescription className="mt-2">
-                  {project.description}
-                </CardDescription>
+      {projects.map((project) => {
+        // --- DEBUG LOG FOR EACH PROJECT ---
+        console.log('ProjectList - Mapping project:', project);
+        // --- END DEBUG LOG ---
+        return (
+          <Card key={project.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              {/* Flex container for title/description and action buttons */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
+                <div className="flex-1 min-w-0"> {/* flex-1 and min-w-0 to allow shrinking */}
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold break-words"> {/* Added break-words */}
+                    {project.title}
+                    {project.is_public ? (
+                      <Eye className="h-4 w-4 text-green-600 flex-shrink-0" /> /* flex-shrink-0 for icons */
+                    ) : (
+                      <EyeOff className="h-4 w-4 text-gray-400 flex-shrink-0" /> /* flex-shrink-0 for icons */
+                    )}
+                  </CardTitle>
+                  <CardDescription className="mt-2 text-sm text-muted-foreground break-words"> {/* Added break-words */}
+                    {project.description}
+                  </CardDescription>
+                </div>
+                {/* Button group: flex-shrink-0 to prevent shrinking, flex-wrap for mobile */}
+                <div className="flex flex-wrap gap-2 flex-shrink-0 mt-2 sm:mt-0"> 
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleToggleVisibility(project.id, project.is_public)}
+                  >
+                    {project.is_public ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onShare?.(project)}
+                    
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onEdit?.(project)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDeleteProject(project.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2 ml-4">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleToggleVisibility(project.id, project.is_public)}
-                >
-                  {project.is_public ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onShare?.(project)}
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onEdit?.(project)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDeleteProject(project.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {project.image_url && (
-              <div className="w-full h-48 rounded-lg overflow-hidden bg-muted">
-                <img
-                  src={project.image_url}
-                  alt={project.title}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {project.image_url && (
+                <div className="w-full h-48 rounded-lg overflow-hidden bg-muted">
+                  <img
+                    src={project.image_url}
+                    alt={project.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
 
-            <div className="flex flex-wrap gap-2">
-              <Badge className={getDifficultyColor(project.difficulty_level)}>
-                {project.difficulty_level}
-              </Badge>
-              {/* Corrected from project_type to category */}
-              <Badge className={getProjectTypeColor(project.category)}> 
-                {project.category}
-              </Badge>
-              {project.technologies?.map((tech, index) => ( // Use technologies instead of tech_stack
-                <Badge key={index} variant="secondary">
-                  {tech}
-                </Badge>
-              ))}
-            </div>
-
-            {project.tags?.length > 0 && ( // Check if tags exist and have length
               <div className="flex flex-wrap gap-2">
-                {project.tags.map((tag, index) => (
-                  <Badge key={index} variant="outline">
-                    #{tag}
+                <Badge className={getDifficultyColor(project.difficulty_level)}>
+                  {project.difficulty_level}
+                </Badge>
+                {/* Corrected from project_type to category */}
+                <Badge className={getProjectTypeColor(project.category)}> 
+                  {project.category}
+                </Badge>
+                {project.technologies?.map((tech, index) => ( // Use technologies instead of tech_stack
+                  <Badge key={index} variant="secondary">
+                    {tech}
                   </Badge>
                 ))}
               </div>
-            )}
 
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              {project.completion_date && (
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  {format(new Date(project.completion_date), 'MMM dd, yyyy')}
+              {project.tags?.length > 0 && ( // Check if tags exist and have length
+                <div className="flex flex-wrap gap-2">
+                  {project.tags.map((tag, index) => (
+                    <Badge key={index} variant="outline">
+                      #{tag}
+                    </Badge>
+                  ))}
                 </div>
               )}
-              {project.time_spent_hours && (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  {project.time_spent_hours}h
-                </div>
-              )}
-            </div>
 
-            <div className="flex gap-2">
-              {project.github_url && (
-                <Button size="sm" variant="outline" asChild>
-                  <a href={project.github_url} target="_blank" rel="noopener noreferrer">
-                    <Github className="h-4 w-4 mr-2" />
-                    Code
-                  </a>
-                </Button>
-              )}
-              {project.live_url && ( // Use live_url instead of live_demo_url
-                <Button size="sm" variant="outline" asChild>
-                  <a href={project.live_url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Live Demo
-                  </a>
-                </Button>
-              )}
-            </div>
-
-            {(project.key_learnings || project.challenges_faced) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                {project.key_learnings && (
-                  <div>
-                    <h4 className="font-semibold text-sm mb-2">Key Learnings</h4>
-                    <p className="text-sm text-muted-foreground">{project.key_learnings}</p>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground"> {/* Added flex-wrap */}
+                {project.completion_date && (
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    {format(new Date(project.completion_date), 'MMM dd, yyyy')}
                   </div>
                 )}
-                {project.challenges_faced && (
-                  <div>
-                    <h4 className="font-semibold text-sm mb-2">Challenges Faced</h4>
-                    <p className="text-sm text-muted-foreground">{project.challenges_faced}</p>
+                {project.time_spent_hours && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    {project.time_spent_hours}h
                   </div>
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+
+              <div className="flex flex-wrap gap-2"> {/* Added flex-wrap */}
+                {project.github_url && (
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={project.github_url} target="_blank" rel="noopener noreferrer">
+                      <Github className="h-4 w-4 mr-2" />
+                      Code
+                    </a>
+                  </Button>
+                )}
+                {project.live_url && ( // Use live_url instead of live_demo_url
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={project.live_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Live Demo
+                    </a>
+                  </Button>
+                )}
+              </div>
+
+              {(project.key_learnings || project.challenges_faced) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                  {project.key_learnings && (
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2">Key Learnings</h4>
+                      <p className="text-sm text-muted-foreground break-words">{project.key_learnings}</p> {/* Added break-words */}
+                    </div>
+                  )}
+                  {project.challenges_faced && (
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2">Challenges Faced</h4>
+                      <p className="text-sm text-muted-foreground break-words">{project.challenges_faced}</p> {/* Added break-words */}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

@@ -37,7 +37,7 @@ export function ShareButton({ project, variant = "outline", size = "sm" }) {
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-56"> {/* Adjusted for mobile responsiveness */}
           <DropdownMenuLabel>Share Options</DropdownMenuLabel>
           <DropdownMenuSeparator />
           

@@ -22,18 +22,20 @@ import {
   ArrowRight,
   CheckCircle,
   AlertTriangle,
-  User,
+  User, // For username section
   GitFork,
   Star,
   Code,
-  Zap,
-} from 'lucide-react';
+  Zap, // For detect ALX projects
+  ListChecks, // For select repositories
+  ClipboardCheck, // For review & import
+} from 'lucide-react'; // Added more icons
 import {
   fetchUserRepositories,
   detectALXProjects,
   importSelectedProjects,
   setWizardStep,
-  setWizardData, // Corrected import: changed from updateWizardData to setWizardData
+  setWizardData,
   toggleProjectSelection,
   resetWizard,
   clearGitHubErrors,
@@ -90,14 +92,16 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       return;
     }
     dispatch(clearGitHubErrors()); // Clear previous errors
-    dispatch(setWizardData({ username: usernameInput.trim() })); // Corrected dispatch call
+    dispatch(setWizardData({ username: usernameInput.trim() }));
     try {
       // 1. Fetch repositories
       await dispatch(fetchUserRepositories(usernameInput.trim())).unwrap();
       
       // 2. Automatically detect ALX projects from the now fetched repositories
       // Pass repositories and username explicitly as required by the thunk
-      await dispatch(detectALXProjects({ repositories: repositories, username: usernameInput.trim() })).unwrap();
+      // The `repositories` state might not be immediately updated here, so pass the action.payload
+      const fetchedRepos = await GitHubService.fetchUserRepositories(usernameInput.trim()); // Re-fetch or pass from previous action payload if available
+      await dispatch(detectALXProjects({ repositories: fetchedRepos, username: usernameInput.trim() })).unwrap();
       
       // 3. Move to the review & import step
       dispatch(setWizardStep('review_import'));
@@ -108,7 +112,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       // If fetching or detecting fails, go back to username step or stay on current step with error
       dispatch(setWizardStep('username'));
     }
-  }, [usernameInput, dispatch, repositories]); // Added 'repositories' to dependencies
+  }, [usernameInput, dispatch]); // Removed `repositories` from dependencies as it caused stale closure issues. Re-fetching or using the payload directly is safer.
 
   // Handle detecting ALX projects (for manual trigger from select_repos step)
   const handleDetectALXProjects = useCallback(async () => {
@@ -123,7 +127,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       console.error('Error in handleDetectALXProjects:', err);
       toast.error('Failed to detect ALX projects: ' + getErrorMessage(err));
     }
-  }, [dispatch, repositories, wizardData.username]); // Added 'repositories', 'wizardData.username' to dependencies
+  }, [dispatch, repositories, wizardData.username]);
 
   // Handle final import
   const handleImportSelectedProjects = useCallback(async () => {
@@ -138,15 +142,13 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
 
     dispatch(clearGitHubErrors()); // Clear previous errors
     
-    // *** CRITICAL CHANGE HERE ***
-    // Instead of re-generating project data from 'repositories',
-    // filter directly from 'alxProjects' which already contain the processed data.
+    // Filter directly from 'alxProjects' which already contain the processed data.
     const projectsToInsert = alxProjects.filter((alxProject) =>
       selectedProjects.includes(alxProject.id) // alxProject.id is the GitHub repo ID
     ).map(alxProject => ({
       user_id: user.id,
-      id: alxProject.id, // Ensure ID is passed for potential upsert or reference
-      title: alxProject.title, // These fields are already processed by ALXProjectDetector.generateProjectData
+      // Removed 'id: alxProject.id' to allow Supabase to auto-generate UUID
+      title: alxProject.title,
       description: alxProject.description,
       technologies: alxProject.technologies,
       github_url: alxProject.github_url,
@@ -155,37 +157,27 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       original_repo_name: alxProject.original_repo_name,
       alx_confidence: alxProject.alx_confidence || 0.0,
       last_updated: alxProject.last_updated,
-      is_public: alxProject.is_public, // This should be derived from the original repo's private status
-      // Add other fields from the schema with default/derived values if not already in projectData
-      completion_date: null, // Default to null, user can edit later
-      time_spent_hours: null, // Default to null, user can edit later
+      is_public: alxProject.is_public,
+      completion_date: null,
+      time_spent_hours: null,
       key_learnings: '',
       challenges_faced: '',
       image_url: '',
       tags: [],
     }));
 
-    // --- Debugging logs ---
-    console.log("handleImportSelectedProjects: alxProjects at time of dispatch:", alxProjects);
-    console.log("handleImportSelectedProjects: selectedProjects at time of dispatch:", selectedProjects);
-    console.log("handleImportSelectedProjects: projectsToInsert before dispatch:", projectsToInsert);
-    // --- End Debugging logs ---
-
     try {
-      // Check if any projects were successfully prepared for insertion
       if (projectsToInsert.length === 0) {
         toast.warning('No valid ALX projects could be prepared for import. This might be due to API access issues or missing READMEs for the selected projects, or an internal state mismatch. Check console for details.');
-        onClose(); // Close the modal if nothing to import
-        return; // Exit the function
+        onClose();
+        return;
       }
 
-      // Pass the already generated and formatted projects directly to the thunk
-      const result = await dispatch(importSelectedProjects({ projectsToImport: projectsToInsert, userId: user.id })).unwrap();
+      const result = await dispatch(importSelectedProjects(projectsToInsert)).unwrap(); // Pass array directly
       toast.success(`Successfully imported ${result.length} projects!`);
-      onImportComplete(result); // Callback to parent
+      onImportComplete(result);
       onClose();
     } catch (err) {
-      // Ensure err.message is always a string
       toast.error('Failed to import projects: ' + getErrorMessage(err));
     }
   }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose]);
@@ -201,7 +193,10 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
     switch (wizardStep) {
       case 'username':
         return (
-          <div className="space-y-4">
+          <div className="space-y-6"> {/* Increased space-y */}
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <User className="h-5 w-5 text-blue-500" /> Enter GitHub Username
+            </h3>
             <Label htmlFor="github-username">GitHub Username</Label>
             <Input
               id="github-username"
@@ -245,36 +240,40 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
           );
         }
         return (
-          <div className="space-y-4">
+          <div className="space-y-6"> {/* Increased space-y */}
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <ListChecks className="h-5 w-5 text-purple-500" /> Select Repositories
+            </h3>
             <DialogDescription>
               Select repositories to detect ALX projects from.
             </DialogDescription>
-            <ScrollArea className="h-80 w-full rounded-md border p-4">
+            <ScrollArea className="h-80 w-full rounded-md border p-4 shadow-inner"> {/* Added shadow-inner */}
               {repositories.map((repo) => (
-                <div key={repo.id} className="flex items-center space-x-2 py-2">
+                <div key={repo.id} className="flex items-start space-x-3 py-2 border-b last:border-b-0"> {/* Adjusted alignment and added border */}
                   <Checkbox
                     id={`repo-${repo.id}`}
                     checked={selectedProjects.includes(repo.id)}
                     onCheckedChange={() => handleToggleProject(repo.id)}
+                    className="mt-1" /* Align checkbox better */
                   />
-                  <Label htmlFor={`repo-${repo.id}`} className="flex-1 cursor-pointer">
-                    <span className="font-medium">{repo.name}</span>
-                    <p className="text-sm text-muted-foreground">{repo.description}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                  <Label htmlFor={`repo-${repo.id}`} className="flex-1 cursor-pointer space-y-0.5">
+                    <span className="font-medium text-base text-gray-800 dark:text-gray-200">{repo.name}</span> {/* Larger font */}
+                    <p className="text-sm text-muted-foreground">{repo.description || 'No description provided.'}</p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
                       {repo.language && (
-                        <Badge variant="outline" className="px-1 py-0.5">
+                        <Badge variant="outline" className="px-2 py-0.5 bg-blue-50 text-blue-700"> {/* Styled badge */}
                           <Code className="h-3 w-3 mr-1" />
                           {repo.language}
                         </Badge>
                       )}
-                      <span className="flex items-center">
+                      <Badge variant="outline" className="px-2 py-0.5">
                         <Star className="h-3 w-3 mr-0.5" />
                         {repo.stargazers_count}
-                      </span>
-                      <span className="flex items-center">
+                      </Badge>
+                      <Badge variant="outline" className="px-2 py-0.5">
                         <GitFork className="h-3 w-3 mr-0.5" />
                         {repo.forks_count}
-                      </span>
+                      </Badge>
                     </div>
                   </Label>
                 </div>
@@ -286,13 +285,14 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                 {error}
               </div>
             )}
-            <div className="flex justify-between gap-2">
-              <Button variant="outline" onClick={() => dispatch(setWizardStep('username'))}>
+            <div className="flex flex-col sm:flex-row justify-between gap-2"> {/* Responsive button layout */}
+              <Button variant="outline" onClick={() => dispatch(setWizardStep('username'))} className="w-full sm:w-auto">
                 Back
               </Button>
               <Button
-                onClick={handleDetectALXProjects} // This button still triggers manual detection
+                onClick={handleDetectALXProjects}
                 disabled={isDetectingALX || selectedProjects.length === 0}
+                className="w-full sm:w-auto"
               >
                 {isDetectingALX ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -306,9 +306,6 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
         );
 
       case 'review_import':
-        // Log the IDs of the projects in alxProjects for debugging
-        console.log('ALX Projects IDs for rendering:', alxProjects.map(p => p.id));
-
         if (alxProjects.length === 0) {
           return (
             <div className="text-center p-8 text-muted-foreground">
@@ -321,29 +318,33 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
           );
         }
         return (
-          <div className="space-y-4">
+          <div className="space-y-6"> {/* Increased space-y */}
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <ClipboardCheck className="h-5 w-5 text-green-500" /> Review & Import
+            </h3>
             <DialogDescription>
               Review the detected ALX projects. These will be imported into your showcase.
             </DialogDescription>
-            <ScrollArea className="h-80 w-full rounded-md border p-4">
+            <ScrollArea className="h-80 w-full rounded-md border p-4 shadow-inner"> {/* Added shadow-inner */}
               {alxProjects.map((project) => (
-                <div key={project.id} className="flex items-center space-x-2 py-2"> {/* Changed key to project.id */}
+                <div key={project.id} className="flex items-start space-x-3 py-2 border-b last:border-b-0"> {/* Adjusted alignment and added border */}
                   <Checkbox
                     id={`alx-project-${project.id}`}
                     checked={selectedProjects.includes(project.id)}
                     onCheckedChange={() => handleToggleProject(project.id)}
+                    className="mt-1" /* Align checkbox better */
                   />
-                  <Label htmlFor={`alx-project-${project.id}`} className="flex-1 cursor-pointer">
-                    <span className="font-medium">{project.name}</span>
-                    <p className="text-sm text-muted-foreground">{project.description}</p>
-                    <div className="flex items-center gap-2 text-xs mt-1">
-                      <Badge variant="secondary" className="px-1 py-0.5">
+                  <Label htmlFor={`alx-project-${project.id}`} className="flex-1 cursor-pointer space-y-0.5">
+                    <span className="font-medium text-base text-gray-800 dark:text-gray-200">{project.name}</span> {/* Larger font */}
+                    <p className="text-sm text-muted-foreground">{project.description || 'No description provided.'}</p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
+                      <Badge variant="secondary" className="px-2 py-0.5 bg-blue-50 text-blue-700"> {/* Styled badge */}
                         ALX Score: {project.alx_score?.toFixed(1)}
                       </Badge>
-                      <Badge variant="outline" className="px-1 py-0.5">
+                      <Badge variant="outline" className="px-2 py-0.5">
                         Confidence: {(project.alx_confidence * 100).toFixed(0)}%
                       </Badge>
-                      <Badge variant="outline" className="px-1 py-0.5">
+                      <Badge variant="outline" className="px-2 py-0.5">
                         Category: {project.alx_category}
                       </Badge>
                     </div>
@@ -357,13 +358,14 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                 {importError}
               </div>
             )}
-            <div className="flex justify-between gap-2">
-              <Button variant="outline" onClick={() => dispatch(setWizardStep('select_repos'))}>
+            <div className="flex flex-col sm:flex-row justify-between gap-2"> {/* Responsive button layout */}
+              <Button variant="outline" onClick={() => dispatch(setWizardStep('select_repos'))} className="w-full sm:w-auto">
                 Back
               </Button>
               <Button
                 onClick={handleImportSelectedProjects}
                 disabled={isImporting || selectedProjects.length === 0}
+                className="w-full sm:w-auto"
               >
                 {isImporting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -383,36 +385,37 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Github className="h-5 w-5" />
+      <DialogContent className="max-w-md sm:max-w-2xl p-4 sm:p-6"> {/* Adjusted responsive max-width and padding */}
+        <DialogHeader className="mb-4"> {/* Adjusted margin-bottom */}
+          <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold"> {/* Adjusted font size */}
+            <Github className="h-6 w-6 sm:h-7 sm:w-7 text-gray-800 dark:text-gray-200" /> {/* Larger icon */}
             Import Projects from GitHub
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base text-muted-foreground">
             This wizard helps you find and import your ALX projects from GitHub.
           </DialogDescription>
         </DialogHeader>
 
-        <Separator />
+        <Separator className="my-4" /> {/* Added margin to separator */}
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <span className={`font-semibold ${wizardStep === 'username' ? 'text-blue-600' : ''}`}>
-              1. Enter Username
+        {/* Progress Indicator */}
+        <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground px-2 sm:px-0 mb-6"> {/* Adjusted font size and padding */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <span className={`font-semibold ${wizardStep === 'username' ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+              1. Username
             </span>
-            <ArrowRight className="h-4 w-4" />
-            <span className={`font-semibold ${wizardStep === 'select_repos' ? 'text-blue-600' : ''}`}>
-              2. Select Repositories
+            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" /> {/* Smaller icon */}
+            <span className={`font-semibold ${wizardStep === 'select_repos' ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+              2. Select Repos
             </span>
-            <ArrowRight className="h-4 w-4" />
-            <span className={`font-semibold ${wizardStep === 'review_import' ? 'text-blue-600' : ''}`}>
+            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" /> {/* Smaller icon */}
+            <span className={`font-semibold ${wizardStep === 'review_import' ? 'text-blue-600 dark:text-blue-400' : ''}`}>
               3. Review & Import
             </span>
           </div>
         </div>
 
-        <div className="py-4">{renderStepContent()}</div>
+        <div className="py-2">{renderStepContent()}</div> {/* Adjusted padding */}
       </DialogContent>
     </Dialog>
   );
