@@ -265,4 +265,4 @@ Happy Coding\! 🎉
 
 -----
 
-Copyright © 2025 [Your Name/Organization]. All rights reserved.
+Copyright © 2025 ***Immanuel Eshun Quansah***. All rights reserved.
