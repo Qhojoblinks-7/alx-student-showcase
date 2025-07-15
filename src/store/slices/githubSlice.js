@@ -1,20 +1,14 @@
-// githubSlice.js
-
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { createSelector } from 'reselect'; // Import createSelector for memoization
-import { supabase } from '../../lib/supabase.js'; // Corrected import path
-import { GitHubService, ALXProjectDetector } from '../../lib/github-service.js'; // Ensure this path is correct for your project structure
+import { GitHubService, ALXProjectDetector } from '../../lib/github-service.js'; // Corrected import path
+import { supabase } from '../../lib/supabase.js'; // Import Supabase client
 
-// No need for initializeSupabase here; supabase is imported directly from lib/supabase.js
-// and should be initialized once at the application entry point (e.g., main.jsx).
-
-// Async thunks for GitHub operations
-export const fetchUserRepositories = createAsyncThunk(
+// Async Thunks
+export const fetchUserRepositories = createAsyncThunk( // Renamed from fetchRepositories
   'github/fetchUserRepositories',
   async (username, { rejectWithValue }) => {
     try {
-      const repos = await GitHubService.fetchUserRepositories(username);
-      return repos;
+      const response = await GitHubService.fetchUserRepositories(username);
+      return response;
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -25,321 +19,223 @@ export const detectALXProjects = createAsyncThunk(
   'github/detectALXProjects',
   async ({ repositories, username }, { rejectWithValue }) => {
     try {
-      const alxProjects = await ALXProjectDetector.detectALXProjects(repositories, username);
-      return alxProjects;
+      // ALXProjectDetector.detectALXProjects now returns an object { alxProjects: [...], skippedProjects: [...] }
+      const detectionResult = await ALXProjectDetector.detectALXProjects(repositories, username);
+      return detectionResult; 
     } catch (error) {
       return rejectWithValue(error.message);
     }
   }
 );
 
-export const importSelectedProjects = createAsyncThunk(
-  'github/importSelectedProjects',
-  async ({ selectedProjects, repositories, username }, { rejectWithValue }) => {
+export const importSelectedProjects = createAsyncThunk( // Renamed from importProjects to importSelectedProjects
+  'github/importSelectedProjects', // Updated action type as well
+  async ({ projectsToImport, userId }, { rejectWithValue }) => {
+    console.log("[importSelectedProjects] Projects received for import:", projectsToImport); // Log projects received
     try {
-      // Supabase client is now directly imported and assumed to be initialized.
-      // User ID should be obtained from the Redux auth state or passed explicitly if needed for this operation's context.
-      // For this thunk, we'll assume the user.id is available in the component calling it,
-      // or that the RLS policies are set up to allow inserts based on auth.uid() without explicit user_id in payload.
-      // However, for explicit user_id, it should be passed from the component.
-      // For now, we'll assume the `user_id` is passed as part of `projectsToCreate` or inferred by RLS.
-
-      const selectedRepos = repositories.filter(repo => 
-        selectedProjects.includes(repo.id)
-      );
-      
-      const projectsToCreate = [];
-      
-      // Generate project data for each selected repository
-      for (const repo of selectedRepos) {
-        const projectData = await ALXProjectDetector.generateProjectData(repo, username);
-        
-        // Map to full database schema
-        const enhancedProjectData = {
-          ...projectData,
-          // user_id: userId, // Removed, as userId is not directly available here.
-                           // It should be added by the component calling this thunk,
-                           // or handled by RLS if the user is authenticated.
-          original_repo_name: repo.name,
-          alx_confidence: projectData.alx_confidence || 0.0,
-          last_updated: repo.updated_at || new Date().toISOString(),
-          is_public: !repo.private,
-          category: projectData.category || 'other',
-          technologies: projectData.technologies || [],
-          github_url: repo.html_url,
-          live_url: repo.homepage || null,
+      const imported = [];
+      for (const project of projectsToImport) {
+        // Prepare project data for Supabase insertion
+        const projectDataForDb = {
+          user_id: userId,
+          // Removed 'id: project.id' to allow Supabase to auto-generate UUID
+          title: project.title, // This will now correctly come from the processed alxProject object
+          description: project.description,
+          technologies: project.technologies || [], // Ensure it's an array
+          github_url: project.github_url,
+          live_url: project.live_url,
+          category: project.category,
+          original_repo_name: project.original_repo_name, // Keep original repo name
+          alx_confidence: project.alx_confidence,
+          last_updated: project.last_updated,
+          is_public: project.is_public,
+          completion_date: project.completion_date || null,
+          time_spent_hours: project.time_spent_hours || null,
+          key_learnings: project.key_learnings || '',
+          challenges_faced: project.challenges_faced || '',
+          image_url: project.image_url || '',
+          tags: project.tags || [], // Ensure it's an array
         };
+
+        // Insert project into Supabase database
+        const { data, error } = await supabase
+          .from('projects')
+          .insert([projectDataForDb])
+          .select(); // Use .select() to get the newly inserted row
+
+        if (error) {
+          console.error("Supabase insert error:", error);
+          throw new Error(`Failed to insert project ${project.title}: ${error.message}`);
+        }
         
-        projectsToCreate.push(enhancedProjectData);
+        if (data && data.length > 0) {
+          imported.push(data[0]); // Add the newly created project to the imported list
+        }
       }
-
-      // --- Database Insertion Logic ---
-      // Insert the prepared projects into the 'projects' table
-      const { data, error } = await supabase
-        .from('projects')
-        .insert(projectsToCreate)
-        .select(); // Select the inserted data to return it
-
-      if (error) {
-        console.error("Error inserting projects into Supabase:", error);
-        throw new Error(`Failed to import projects: ${error.message}`);
-      }
-
-      console.log("Successfully imported projects:", data);
-      return data; // Return the inserted data
+      return imported; // Return the list of successfully imported projects
     } catch (error) {
       return rejectWithValue(error.message);
     }
   }
 );
 
-export const fetchRepositoryDetails = createAsyncThunk(
-  'github/fetchRepositoryDetails',
-  async ({ username, repoName }, { rejectWithValue }) => {
-    try {
-      const [readme, languages, contents] = await Promise.all([
-        GitHubService.fetchRepositoryReadme(username, repoName),
-        GitHubService.fetchRepositoryLanguages(username, repoName),
-        GitHubService.fetchRepositoryContents(username, repoName)
-      ]);
 
-      return {
-        readme,
-        languages,
-        contents
-      };
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
-export const initialState = { // Added 'export' keyword
-  // Current GitHub user
-  currentUser: '',
-  
-  // Repository data
+export const initialState = { // Added export here
   repositories: [],
   alxProjects: [],
-  selectedProjects: [],
-  
-  // Repository details
-  repositoryDetails: {},
-  
-  // Import data
-  importCandidates: [],
-  
-  // Loading states
+  selectedProjects: [], // Projects selected for import
   isLoadingRepositories: false,
   isDetectingALX: false,
   isImporting: false,
-  isLoadingDetails: false,
-  
-  // Error states
   error: null,
   repositoryError: null,
   importError: null,
-  
-  // Import wizard state
-  wizardStep: 'username', // 'username', 'select', 'import'
-  wizardData: {},
+  wizardStep: 'username', // 'username', 'select_repos', 'review_import'
+  wizardData: {
+    username: '',
+    selectedRepoIds: [],
+  },
 };
 
 const githubSlice = createSlice({
   name: 'github',
   initialState,
   reducers: {
-    // Clear states
-    clearError: (state) => {
-      state.error = null;
-      state.repositoryError = null;
-      state.importError = null;
+    setRepositories: (state, action) => {
+      state.repositories = action.payload;
     },
-    clearRepositories: (state) => {
-      state.repositories = [];
-      state.alxProjects = [];
-      state.selectedProjects = [];
-      state.repositoryDetails = {};
+    setALXProjects: (state, action) => {
+      state.alxProjects = action.payload;
     },
-    clearImportData: (state) => {
-      state.importCandidates = [];
-      state.selectedProjects = [];
-    },
-    
-    // User actions
-    setCurrentUser: (state, action) => {
-      state.currentUser = action.payload;
-    },
-    
-    // Selection actions
     toggleProjectSelection: (state, action) => {
       const projectId = action.payload;
-      const index = state.selectedProjects.indexOf(projectId);
-      
-      if (index === -1) {
-        state.selectedProjects.push(projectId);
+      const isSelected = state.selectedProjects.includes(projectId);
+      if (isSelected) {
+        state.selectedProjects = state.selectedProjects.filter(id => id !== projectId);
       } else {
-        state.selectedProjects.splice(index, 1);
+        state.selectedProjects.push(projectId);
       }
-    },
-    selectAllALXProjects: (state) => {
-      state.selectedProjects = state.alxProjects.map(project => project.id);
-    },
-    clearSelection: (state) => { // This is the clearSelection action
-      state.selectedProjects = [];
     },
     setSelectedProjects: (state, action) => {
       state.selectedProjects = action.payload;
     },
-    
-    // Wizard actions
     setWizardStep: (state, action) => {
       state.wizardStep = action.payload;
     },
-    updateWizardData: (state, action) => {
+    setWizardData: (state, action) => {
       state.wizardData = { ...state.wizardData, ...action.payload };
     },
-    resetWizard: (state) => {
-      state.wizardStep = 'username';
-      state.wizardData = {};
-      state.selectedProjects = [];
+    resetGitHubState: (state) => {
       state.repositories = [];
       state.alxProjects = [];
-    },
-    
-    // Manual data updates
-    updateRepositoryDetails: (state, action) => {
-      const { repoKey, details } = action.payload;
-      state.repositoryDetails[repoKey] = details;
-    },
-    clearGitHubErrors: (state) => { // Added clearGitHubErrors reducer here
+      state.selectedProjects = [];
+      state.isLoadingRepositories = false;
+      state.isDetectingALX = false;
+      state.isImporting = false;
       state.error = null;
       state.repositoryError = null;
       state.importError = null;
+      state.wizardStep = 'username';
+      state.wizardData = {
+        username: '',
+        selectedRepoIds: [],
+      };
+    },
+    clearGitHubErrors: (state) => {
+      state.error = null;
+      state.repositoryError = null;
+      state.importError = null;
+    },
+    clearSelection: (state) => { // This action was missing from exports
+      state.selectedProjects = [];
+    },
+    resetWizard: (state) => { // Added resetWizard action
+      state.repositories = [];
+      state.alxProjects = [];
+      state.selectedProjects = [];
+      state.isLoadingRepositories = false;
+      state.isDetectingALX = false;
+      state.isImporting = false;
+      state.error = null;
+      state.repositoryError = null;
+      state.importError = null;
+      state.wizardStep = 'username';
+      state.wizardData = { username: '', selectedRepoIds: [] };
     }
   },
   extraReducers: (builder) => {
     builder
-      // Fetch user repositories
-      .addCase(fetchUserRepositories.pending, (state) => {
+      // fetchUserRepositories
+      .addCase(fetchUserRepositories.pending, (state) => { // Updated case name
         state.isLoadingRepositories = true;
         state.repositoryError = null;
       })
-      .addCase(fetchUserRepositories.fulfilled, (state, action) => {
+      .addCase(fetchUserRepositories.fulfilled, (state, action) => { // Updated case name
         state.isLoadingRepositories = false;
         state.repositories = action.payload;
-        state.repositoryError = null;
       })
-      .addCase(fetchUserRepositories.rejected, (state, action) => {
+      .addCase(fetchUserRepositories.rejected, (state, action) => { // Updated case name
         state.isLoadingRepositories = false;
         state.repositoryError = action.payload;
         state.repositories = [];
       })
-      
-      // Detect ALX projects
+      // detectALXProjects
       .addCase(detectALXProjects.pending, (state) => {
         state.isDetectingALX = true;
         state.error = null;
       })
       .addCase(detectALXProjects.fulfilled, (state, action) => {
         state.isDetectingALX = false;
-        state.alxProjects = action.payload;
-        state.error = null;
+        // Corrected: action.payload is now an object { alxProjects: [...], skippedProjects: [...] }
+        state.alxProjects = action.payload.alxProjects; 
+        // Automatically select all detected ALX projects for import
+        state.selectedProjects = action.payload.alxProjects.map(project => project.id);
+
+        console.log("[detectALXProjects.fulfilled] Payload:", action.payload);
+        console.log("[detectALXProjects.fulfilled] Resulting state.alxProjects:", state.alxProjects);
+        console.log("[detectALXProjects.fulfilled] Resulting state.selectedProjects:", state.selectedProjects);
+
+        if (action.payload.skippedProjects && action.payload.skippedProjects.length > 0) {
+          console.warn("Skipped projects during ALX detection:", action.payload.skippedProjects);
+        }
       })
       .addCase(detectALXProjects.rejected, (state, action) => {
         state.isDetectingALX = false;
         state.error = action.payload;
         state.alxProjects = [];
       })
-      
-      // Import selected projects
+      // importSelectedProjects (Updated case name)
       .addCase(importSelectedProjects.pending, (state) => {
         state.isImporting = true;
         state.importError = null;
       })
       .addCase(importSelectedProjects.fulfilled, (state, action) => {
         state.isImporting = false;
-        state.importCandidates = action.payload; // This will now be the data returned from Supabase
-        state.importError = null;
+        // Optionally add imported projects to the main projects state if needed,
+        // or rely on a re-fetch of all projects after import.
+        state.selectedProjects = []; // Clear selected projects after import
+        state.wizardStep = 'username'; // Reset wizard
+        state.wizardData = { username: '', selectedRepoIds: [] };
       })
       .addCase(importSelectedProjects.rejected, (state, action) => {
         state.isImporting = false;
         state.importError = action.payload;
-      })
-      
-      // Fetch repository details
-      .addCase(fetchRepositoryDetails.pending, (state) => {
-        state.isLoadingDetails = true;
-        state.error = null;
-      })
-      .addCase(fetchRepositoryDetails.fulfilled, (state, action) => {
-        state.isLoadingDetails = false;
-        // Store details with a key for the specific repository
-        state.error = null;
-      })
-      .addCase(fetchRepositoryDetails.rejected, (state, action) => {
-        state.isLoadingDetails = false;
-        state.error = action.payload;
       });
   },
 });
 
 export const {
-  // Clear actions
-  clearError,
-  clearRepositories,
-  clearImportData,
-  
-  // User actions
-  setCurrentUser,
-  
-  // Selection actions
+  setRepositories,
+  setALXProjects,
   toggleProjectSelection,
-  selectAllALXProjects,
-  clearSelection,
   setSelectedProjects,
-  
-  // Wizard actions
   setWizardStep,
+  setWizardData, // Exported updateWizardData action
+  resetGitHubState,
+  clearGitHubErrors,
+  clearSelection, // Exported clearSelection action
+  resetWizard, // Exported resetWizard action
   updateWizardData,
-  resetWizard,
-  
-  // Manual data updates
-  updateRepositoryDetails,
-  clearGitHubErrors, // Exported clearGitHubErrors here
 } = githubSlice.actions;
-
-// Base selectors
-const getGitHubState = (state) => state.github;
-
-// Memoized selectors
-export const selectCurrentUser = createSelector(getGitHubState, (github) => github.currentUser);
-export const selectRepositories = createSelector(getGitHubState, (github) => github.repositories);
-export const selectALXProjects = createSelector(getGitHubState, (github) => github.alxProjects);
-export const selectSelectedProjects = createSelector(getGitHubState, (github) => github.selectedProjects);
-export const selectRepositoryDetails = createSelector(getGitHubState, (github) => github.repositoryDetails);
-export const selectImportCandidates = createSelector(getGitHubState, (github) => github.importCandidates);
-export const selectWizardStep = createSelector(getGitHubState, (github) => github.wizardStep);
-export const selectWizardData = createSelector(getGitHubState, (github) => github.wizardData);
-
-// Memoized loading and error selectors
-export const selectGitHubLoading = createSelector(
-  getGitHubState,
-  (github) => ({
-    repositories: github.isLoadingRepositories,
-    detecting: github.isDetectingALX,
-    importing: github.isImporting,
-    details: github.isLoadingDetails,
-  })
-);
-
-export const selectGitHubErrors = createSelector(
-  getGitHubState,
-  (github) => ({
-    general: github.error,
-    repository: github.repositoryError,
-    import: github.importError,
-  })
-);
 
 export default githubSlice.reducer;

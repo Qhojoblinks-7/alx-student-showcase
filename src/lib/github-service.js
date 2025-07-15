@@ -1,23 +1,46 @@
+// github-service.js
+
 // GitHub API service for fetching user repositories and project data
 const GITHUB_API_BASE = 'https://api.github.com';
+// Retrieve GitHub Token from environment variables
+// Ensure this is correctly loaded by your build tool (e.g., Vite uses import.meta.env)
+const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
+
+// Prepare headers for authenticated requests
+const getHeaders = () => {
+  const headers = {
+    'Accept': 'application/vnd.github.v3+json',
+  };
+  // Only add Authorization header if GITHUB_TOKEN is present and not empty
+  if (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) {
+    headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+  }
+  return headers;
+};
 
 export class GitHubService {
   // Fetch user repositories
   static async fetchUserRepositories(username) {
     try {
-      const response = await fetch(`${GITHUB_API_BASE}/users/${username}/repos?per_page=100&sort=updated`);
+      const response = await fetch(`${GITHUB_API_BASE}/users/${username}/repos?per_page=100&sort=updated`, {
+        headers: getHeaders(), // Use authenticated headers
+      });
       
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error('GitHub user not found. Please check the username.');
         }
-        throw new Error('Failed to fetch repositories from GitHub.');
+        if (response.status === 403) {
+          // Provide more specific message for 403
+          throw new Error('GitHub API rate limit exceeded or forbidden. Please try again later. Ensure you have a valid GitHub Personal Access Token (PAT) with `public_repo` scope set in your VITE_GITHUB_TOKEN environment variable.');
+        }
+        throw new Error(`Failed to fetch repositories from GitHub: ${response.statusText || response.status}`);
       }
 
       const repos = await response.json();
       return repos;
     } catch (error) {
-      console.error('Error fetching GitHub repositories:', error);
+      console.error('Error fetching GitHub repositories:', error.message ? String(error.message) : String(error));
       throw error;
     }
   }
@@ -25,18 +48,35 @@ export class GitHubService {
   // Fetch repository README content
   static async fetchRepositoryReadme(username, repoName) {
     try {
-      const response = await fetch(`${GITHUB_API_BASE}/repos/${username}/${repoName}/readme`);
+      const response = await fetch(`${GITHUB_API_BASE}/repos/${username}/${repoName}/readme`, {
+        headers: getHeaders(), // Use authenticated headers
+      });
       
       if (!response.ok) {
-        return null; // README not found
+        // If 404, it means no README, which is fine.
+        // If 403, it means forbidden, so throw an error to be caught by generateProjectData.
+        if (response.status === 403) {
+          throw new Error(`Forbidden: Could not access README for ${username}/${repoName}. Check token permissions.`);
+        }
+        // For other non-OK statuses (e.g., 404), return null to indicate no README found.
+        return null; 
       }
 
       const readmeData = await response.json();
+      // Defensive check: Ensure readmeData and readmeData.content exist and are strings
+      if (!readmeData || typeof readmeData.content !== 'string') {
+        console.warn(`README content not found or not a string for ${username}/${repoName}. Returning null.`);
+        return null;
+      }
       // Decode base64 content
       const content = atob(readmeData.content.replace(/\n/g, ''));
       return content;
     } catch (error) {
-      console.error('Error fetching README:', error);
+      // Re-throw 403 errors, log others
+      if (error.message.includes('Forbidden')) {
+        throw error; // Propagate the specific 403 error
+      }
+      console.error(`Error fetching README for ${username}/${repoName}:`, error.message ? String(error.message) : String(error));
       return null;
     }
   }
@@ -44,31 +84,53 @@ export class GitHubService {
   // Fetch repository languages
   static async fetchRepositoryLanguages(username, repoName) {
     try {
-      const response = await fetch(`${GITHUB_API_BASE}/repos/${username}/${repoName}/languages`);
+      const response = await fetch(`${GITHUB_API_BASE}/repos/${username}/${repoName}/languages`, {
+        headers: getHeaders(), // Use authenticated headers
+      });
       
       if (!response.ok) {
+        // If 403, it means forbidden, so throw an error to be caught by generateProjectData.
+        if (response.status === 403) {
+          throw new Error(`Forbidden: Could not access languages for ${username}/${repoName}. Check token permissions.`);
+        }
+        console.error(`Error fetching languages for ${username}/${repoName}. Status: ${response.status}, Message: ${response.statusText || response.status}`);
         return {};
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error fetching languages:', error);
+      // Re-throw 403 errors, log others
+      if (error.message.includes('Forbidden')) {
+        throw error; // Propagate the specific 403 error
+      }
+      console.error(`Error fetching languages for ${username}/${repoName}:`, error.message ? String(error.message) : String(error));
       return {};
     }
   }
 
-  // Fetch repository contents to analyze structure
+  // Fetch repository contents to analyze structure (less critical for ALX detection, but useful)
   static async fetchRepositoryContents(username, repoName, path = '') {
     try {
-      const response = await fetch(`${GITHUB_API_BASE}/repos/${username}/${repoName}/contents/${path}`);
+      const response = await fetch(`${GITHUB_API_BASE}/repos/${username}/${repoName}/contents/${path}`, {
+        headers: getHeaders(), // Use authenticated headers
+      });
       
       if (!response.ok) {
+        // If 403, it means forbidden, so throw an error.
+        if (response.status === 403) {
+          throw new Error(`Forbidden: Could not access contents for ${username}/${repoName}/${path}. Check token permissions.`);
+        }
+        console.error(`Error fetching contents for ${username}/${repoName}/${path}. Status: ${response.status}, Message: ${response.statusText || response.status}`);
         return [];
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error fetching repository contents:', error);
+      // Re-throw 403 errors, log others
+      if (error.message.includes('Forbidden')) {
+        throw error; // Propagate the specific 403 error
+      }
+      console.error(`Error fetching repository contents for ${username}/${repoName}/${path}:`, error.message ? String(error.message) : String(error));
       return [];
     }
   }
@@ -141,31 +203,55 @@ export class ALXProjectDetector {
     ]
   };
 
-  // Main detection method
+  // Main detection method - now returns processed project data
   static async detectALXProjects(repositories, username) {
     const alxProjects = [];
+    const skippedProjects = []; // To track projects that failed generation
 
     for (const repo of repositories) {
       const score = await this.calculateALXScore(repo, username);
       
+      // Log the detection score for each repository
+      console.log(`[detectALXProjects] Repo: ${repo.name}, ALX Score: ${score.score}, Is ALX Project: ${score.isALXProject}`);
+
       if (score.isALXProject) {
-        alxProjects.push({
-          ...repo,
-          alx_score: score.score,
-          alx_category: score.category,
-          alx_confidence: score.confidence,
-          detected_features: score.features
-        });
+        try {
+          // Pass alx_category and alx_confidence directly to generateProjectData
+          const processedProject = await this.generateProjectData(
+            repo, 
+            username, 
+            score.category, 
+            score.confidence
+          );
+          if (processedProject) {
+            // Add ALX specific scores to the processed project
+            processedProject.alx_score = score.score;
+            // alx_category and alx_confidence are now set inside generateProjectData
+            processedProject.detected_features = score.features;
+            alxProjects.push(processedProject);
+            console.log(`[detectALXProjects] Successfully processed ALX project: ${processedProject.title} (ID: ${processedProject.id})`);
+          } else {
+            // If generateProjectData returns null (e.g., due to API error), skip
+            skippedProjects.push({ repoName: repo.name, reason: 'Failed to generate project data' });
+            console.warn(`[detectALXProjects] Skipped project ${repo.name}: Failed to generate project data.`);
+          }
+        } catch (error) {
+          console.error(`Error processing ALX project ${repo.name}:`, error.message ? String(error.message) : String(error));
+          skippedProjects.push({ repoName: repo.name, reason: error.message });
+        }
       }
     }
 
-    // Sort by confidence and last updated
-    return alxProjects.sort((a, b) => {
+    // Sort by confidence and last updated (using 'last_updated' from processed project)
+    const sortedProjects = alxProjects.sort((a, b) => {
       if (a.alx_confidence !== b.alx_confidence) {
         return b.alx_confidence - a.alx_confidence;
       }
-      return new Date(b.updated_at) - new Date(a.updated_at);
+      return new Date(b.last_updated) - new Date(a.last_updated);
     });
+
+    console.log("ALXProjectDetector.detectALXProjects returning:", { alxProjects: sortedProjects, skippedProjects });
+    return { alxProjects: sortedProjects, skippedProjects }; // Return an object with both
   }
 
   // Calculate ALX project score
@@ -287,28 +373,56 @@ export class ALXProjectDetector {
   }
 
   // Auto-generate project data from GitHub repo
-  static async generateProjectData(repo, username) {
-    // Fetch additional data
-    const [readme, languages] = await Promise.all([
-      GitHubService.fetchRepositoryReadme(username, repo.name),
-      GitHubService.fetchRepositoryLanguages(username, repo.name)
-    ]);
+  static async generateProjectData(repo, username, alxCategory, alxConfidence) {
+    let readmeContent = null;
+    let languagesData = {};
 
-    // Extract description from README if repo description is empty
+    try {
+      // Log the repo and username being processed
+      console.log(`[generateProjectData] Attempting to fetch data for repo: ${repo.name} by user: ${username}`);
+
+      // Fetch README and languages independently, handling their potential null returns
+      readmeContent = await GitHubService.fetchRepositoryReadme(username, repo.name);
+      languagesData = await GitHubService.fetchRepositoryLanguages(username, repo.name);
+      
+      console.log(`[generateProjectData] Fetched for ${username}/${repo.name}:`);
+      console.log(`  - readmeContent: ${readmeContent ? 'Available (length: ' + readmeContent.length + ')' : 'Null/Undefined'}`);
+      console.log(`  - languagesData: ${Object.keys(languagesData).length > 0 ? 'Available (keys: ' + Object.keys(languagesData).join(', ') + ')' : 'Empty/Undefined'}`);
+
+    } catch (error) {
+      // This catch block will only be hit if fetchRepositoryReadme or fetchRepositoryLanguages
+      // throw an error that's not handled internally (e.g., a 403 that's re-thrown).
+      console.warn(`Skipping project ${repo.name} due to critical GitHub API access error during data fetching: ${error.message}`);
+      return null; // Return null if critical error prevents even basic data fetching
+    }
+
+    // Continue processing even if readmeContent or languagesData are null/empty
     let description = repo.description || '';
-    if (!description && readme) {
-      // Extract first paragraph from README
-      const lines = readme.split('\n').filter(line => line.trim());
+    if (!description && typeof readmeContent === 'string') { // Explicitly check if readmeContent is a string
+      console.log(`[generateProjectData] Processing README for ${repo.name}. readmeContent type: ${typeof readmeContent}, length: ${readmeContent.length}`);
+      // Ensure readmeContent is a string before calling split
+      const lines = (readmeContent || '').split('\n').filter(line => line.trim());
       for (const line of lines) {
         if (line.length > 20 && !line.startsWith('#') && !line.startsWith('*')) {
           description = line.substring(0, 200) + (line.length > 200 ? '...' : '');
+          console.log(`[generateProjectData] Extracted description from README for ${repo.name}: "${description}"`);
           break;
         }
       }
+      if (!description) {
+        console.warn(`[generateProjectData] Could not extract a suitable description from README for ${repo.name}.`);
+      }
+    } else if (!description && (readmeContent === null || readmeContent === undefined)) { // More robust check for null/undefined
+        console.warn(`[generateProjectData] No description or README content available for ${username}/${repo.name}.`);
+    } else if (typeof readmeContent !== 'string' && readmeContent !== null && readmeContent !== undefined) { // Log unexpected types
+        console.error(`[generateProjectData] Unexpected readmeContent type for ${repo.name}: ${typeof readmeContent}. Value:`, readmeContent);
     }
 
+
     // Generate technologies array from languages
-    const technologies = Object.keys(languages || {});
+    console.log(`[generateProjectData] Processing languages for ${repo.name}. languagesData type: ${typeof languagesData}.`);
+    const technologies = Object.keys(languagesData || {});
+    console.log(`[generateProjectData] Generated technologies for ${repo.name}:`, technologies);
     
     // Map ALX category to showcase category
     const categoryMap = {
@@ -322,21 +436,30 @@ export class ALXProjectDetector {
       'general': 'other'
     };
 
-    return {
-      title: this.generateTitle(repo.name),
-      description: description || `${repo.name} - ALX Software Engineering project`,
+    const projectData = {
+      id: repo.id, // Include the original GitHub repository ID
+      title: this.generateTitle(repo.name), // Ensures title is always generated from repo.name
+      description: description || `${repo.name} - ALX Software Engineering project`, // Fallback description
       technologies,
+      tags: [], // Ensure tags is always an empty array by default
       github_url: repo.html_url,
       live_url: repo.homepage || '',
-      category: categoryMap[repo.alx_category] || 'other',
+      // Use the alxCategory and alxConfidence passed as arguments
+      category: categoryMap[alxCategory] || 'other', 
       original_repo_name: repo.name,
-      alx_confidence: repo.alx_confidence,
+      alx_confidence: alxConfidence, 
+      is_public: !repo.private, // Derive is_public from GitHub repo's private status
       last_updated: repo.updated_at
     };
+
+    console.log(`[generateProjectData] Final project data for ${repo.name}:`, projectData);
+    return projectData;
   }
 
   // Generate user-friendly title from repo name
   static generateTitle(repoName) {
+    if (!repoName) return 'Untitled Project'; // Fallback for empty repoName
+
     return repoName
       .replace(/[-_]/g, ' ')
       .replace(/0x\d+/g, match => `${match.toUpperCase()} -`)

@@ -33,7 +33,7 @@ import {
   detectALXProjects,
   importSelectedProjects,
   setWizardStep,
-  updateWizardData,
+  setWizardData, // Corrected import: changed from updateWizardData to setWizardData
   toggleProjectSelection,
   resetWizard,
   clearGitHubErrors,
@@ -48,7 +48,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
 
   const {
     repositories,
-    alxProjects,
+    alxProjects, // This already contains the processed project data
     selectedProjects,
     isLoadingRepositories,
     isDetectingALX,
@@ -70,6 +70,19 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
     }
   }, [wizardStep, dispatch, usernameInput]);
 
+  // Helper function to get a readable error message
+  const getErrorMessage = (err) => {
+    if (err instanceof Error) {
+      return err.message;
+    }
+    // Check if it's a Redux Toolkit unwrap error with a payload
+    if (err && typeof err === 'object' && err.payload) {
+      return String(err.payload);
+    }
+    // Fallback for other non-Error objects
+    return String(err) || 'Unknown error';
+  };
+
   // Handle fetching repositories
   const handleFetchRepositories = useCallback(async () => {
     if (!usernameInput.trim()) {
@@ -77,25 +90,40 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
       return;
     }
     dispatch(clearGitHubErrors()); // Clear previous errors
-    dispatch(updateWizardData({ username: usernameInput.trim() }));
+    dispatch(setWizardData({ username: usernameInput.trim() })); // Corrected dispatch call
     try {
+      // 1. Fetch repositories
       await dispatch(fetchUserRepositories(usernameInput.trim())).unwrap();
-      dispatch(setWizardStep('select_repos'));
+      
+      // 2. Automatically detect ALX projects from the now fetched repositories
+      // Pass repositories and username explicitly as required by the thunk
+      await dispatch(detectALXProjects({ repositories: repositories, username: usernameInput.trim() })).unwrap();
+      
+      // 3. Move to the review & import step
+      dispatch(setWizardStep('review_import'));
     } catch (err) {
-      toast.error('Failed to fetch repositories: ' + (err.message || 'Unknown error'));
+      // Log the full error object for debugging
+      console.error('Error in handleFetchRepositories:', err);
+      toast.error('Failed to fetch or detect projects: ' + getErrorMessage(err));
+      // If fetching or detecting fails, go back to username step or stay on current step with error
+      dispatch(setWizardStep('username'));
     }
-  }, [usernameInput, dispatch]);
+  }, [usernameInput, dispatch, repositories]); // Added 'repositories' to dependencies
 
-  // Handle detecting ALX projects
+  // Handle detecting ALX projects (for manual trigger from select_repos step)
   const handleDetectALXProjects = useCallback(async () => {
     dispatch(clearGitHubErrors()); // Clear previous errors
     try {
-      await dispatch(detectALXProjects({ repositories, username: wizardData.username })).unwrap();
+      // This will use the current `repositories` and `selectedProjects` from Redux state
+      // Pass repositories and username explicitly as required by the thunk
+      await dispatch(detectALXProjects({ repositories: repositories, username: wizardData.username })).unwrap();
       dispatch(setWizardStep('review_import'));
     } catch (err) {
-      toast.error('Failed to detect ALX projects: ' + (err.message || 'Unknown error'));
+      // Log the full error object for debugging
+      console.error('Error in handleDetectALXProjects:', err);
+      toast.error('Failed to detect ALX projects: ' + getErrorMessage(err));
     }
-  }, [repositories, wizardData.username, dispatch]);
+  }, [dispatch, repositories, wizardData.username]); // Added 'repositories', 'wizardData.username' to dependencies
 
   // Handle final import
   const handleImportSelectedProjects = useCallback(async () => {
@@ -109,29 +137,58 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
     }
 
     dispatch(clearGitHubErrors()); // Clear previous errors
-    const projectsToImport = alxProjects.filter((p) =>
-      selectedProjects.includes(p.id || p.full_name)
-    );
+    
+    // *** CRITICAL CHANGE HERE ***
+    // Instead of re-generating project data from 'repositories',
+    // filter directly from 'alxProjects' which already contain the processed data.
+    const projectsToInsert = alxProjects.filter((alxProject) =>
+      selectedProjects.includes(alxProject.id) // alxProject.id is the GitHub repo ID
+    ).map(alxProject => ({
+      user_id: user.id,
+      id: alxProject.id, // Ensure ID is passed for potential upsert or reference
+      title: alxProject.title, // These fields are already processed by ALXProjectDetector.generateProjectData
+      description: alxProject.description,
+      technologies: alxProject.technologies,
+      github_url: alxProject.github_url,
+      live_url: alxProject.live_url,
+      category: alxProject.category,
+      original_repo_name: alxProject.original_repo_name,
+      alx_confidence: alxProject.alx_confidence || 0.0,
+      last_updated: alxProject.last_updated,
+      is_public: alxProject.is_public, // This should be derived from the original repo's private status
+      // Add other fields from the schema with default/derived values if not already in projectData
+      completion_date: null, // Default to null, user can edit later
+      time_spent_hours: null, // Default to null, user can edit later
+      key_learnings: '',
+      challenges_faced: '',
+      image_url: '',
+      tags: [],
+    }));
+
+    // --- Debugging logs ---
+    console.log("handleImportSelectedProjects: alxProjects at time of dispatch:", alxProjects);
+    console.log("handleImportSelectedProjects: selectedProjects at time of dispatch:", selectedProjects);
+    console.log("handleImportSelectedProjects: projectsToInsert before dispatch:", projectsToInsert);
+    // --- End Debugging logs ---
 
     try {
-      // Generate full project data for each selected ALX project
-      const generatedProjects = await Promise.all(
-        projectsToImport.map(async (repo) => {
-          // Corrected: Use ALXProjectDetector.generateProjectData
-          return await ALXProjectDetector.generateProjectData(repo, wizardData.username);
-        })
-      );
+      // Check if any projects were successfully prepared for insertion
+      if (projectsToInsert.length === 0) {
+        toast.warning('No valid ALX projects could be prepared for import. This might be due to API access issues or missing READMEs for the selected projects, or an internal state mismatch. Check console for details.');
+        onClose(); // Close the modal if nothing to import
+        return; // Exit the function
+      }
 
-      const result = await dispatch(
-        importSelectedProjects({ selectedProjects: generatedProjects, repositories, username: wizardData.username }) // Pass correct parameters to thunk
-      ).unwrap();
+      // Pass the already generated and formatted projects directly to the thunk
+      const result = await dispatch(importSelectedProjects({ projectsToImport: projectsToInsert, userId: user.id })).unwrap();
       toast.success(`Successfully imported ${result.length} projects!`);
       onImportComplete(result); // Callback to parent
       onClose();
     } catch (err) {
-      toast.error('Failed to import projects: ' + (err.message || 'Unknown error'));
+      // Ensure err.message is always a string
+      toast.error('Failed to import projects: ' + getErrorMessage(err));
     }
-  }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose, repositories, wizardData.username]);
+  }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose]);
 
   const handleToggleProject = useCallback(
     (projectId) => {
@@ -234,7 +291,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
                 Back
               </Button>
               <Button
-                onClick={handleDetectALXProjects}
+                onClick={handleDetectALXProjects} // This button still triggers manual detection
                 disabled={isDetectingALX || selectedProjects.length === 0}
               >
                 {isDetectingALX ? (
@@ -249,6 +306,9 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
         );
 
       case 'review_import':
+        // Log the IDs of the projects in alxProjects for debugging
+        console.log('ALX Projects IDs for rendering:', alxProjects.map(p => p.id));
+
         if (alxProjects.length === 0) {
           return (
             <div className="text-center p-8 text-muted-foreground">
@@ -267,13 +327,13 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
             </DialogDescription>
             <ScrollArea className="h-80 w-full rounded-md border p-4">
               {alxProjects.map((project) => (
-                <div key={project.id || project.full_name} className="flex items-center space-x-2 py-2">
+                <div key={project.id} className="flex items-center space-x-2 py-2"> {/* Changed key to project.id */}
                   <Checkbox
-                    id={`alx-project-${project.id || project.full_name}`}
-                    checked={selectedProjects.includes(project.id || project.full_name)}
-                    onCheckedChange={() => handleToggleProject(project.id || project.full_name)}
+                    id={`alx-project-${project.id}`}
+                    checked={selectedProjects.includes(project.id)}
+                    onCheckedChange={() => handleToggleProject(project.id)}
                   />
-                  <Label htmlFor={`alx-project-${project.id || project.full_name}`} className="flex-1 cursor-pointer">
+                  <Label htmlFor={`alx-project-${project.id}`} className="flex-1 cursor-pointer">
                     <span className="font-medium">{project.name}</span>
                     <p className="text-sm text-muted-foreground">{project.description}</p>
                     <div className="flex items-center gap-2 text-xs mt-1">
