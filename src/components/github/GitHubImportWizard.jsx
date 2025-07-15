@@ -173,7 +173,8 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
         return;
       }
 
-      const result = await dispatch(importSelectedProjects(projectsToInsert)).unwrap(); // Pass array directly
+      // FIX: Pass projectsToInsert and userId as an object to the thunk
+      const result = await dispatch(importSelectedProjects({ projectsToImport: projectsToInsert, userId: user.id })).unwrap();
       toast.success(`Successfully imported ${result.length} projects!`);
       onImportComplete(result);
       onClose();

@@ -1,22 +1,21 @@
-// src/components/Dashboard.jsx
-import React, { useEffect, useState, useCallback } from 'react' // Ensure React, useEffect, useState, useCallback are imported
+import React, { useEffect, useState, useCallback } from 'react'; // Ensure React, useEffect, useState, useCallback are imported
 
-import { useDispatch, useSelector } from 'react-redux'
-import { useAuth } from './../hooks/use-auth' // This is the updated useAuth hook
-import { toast } from 'sonner'
+import { useDispatch, useSelector } from 'react-redux';
+import { useAuth } from './../hooks/use-auth'; // This is the updated useAuth hook
+import { toast } from 'sonner';
 
 // Import actions from slices
-import { closeModal, openModal, setActiveTab, toggleTheme } from '../store/slices/uiSlice'
-import { fetchProjectStats, fetchProjects } from '../store/slices/projectsSlice' // Ensure fetchProjects is imported
+import { closeModal, openModal, setActiveTab, toggleTheme } from '../store/slices/uiSlice';
+import { fetchProjectStats, fetchProjects } from '../store/slices/projectsSlice'; // Ensure fetchProjects is imported
 import { setWizardStep } from '../store/slices/githubSlice'; // Import setWizardStep
 import { useAppSelector } from '../lib/redux-selectors'; // Import useAppSelector
 
 // Import UI components (assuming these are from shadcn/ui or similar)
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Button } from './ui/button' // Corrected path
-import { Tabs, TabsList, TabsContent, TabsTrigger } from './ui/tabs' // Ensure these are the refactored ones
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-import { Badge } from './ui/badge' // Corrected path
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button'; // Corrected path
+import { Tabs, TabsList, TabsContent, TabsTrigger } from './ui/tabs'; // Ensure these are the refactored ones
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Badge } from './ui/badge'; // Corrected path
 import {
   Sheet,
   SheetContent,
@@ -37,33 +36,18 @@ import { Skeleton } from '@/components/ui/skeleton.jsx'; // Import Skeleton
 
 
 // Import icons (assuming these are from lucide-react)
-import { Plus, Github, Zap, LogOut, Sparkle, Target, Menu, LayoutDashboard, User, Settings, BarChart2, Share2, CalendarDays, Sun, Moon, Loader2 } from 'lucide-react'
+import { Plus, Github, Zap, LogOut, Sparkle, Target, Menu, LayoutDashboard, User, Settings, BarChart2, Share2, CalendarDays, Sun, Moon, Loader2 } from 'lucide-react';
 
 // Import other components (assuming these paths are correct)
-import { ProjectForm } from '../components/projects/ProjectForm'
-import { ProjectList } from '../components/projects/ProjectList'
-import { UserProfile } from '../components/profile/UserProfile'
-import { GitHubImportWizard } from '../components/github/GitHubImportWizard'
+import { ProjectForm } from '../components/projects/ProjectForm';
+import { ProjectList } from '../components/projects/ProjectList';
+import { UserProfile } from '../components/profile/UserProfile';
+import { GitHubImportWizard } from '../components/github/GitHubImportWizard';
 import { ShareProjectModal } from '../components/sharing/ShareProjectModal';
 import { AutoWorkLogShare } from '../components/sharing/AutoWorkLogShare';
 import { WorkLogGenerator } from '../components/sharing/WorkLogGenerator';
-import { DashboardStats } from '../components/DashboardStats'
-
-
-import { 
-  useProjects, // Selector for projects array
-  useGitHubLoading, // Selector for GitHub loading states
-  useProjectsLoading, // Selector for projects loading states
-  useModals, // Selector for UI modals state
-  useActiveTab, // Selector for active tab state
-  useTheme // Selector for theme state
-} from '../lib/redux-selectors'; // Corrected import path for UI selectors
-
-
-
-
-
-
+import { DashboardStats } from '../components/DashboardStats';
+import { OnboardingDialog } from './OnboardingDialog';
 
 
 export function Dashboard() {
@@ -71,14 +55,14 @@ export function Dashboard() {
   const { user, signOut, loading: authLoading } = useAuth(); // Get user and signOut from useAuth
   
   // Get UI state values using their respective selectors
-  const activeTab = useActiveTab();
-  const modals = useModals();
-  const theme = useTheme();
+  const activeTab = useAppSelector((state) => state.ui.activeTab); // Use useAppSelector
+  const modals = useAppSelector((state) => state.ui.modals); // Use useAppSelector
+  const theme = useAppSelector((state) => state.ui.theme); // Use useAppSelector
 
   // Get other state values
-  const projects = useProjects(); // projects is directly the array from the selector
-  const { isLoading: projectsListLoading } = useProjectsLoading(); // Get specific loading state for project list fetching
-  const { repositories: githubLoadingRepositories } = useGitHubLoading(); // Destructure 'repositories' directly
+  const projects = useAppSelector((state) => state.projects.projects); // Use useAppSelector
+  const { isLoading: projectsListLoading } = useAppSelector((state) => state.projects); // Correctly get isLoading from projects slice
+  const { isLoadingRepositories: githubLoadingRepositories } = useAppSelector((state) => state.github); // Correctly get isLoadingRepositories from github slice
 
   const [editingProject, setEditingProject] = useState(null);
   const [sharingProject, setSharingProject] = useState(null);
@@ -230,15 +214,15 @@ export function Dashboard() {
       {/* Top Header */}
       <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-white px-4 shadow-sm dark:bg-gray-800 sm:px-6 lg:px-8">
         <div className="flex items-center gap-4">
-          {/* Mobile Menu Toggle */}
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}> {/* Control Sheet visibility with state */}
+          {/* Mobile Menu Toggle (visible on small screens, hidden on large) */}
+          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
               <Button size="icon" variant="outline" className="lg:hidden">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col">
+            <SheetContent side="left" className="flex flex-col w-3/4 sm:max-w-xs"> {/* Adjusted width for mobile sheet */}
               <SheetHeader>
                 <SheetTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   ALX Showcase
@@ -265,13 +249,13 @@ export function Dashboard() {
             </SheetContent>
           </Sheet>
 
-          {/* Desktop App Title */}
+          {/* Desktop App Title (hidden on small screens, visible on large) */}
           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden lg:block">
             ALX Showcase
           </h1>
         </div>
 
-        {/* Desktop Tabs */}
+        {/* Desktop Tabs (hidden on small screens, visible on large) */}
         <Tabs value={activeTab} onValueChange={(value) => dispatch(setActiveTab(value))} className="hidden lg:block">
           <TabsList>
             <TabsTrigger value="projects">
@@ -289,13 +273,13 @@ export function Dashboard() {
           </TabsList>
         </Tabs>
 
-        {/* Right side: Add Project, GitHub Import, User Dropdown */}
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={handleAddProjectClick}>
+        {/* Right side: Add Project, GitHub Import, Theme Toggle, User Dropdown */}
+        <div className="flex items-center gap-2 sm:gap-4"> {/* Adjusted gap for smaller screens */}
+          <Button variant="outline" onClick={handleAddProjectClick} className="hidden sm:inline-flex"> {/* Hide on extra small screens */}
             <Plus className="mr-2 h-4 w-4" />
             Add Project
           </Button>
-          <Button variant="outline" onClick={handleOpenGitHubImport} disabled={githubLoadingRepositories}>
+          <Button variant="outline" onClick={handleOpenGitHubImport} disabled={githubLoadingRepositories} className="hidden sm:inline-flex"> {/* Hide on extra small screens */}
             {githubLoadingRepositories ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -342,7 +326,7 @@ export function Dashboard() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8"> {/* Responsive padding */}
         <Tabs value={activeTab} onValueChange={(value) => dispatch(setActiveTab(value))}>
           {/* TabsList is hidden on mobile, shown on desktop */}
           <TabsList className="hidden lg:grid w-full grid-cols-3 mb-6">
@@ -361,24 +345,24 @@ export function Dashboard() {
           </TabsList>
 
           <TabsContent value="projects">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4"> {/* Responsive layout for header */}
               <div>
                 <h3 className="text-xl font-semibold">Your Projects</h3>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground text-sm sm:text-base"> {/* Responsive font size */}
                   Manage and share your coding projects with the ALX community
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto"> {/* Responsive button stacking */}
                 <Button
                   variant="outline"
-                  className="border-dashed"
+                  className="border-dashed w-full sm:w-auto" /* Full width on mobile */
                   onClick={handleOpenGitHubImport}
                 >
                   <Github className="h-4 w-4 mr-2" />
                   <Zap className="h-4 w-4 mr-1" />
                   Import from GitHub
                 </Button>
-                <Button onClick={handleAddProjectClick}>
+                <Button onClick={handleAddProjectClick} className="w-full sm:w-auto"> {/* Full width on mobile */}
                   <Plus className="h-4 w-4 mr-2" />
                   Add Project
                 </Button>
@@ -392,19 +376,19 @@ export function Dashboard() {
             {projectsListLoading ? (
               <div className="space-y-6">
                 {[...Array(3)].map((_, i) => (
-                  <Card key={i}>
+                  <Card key={i} className="rounded-lg shadow-sm"> {/* Added rounded-lg and shadow-sm */}
                     <CardHeader>
-                      <Skeleton className="h-6 w-3/4" />
+                      <Skeleton className="h-6 w-3/4 mb-2" />
                       <Skeleton className="h-4 w-full" />
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
                         <Skeleton className="h-4 w-full" />
                         <Skeleton className="h-4 w-2/3" />
-                        <div className="flex gap-2">
-                          <Skeleton className="h-6 w-16" />
-                          <Skeleton className="h-6 w-20" />
-                          <Skeleton className="h-6 w-14" />
+                        <div className="flex flex-wrap gap-2 mt-4"> {/* Responsive gap and wrap */}
+                          <Skeleton className="h-6 w-16 rounded-full" /> {/* Rounded skeleton for badges */}
+                          <Skeleton className="h-6 w-20 rounded-full" />
+                          <Skeleton className="h-6 w-14 rounded-full" />
                         </div>
                       </div>
                     </CardContent>
@@ -417,7 +401,7 @@ export function Dashboard() {
           </TabsContent>
 
           <TabsContent value="profile">
-            <div className="max-w-2xl mx-auto"> {/* Centered profile content */}
+            <div className="max-w-full sm:max-w-2xl mx-auto p-0 sm:p-4"> {/* Responsive max-width and padding */}
               <h3 className="text-xl font-semibold mb-2">Profile Settings</h3>
               <p className="text-muted-foreground mb-6">
                 Update your profile information to showcase your ALX journey
@@ -435,7 +419,7 @@ export function Dashboard() {
       {/* Modals */}
       {modals.projectForm && (
         <Sheet open={modals.projectForm} onOpenChange={() => handleProjectFormCancel()}>
-          <SheetContent className="w-full max-w-2xl overflow-y-auto">
+          <SheetContent className="w-full max-w-full sm:max-w-2xl overflow-y-auto"> {/* Full width on mobile, max-w-2xl on sm+ */}
             <SheetHeader>
               <SheetTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</SheetTitle>
             </SheetHeader>
