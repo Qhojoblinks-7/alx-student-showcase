@@ -1,206 +1,268 @@
 # ALX Student Showcase 🚀
 
-A modern web application built for ALX Software Engineering students to document their coding journey and share their projects across social media platforms.
+Your ultimate portfolio platform to document, manage, and share your incredible ALX Software Engineering projects with the world\!
 
-## Features ✨
+-----
 
-- **User Authentication**: Secure login/signup with Supabase Auth
-- **Project Management**: Add, edit, and organize your coding projects
-- **Social Media Integration**: Generate formatted posts for X (Twitter), LinkedIn, Facebook, and Discord
-- **Profile Management**: Showcase your ALX journey with a comprehensive profile
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **Modern UI**: Built with Tailwind CSS and shadcn/ui components
+✨ **Features at a Glance**
 
-## Tech Stack 🛠️
+  * **Secure Authentication:** Seamless sign-up and login powered by Supabase Auth, including Google & GitHub integrations.
+  * **Comprehensive Project Management:** Easily add, edit, and organize all your coding projects with rich metadata.
+  * **Smart Social Sharing:** Generate perfectly formatted posts for X (Twitter), LinkedIn, Facebook, and Discord with a single click.
+  * **Dynamic Profile:** Create a detailed profile showcasing your ALX journey, skills, and contact information.
+  * **GitHub Import Wizard:** Effortlessly import your ALX projects directly from your GitHub repositories.
+  * **Work Log Generation:** Automatically create summaries of your recent GitHub activity for project updates.
+  * **Responsive & Modern UI:** A beautiful, intuitive interface designed with Tailwind CSS and shadcn/ui, ensuring a flawless experience on any device.
 
-- **Frontend**: React 19, JavaScript (JSX), Vite
-- **Styling**: Tailwind CSS V4, shadcn/ui
-- **Backend**: Supabase (Authentication & Database)
-- **Package Manager**: npm (not yarn or bun)
-- **Icons**: Lucide React
+-----
 
-## Quick Start 🏃‍♂️
+🛠️ **Tech Stack**
+
+This application is built with a robust and modern technology stack:
+
+  * **Frontend:** React 19, JavaScript (JSX), Vite
+  * **Styling:** Tailwind CSS V4, shadcn/ui
+  * **Backend & Database:** Supabase (PostgreSQL, Authentication, Realtime)
+  * **Package Manager:** npm
+  * **Icons:** Lucide React
+
+-----
+
+🚀 **Quick Start Guide**
+
+Get your ALX Student Showcase up and running in minutes\!
 
 ### Prerequisites
 
-- Node.js (v18+)
-- npm
-- A Supabase account
+Before you begin, ensure you have the following installed:
 
-### Installation
+  * Node.js (v18 or higher)
+  * npm (Node Package Manager)
+  * A Supabase account (free tier is sufficient)
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd alx-student-showcase
-   ```
+### Installation Steps
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-   
-   *Note: If you encounter ERESOLVE errors, use `npm install --legacy-peer-deps`*
+1.  **Clone the repository:**
 
-3. **Set up Supabase**
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Copy your project URL and anon key
-   - Run the SQL schema from `supabase-schema.txt` in your Supabase SQL Editor
+    ```bash
+    git clone <repository-url>
+    cd alx-student-showcase
+    ```
 
-4. **Configure environment variables**
-   ```bash
-   cp .env.local.example .env.local
-   ```
-   
-   Update `.env.local` with your Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
+2.  **Install project dependencies:**
 
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
+    ```bash
+    npm install
+    # If you encounter ERESOLVE errors, try: npm install --legacy-peer-deps
+    ```
 
-6. **Build for production**
-   ```bash
-   npm run build
-   ```
+3.  **Set up your Supabase Project:**
 
-## Database Setup 📊
+      * Go to [supabase.com](https://supabase.com/) and create a new project.
+      * Navigate to **Settings \> API** to find your **Project URL** and **Anon Key**.
+      * Open your Supabase SQL Editor and run the database schema provided in `supabase-schema.txt`. This will create your `users` and `projects` tables, along with Row Level Security (RLS) policies and triggers.
 
-Run the SQL commands from `supabase-schema.txt` in your Supabase SQL Editor to create the necessary tables:
+4.  **Configure Environment Variables:**
 
-- **users**: Extended user profiles with ALX-specific fields
-- **projects**: Student project documentation with rich metadata
+      * Create a copy of the example environment file:
+        ```bash
+        cp .env.local.example .env.local
+        ```
+      * Open `.env.local` and update it with your Supabase credentials:
+        ```
+        VITE_SUPABASE_URL="YOUR_SUPABASE_PROJECT_URL"
+        VITE_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
+        # Optional: For GitHub API rate limit increase (recommended for import feature)
+        # VITE_GITHUB_TOKEN="YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
+        ```
+        Replace `"YOUR_SUPABASE_PROJECT_URL"` and `"YOUR_SUPABASE_ANON_KEY"` with your actual values.
+        For `VITE_GITHUB_TOKEN`, generate a Personal Access Token (PAT) with `public_repo` scope on GitHub if you plan to use the GitHub import feature extensively.
 
-The schema includes:
-- Row Level Security (RLS) policies
-- Automatic user profile creation on signup
-- Optimized indexes for performance
+5.  **Start the Development Server:**
 
-## Usage Guide 📖
+    ```bash
+    npm run dev
+    ```
+
+    Your application will now be running locally, typically at `http://localhost:5173`.
+
+6.  **Build for Production:**
+
+    ```bash
+    npm run build
+    ```
+
+    This command compiles the application into the `dist` directory, ready for deployment.
+
+-----
+
+📊 **Database Schema**
+
+The core database schema is defined in `supabase-schema.txt` and includes:
+
+  * `users` table: Stores extended user profiles (full name, ALX ID, GitHub username, LinkedIn URL, bio, etc.) linked to Supabase Auth users.
+  * `projects` table: Houses detailed documentation for each student project, including title, description, technologies, URLs, categories, and ALX-specific metadata.
+
+**Key Database Features:**
+
+  * **Row Level Security (RLS):** Ensures data privacy and proper access control.
+  * **Automatic Profile Creation:** A database trigger automatically creates a `users` entry upon new user sign-up via Supabase Auth.
+  * **Optimized Indexes:** For efficient data retrieval and performance.
+  * `updated_at` timestamps: Triggers automatically update timestamps on record modifications.
+
+-----
+
+📖 **Usage Guide**
 
 ### Getting Started
 
-1. **Sign Up/Login**: Create an account or login with Google/GitHub
-2. **Complete Profile**: Add your ALX ID, GitHub username, and bio
-3. **Add Projects**: Document your coding projects with:
-   - Project details and description
-   - Tech stack and difficulty level
-   - GitHub and live demo links
-   - Key learnings and challenges
-   - Project images and tags
+1.  **Sign Up or Log In:** Create a new account or sign in using email/password, Google, or GitHub.
+2.  **Onboarding Tour:** For first-time users, an interactive onboarding dialog will guide you through key features.
+3.  **Complete Your Profile:** Navigate to the "Profile" tab to add your ALX ID, GitHub username, professional bio, and social links.
+4.  **Add Your Projects:**
+      * **Manually:** Click "Add Project" to input details like project description, tech stack, difficulty, links, key learnings, and challenges.
+      * **From GitHub:** Use the "Import GitHub" wizard to fetch your repositories, detect ALX projects, and import them directly.
 
-### Sharing Projects
+### Sharing Your Projects
 
-1. **Navigate to Your Projects**: View all your documented projects
-2. **Click Share Button**: Open the sharing modal for any project
-3. **Choose Platform**: Select from X, LinkedIn, Facebook, or Discord
-4. **Customize Content**: Edit the auto-generated posts as needed
-5. **Copy or Share**: Use the direct sharing buttons or copy to clipboard
+1.  **View Your Projects:** Go to the "Projects" tab to see all your documented work.
+2.  **Click the Share Icon:** On any project card, click the share button to open the sharing modal.
+3.  **Generate Work Log (Optional):** If the project has a GitHub URL, you can generate a summary of recent commits to include in your post.
+4.  **Choose Your Platform:** Select from X (Twitter), LinkedIn, Facebook, or Discord.
+5.  **Customize Content:** Edit the auto-generated post content to perfectly match your message.
+6.  **Copy or Share:** Copy the formatted text to your clipboard or use direct sharing buttons where available.
 
 ### Platform-Specific Features
 
-- **X (Twitter)**: Optimized for 280-character limit with hashtags
-- **LinkedIn**: Professional format with detailed project information
-- **Facebook**: Engaging format for broader audience
-- **Discord**: Developer-friendly format with markdown styling
+  * **X (Twitter):** Content is optimized for the 280-character limit, including smart hashtag generation.
+  * **LinkedIn:** Professional format with detailed project information and career-focused insights.
+  * **Facebook:** Engaging and descriptive content for broader audience reach.
+  * **Discord:** Developer-friendly markdown formatting for clean, readable posts in coding communities.
 
-## Project Structure 📁
+-----
+
+📁 **Project Structure**
 
 ```
 src/
 ├── components/
-│   ├── auth/          # Authentication components
-│   ├── projects/      # Project management components
-│   ├── profile/       # User profile components
-│   ├── sharing/       # Social media sharing components
-│   └── ui/           # Reusable UI components (shadcn/ui)
-├── hooks/            # Custom React hooks
-├── lib/              # Utility functions and configurations
-└── types/            # TypeScript type definitions
+│   ├── auth/           # Authentication forms, pages, and protected routes
+│   ├── projects/       # Components for project creation, listing, and editing
+│   ├── profile/        # User profile management components
+│   ├── github/         # GitHub import wizard and related UI
+│   ├── sharing/        # Modals and components for social media sharing
+│   └── ui/             # Reusable ShadCN UI components (buttons, cards, etc.)
+├── hooks/              # Custom React hooks (e.g., useAuth)
+├── lib/                # Utility functions (cn, supabase client, GitHub API service)
+├── services/           # Backend interaction services (AuthService, GitHubCommitsService, SocialContentOptimizer)
+├── store/              # Redux Toolkit store, slices (auth, projects, ui, github, sharing)
+├── pages/              # Top-level page components (SignInPage, SignUpPage, Dashboard)
+└── App.jsx             # Main application router and layout
 ```
 
-## Contributing 🤝
+-----
 
-We welcome contributions from the ALX community! Please:
+🤝 **Contributing**
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+We welcome contributions from the ALX community and beyond\! If you'd like to contribute, please follow these steps:
 
-## Environment Variables 🔐
+1.  Fork the repository.
+2.  Create a new feature branch (`git checkout -b feature/your-feature-name`).
+3.  Make your changes and ensure the code adheres to existing style.
+4.  Add tests for new features or bug fixes, if applicable.
+5.  Commit your changes with a clear and concise commit message.
+6.  Submit a Pull Request to the `main` branch.
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `VITE_SUPABASE_URL` | Your Supabase project URL | ✅ |
-| `VITE_SUPABASE_ANON_KEY` | Your Supabase anonymous key | ✅ |
+-----
 
-## Deployment 🚀
+🔐 **Environment Variables**
 
-**Ready to go live? Your app is deployment-ready!**
+Ensure these environment variables are configured in your `.env.local` file:
+
+| Variable                  | Description                          | Required        |
+| :------------------------ | :----------------------------------- | :-------------- |
+| `VITE_SUPABASE_URL`       | Your Supabase project URL            | ✅              |
+| `VITE_SUPABASE_ANON_KEY`  | Your Supabase anonymous key          | ✅              |
+| `VITE_GITHUB_TOKEN`       | Your GitHub Personal Access Token (for API calls) | ⚠️ (Highly Recommended) |
+
+-----
+
+🚀 **Deployment**
+
+Your ALX Student Showcase is designed for easy deployment to popular hosting platforms\!
 
 ### Quick Deploy (2 minutes)
 
-1. **Prepare for deployment:**
-   ```bash
-   ./deploy.sh  # Automated deployment preparation
-   ```
+1.  **Prepare for deployment:**
 
-2. **Choose your platform:**
+    ```bash
+    ./deploy.sh # Automated script to prepare build artifacts and configurations
+    ```
 
-   **Option A: Vercel (Recommended)**
-   - Push to GitHub
-   - Import project at [vercel.com](https://vercel.com)
-   - Add environment variables
-   - Deploy! ✨
+2.  **Choose your platform:**
 
-   **Option B: Netlify**
-   - Push to GitHub or drag & drop `dist` folder
-   - Configure at [netlify.com](https://netlify.com)
-   - Goes live instantly! 🚀
+      * **Option A: Vercel (Recommended)**
+
+          * Push your code to a GitHub repository.
+          * Import your project at [vercel.com](https://vercel.com/).
+          * Add your environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_GITHUB_TOKEN`) in Vercel settings.
+          * Deploy\! ✨ Your app will be live in moments.
+
+      * **Option B: Netlify**
+
+          * Push to GitHub or simply drag & drop your `dist` folder.
+          * Configure your build settings at [netlify.com](https://www.netlify.com/).
+          * Goes live instantly\! 🚀
 
 ### Deployment Files Included
 
-- ✅ `vercel.json` - Vercel configuration
-- ✅ `netlify.toml` - Netlify configuration  
-- ✅ `public/_redirects` - SPA routing
-- ✅ `Dockerfile` - Container deployment
-- ✅ `.github/workflows/deploy.yml` - CI/CD
-- ✅ `deploy.sh` - Automated preparation script
+The repository includes pre-configured files for various deployment strategies:
+
+  * ✅ `vercel.json` - Vercel deployment configuration
+  * ✅ `netlify.toml` - Netlify build and deployment configuration
+  * ✅ `public/_redirects` - SPA routing rules for Netlify
+  * ✅ `Dockerfile` - For containerized deployments (e.g., Docker, Kubernetes)
+  * ✅ `.github/workflows/deploy.yml` - Basic CI/CD pipeline for GitHub Actions
+  * ✅ `deploy.sh` - An automated script to streamline deployment preparation
 
 ### Build Stats
 
-- **Build Size**: ~576KB (optimized)
-- **Load Time**: <2s on fast connections
-- **Performance**: Optimized for production
+  * **Optimized Build Size:** \~576KB
+  * **Fast Load Time:** \<2s on fast connections
+  * **High Performance:** Optimized for production environments
 
-**📖 Detailed Instructions**: See `DEPLOYMENT.md` for comprehensive deployment guide
+-----
 
-**⚡ Quick Start**: See `QUICK-DEPLOY.md` for 1-click deployment
+📖 **Detailed Instructions:** For a comprehensive guide on deployment, refer to `DEPLOYMENT.md`.
 
-## Support & Community 💬
+⚡ **Quick Start:** For 1-click deployment options, see `QUICK-DEPLOY.md`.
 
-- **Issues**: Report bugs or request features via GitHub Issues
-- **Discussions**: Join our community discussions
-- **ALX Community**: Share your showcased projects with fellow ALX students
+-----
 
-## License 📄
+💬 **Support & Community**
 
-This project is open source and available under the [MIT License](LICENSE).
+  * **Issues:** Report any bugs, suggest features, or ask questions via GitHub Issues.
+  * **Discussions:** Join our community discussions on the GitHub Discussions tab.
+  * **ALX Community:** Feel free to share your showcased projects with fellow ALX students and inspire others\!
 
-## Acknowledgments 🙏
+-----
 
-- Built for the ALX Software Engineering community
-- Powered by Supabase and modern web technologies
-- UI components from shadcn/ui
+📄 **License**
 
----
+This project is open source and available under the [MIT License](https://www.google.com/search?q=LICENSE).
 
-**Happy Coding! 🎉**
+-----
 
-*Built with ❤️ for ALX Students*
+🙏 **Acknowledgments**
+
+  * Built with passion and dedication.
+  * Powered by Supabase and modern web technologies.
+  * UI components from shadcn/ui.
+
+-----
+
+Happy Coding\! 🎉
+
+-----
+
+Copyright © 2025 [Your Name/Organization]. All rights reserved.
