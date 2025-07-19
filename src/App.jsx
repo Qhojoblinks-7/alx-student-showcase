@@ -29,7 +29,9 @@ export default function App() {
 
   useEffect(() => {
     const theme = localStorage.getItem('theme') || 'light';
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.remove('dark', 'light');
+    document.documentElement.classList.add(theme);
+    console.log('Document classes after applying theme:', document.documentElement.classList);
   }, []);
 
   // Show a global loading indicator until authentication state is initialized

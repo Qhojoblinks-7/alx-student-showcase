@@ -43,6 +43,8 @@ import {
 } from '@/store/slices/githubSlice.js';
 import { useAuth } from '@/hooks/use-auth.js';
 import { GitHubService, ALXProjectDetector } from '@/lib/github-service.js'; // Import ALXProjectDetector
+import { GitLabService, BitbucketService } from '@/lib/platform-services.js'; // Import services for GitLab and Bitbucket
+import { Select } from '@/components/ui/select.jsx'; // Import Select component
 
 export function GitHubImportWizard({ onClose, onImportComplete }) {
   const dispatch = useDispatch();
@@ -63,6 +65,7 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
   } = useSelector((state) => state.github);
 
   const [usernameInput, setUsernameInput] = useState(wizardData.username || '');
+  const [platform, setPlatform] = useState('GitHub'); // Add platform state
 
   // Effect to reset state when modal opens/closes
   useEffect(() => {
@@ -88,31 +91,30 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
   // Handle fetching repositories
   const handleFetchRepositories = useCallback(async () => {
     if (!usernameInput.trim()) {
-      toast.error('Please enter a GitHub username.');
+      toast.error('Please enter a username.');
       return;
     }
-    dispatch(clearGitHubErrors()); // Clear previous errors
+
+    dispatch(clearGitHubErrors());
     dispatch(setWizardData({ username: usernameInput.trim() }));
+
     try {
-      // 1. Fetch repositories
-      await dispatch(fetchUserRepositories(usernameInput.trim())).unwrap();
-      
-      // 2. Automatically detect ALX projects from the now fetched repositories
-      // Pass repositories and username explicitly as required by the thunk
-      // The `repositories` state might not be immediately updated here, so pass the action.payload
-      const fetchedRepos = await GitHubService.fetchUserRepositories(usernameInput.trim()); // Re-fetch or pass from previous action payload if available
-      await dispatch(detectALXProjects({ repositories: fetchedRepos, username: usernameInput.trim() })).unwrap();
-      
-      // 3. Move to the review & import step
-      dispatch(setWizardStep('review_import'));
+      let repositories;
+      if (platform === 'GitHub') {
+        repositories = await GitHubService.fetchUserRepositories(usernameInput.trim());
+      } else if (platform === 'GitLab') {
+        repositories = await GitLabService.fetchUserRepositories(usernameInput.trim());
+      } else if (platform === 'Bitbucket') {
+        repositories = await BitbucketService.fetchUserRepositories(usernameInput.trim());
+      }
+
+      dispatch(setRepositories(repositories));
+      dispatch(setWizardStep('select_repos'));
     } catch (err) {
-      // Log the full error object for debugging
-      console.error('Error in handleFetchRepositories:', err);
-      toast.error('Failed to fetch or detect projects: ' + getErrorMessage(err));
-      // If fetching or detecting fails, go back to username step or stay on current step with error
-      dispatch(setWizardStep('username'));
+      console.error('Error fetching repositories:', err);
+      toast.error('Failed to fetch repositories: ' + err.message);
     }
-  }, [usernameInput, dispatch]); // Removed `repositories` from dependencies as it caused stale closure issues. Re-fetching or using the payload directly is safer.
+  }, [platform, usernameInput, dispatch]);
 
   // Handle detecting ALX projects (for manual trigger from select_repos step)
   const handleDetectALXProjects = useCallback(async () => {
@@ -189,6 +191,10 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
     },
     [dispatch]
   );
+
+  const handlePlatformChange = (event) => {
+    setPlatform(event.target.value);
+  };
 
   const renderStepContent = () => {
     switch (wizardStep) {

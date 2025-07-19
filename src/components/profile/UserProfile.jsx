@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'; // Added useEffect
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
-import { supabase } from '../../lib/supabase.js';
+import { supabase, subscribeToProjectChanges, backupProjectData, fetchUserBadges, awardBadge } from '../../lib/supabase.js';
+import { getProjectRecommendations, generateProjectSummary } from '../../lib/ai-service.js';
 import { Button } from '../ui/button.jsx';
 import { Input } from '../ui/input.jsx';
 import { Label } from '../ui/label.jsx';
@@ -9,7 +10,7 @@ import { Textarea } from '../ui/textarea.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar.jsx';
 import { toast } from 'sonner';
-import { Loader2, User, Github, Linkedin, BookOpen, Image, Info } from 'lucide-react'; // Added more icons
+import { Loader2, User, Github, Linkedin, BookOpen, Image, Info, Trophy, Star } from 'lucide-react'; // Added more icons
 import {Link} from 'react-router-dom'
 
 export function UserProfile() {
@@ -23,7 +24,17 @@ export function UserProfile() {
     linkedin_url: '',
     bio: '',
     avatar_url: '',
+    certifications: [], // Changed to array
+    skills: [], // Changed to array
+    achievements: [], // Changed to array
+    portfolio: [],
   });
+  const [badges, setBadges] = useState([
+    { id: 1, name: 'Top Contributor', description: 'Awarded for contributing 10+ projects', icon: <Trophy className="h-8 w-8 text-yellow-500" /> },
+    { id: 2, name: 'Most Endorsed', description: 'Received 50+ endorsements', icon: <Star className="h-8 w-8 text-blue-500" /> },
+  ]);
+  const [recommendations, setRecommendations] = useState([]);
+  const [summary, setSummary] = useState('');
 
   const fetchProfile = useCallback(async () => {
     if (!user) {
@@ -56,6 +67,10 @@ export function UserProfile() {
           linkedin_url: data.linkedin_url || '',
           bio: data.bio || '',
           avatar_url: data.avatar_url || '',
+          certifications: data.certifications || [], // Parse as array
+          skills: data.skills || [], // Parse as array
+          achievements: data.achievements || [], // Parse as array
+          portfolio: data.portfolio || [], // Map portfolio
         });
       }
     } catch (error) {
@@ -69,6 +84,32 @@ export function UserProfile() {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]); // Depend on fetchProfile to re-run when user changes
+
+  useEffect(() => {
+    const subscription = subscribeToProjectChanges((updatedProject) => {
+      console.log('Real-time project update:', updatedProject);
+      toast.info(`Project updated: ${updatedProject.title}`);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadBadges = async () => {
+      try {
+        const userBadges = await fetchUserBadges(user.id);
+        setBadges(userBadges);
+      } catch (error) {
+        toast.error('Failed to load badges.');
+      }
+    };
+
+    if (user) {
+      loadBadges();
+    }
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) {
@@ -99,9 +140,71 @@ export function UserProfile() {
     }
   };
 
+  const handleBackup = async () => {
+    try {
+      const backupData = {
+        user_id: user.id,
+        projects: profile.portfolio,
+      };
+      await backupProjectData(backupData);
+      toast.success('Project data backed up successfully!');
+    } catch (error) {
+      toast.error('Failed to back up project data.');
+    }
+  };
+
   const updateProfile = (field, value) => {
     setProfile(prev => ({ ...prev, [field]: value }));
   };
+
+  const addPortfolioProject = (project) => {
+    setProfile((prev) => ({ ...prev, portfolio: [...prev.portfolio, project] }));
+  };
+
+  const handleAwardBadge = async (badge) => {
+    try {
+      await awardBadge(user.id, badge);
+      setBadges((prev) => [...prev, badge]);
+      toast.success(`Badge awarded: ${badge.name}`);
+    } catch (error) {
+      toast.error('Failed to award badge.');
+    }
+  };
+
+  const fetchRecommendations = useCallback(async () => {
+    try {
+      const userPreferences = {
+        skills: profile.skills,
+        interests: profile.bio,
+      };
+      const recommendedProjects = await getProjectRecommendations(userPreferences);
+      setRecommendations(recommendedProjects);
+    } catch (error) {
+      toast.error('Failed to fetch project recommendations.');
+    }
+  }, [profile.skills, profile.bio]);
+
+  const fetchSummary = useCallback(async () => {
+    try {
+      const projectDetails = profile.portfolio;
+      const projectSummary = await generateProjectSummary(projectDetails);
+      setSummary(projectSummary);
+    } catch (error) {
+      toast.error('Failed to generate project summary.');
+    }
+  }, [profile.portfolio]);
+
+  useEffect(() => {
+    if (profile.skills.length > 0) {
+      fetchRecommendations();
+    }
+  }, [profile.skills, fetchRecommendations]);
+
+  useEffect(() => {
+    if (profile.portfolio.length > 0) {
+      fetchSummary();
+    }
+  }, [profile.portfolio, fetchSummary]);
 
   if (loading) {
     return (
@@ -222,9 +325,107 @@ export function UserProfile() {
           </div>
         </div>
 
+        {/* Section: Certifications, Skills, Achievements */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+            <Info className="h-5 w-5 text-purple-500" /> Additional Information
+          </h3>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <Label htmlFor="certifications">Certifications</Label>
+              <Textarea
+                id="certifications"
+                placeholder="Enter certifications, separated by commas..."
+                value={profile.certifications.join(', ')}
+                onChange={(e) => updateProfile('certifications', e.target.value.split(',').map(item => item.trim()))}
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="skills">Skills</Label>
+              <Textarea
+                id="skills"
+                placeholder="Enter skills, separated by commas..."
+                value={profile.skills.join(', ')}
+                onChange={(e) => updateProfile('skills', e.target.value.split(',').map(item => item.trim()))}
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="achievements">Achievements</Label>
+              <Textarea
+                id="achievements"
+                placeholder="Enter achievements, separated by commas..."
+                value={profile.achievements.join(', ')}
+                onChange={(e) => updateProfile('achievements', e.target.value.split(',').map(item => item.trim()))}
+                rows={3}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section: Portfolio */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+            <BookOpen className="h-5 w-5 text-yellow-500" /> Portfolio
+          </h3>
+          <Button onClick={() => addPortfolioProject({ title: 'New Project', description: 'Project description' })}>
+            Add Project
+          </Button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {profile.portfolio.map((project, index) => (
+              <Card key={index} className="p-4 shadow-md">
+                <CardTitle>{project.title}</CardTitle>
+                <CardDescription>{project.description}</CardDescription>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Section: Badges */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+            <Info className="h-5 w-5 text-purple-500" /> Badges
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {badges.map((badge) => (
+              <div key={badge.id} className="flex items-center space-x-4 p-4 border rounded-lg shadow-sm">
+                {badge.icon}
+                <div>
+                  <h4 className="font-bold text-lg">{badge.name}</h4>
+                  <p className="text-sm text-muted-foreground">{badge.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Section: AI Recommendations */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+            <Info className="h-5 w-5 text-purple-500" /> AI-Powered Recommendations
+          </h3>
+          <ul className="list-disc pl-5">
+            {recommendations.map((rec, index) => (
+              <li key={index}>{rec}</li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Section: AI Summary */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+            <Info className="h-5 w-5 text-purple-500" /> AI-Generated Summary
+          </h3>
+          <p>{summary}</p>
+        </div>
+
         <Button onClick={handleSave} disabled={saving} className="w-full mt-6"> {/* Increased margin-top */}
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Save Profile
+        </Button>
+        <Button onClick={handleBackup} className="w-full mt-6">
+          Back Up Project Data
         </Button>
       </CardContent>
     </Card>
