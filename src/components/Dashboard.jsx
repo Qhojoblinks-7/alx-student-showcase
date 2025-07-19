@@ -48,6 +48,7 @@ import { AutoWorkLogShare } from '../components/sharing/AutoWorkLogShare';
 import { WorkLogGenerator } from '../components/sharing/WorkLogGenerator';
 import { DashboardStats } from '../components/DashboardStats';
 import { OnboardingDialog } from './OnboardingDialog';
+import { ProjectSearch } from '../components/projects/ProjectSearch'; // Import ProjectSearch
 
 
 export function Dashboard() {
@@ -70,6 +71,12 @@ export function Dashboard() {
   const [showWorkLogGenerator, setShowWorkLogGenerator] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false); // State to control Sheet visibility
   const [showOnboarding, setShowOnboarding] = useState(false); // State for onboarding dialog
+  const [filters, setFilters] = useState({
+    query: '',
+    sortBy: 'popularity',
+    tags: '',
+    technologies: '',
+  });
 
   // Fetch projects and stats when user is available and on component mount
   useEffect(() => {
@@ -87,6 +94,13 @@ export function Dashboard() {
       localStorage.removeItem('isNewUser'); // Clear the flag after showing
     }
   }, []);
+
+  useEffect(() => {
+  document.documentElement.classList.remove('dark', 'light');
+  document.documentElement.classList.add(theme);
+  console.log('Document classes after toggling theme:', document.documentElement.classList);
+}, [theme]);
+
 
   const handleSignOut = async () => {
     try {
@@ -255,23 +269,7 @@ export function Dashboard() {
           </h1>
         </div>
 
-        {/* Desktop Tabs (hidden on small screens, visible on large) */}
-        <Tabs value={activeTab} onValueChange={(value) => dispatch(setActiveTab(value))} className="hidden lg:block">
-          <TabsList>
-            <TabsTrigger value="projects">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Projects
-            </TabsTrigger>
-            <TabsTrigger value="profile">
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="stats">
-              <BarChart2 className="mr-2 h-4 w-4" />
-              Stats
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        
 
         {/* Right side: Add Project, GitHub Import, Theme Toggle, User Dropdown */}
         <div className="flex items-center gap-2 sm:gap-4"> {/* Adjusted gap for smaller screens */}
@@ -287,7 +285,7 @@ export function Dashboard() {
             )}
             Import GitHub
           </Button>
-          <Button variant="outline" size="icon" onClick={() => dispatch(toggleTheme())}>
+          <Button variant="outline" size="icon" onClick={() => { dispatch(toggleTheme()); console.log('Theme toggled to:', theme); }}>
             {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </Button>
 
@@ -396,7 +394,10 @@ export function Dashboard() {
                 ))}
               </div>
             ) : (
-              <ProjectList onEdit={handleEditProject} onShare={handleOpenAutoWorkLogShare} />
+              <div className="space-y-6">
+                <ProjectSearch onSearch={(newFilters) => setFilters(newFilters)} />
+                <ProjectList filters={filters} onEdit={handleEditProject} onShare={handleOpenAutoWorkLogShare} />
+              </div>
             )}
           </TabsContent>
 
@@ -474,3 +475,4 @@ export function Dashboard() {
 Dashboard.propTypes = {
   // No specific props for Dashboard, but can be defined if needed.
 };
+

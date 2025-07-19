@@ -28,6 +28,7 @@ import {
   AlertTriangle // Added AlertTriangle for error display
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
 
 // --- Tabs Component Refactor (from tabs.jsx) ---
 const TabsContext = createContext(null);
@@ -123,7 +124,7 @@ TabsContent.propTypes = {
 // --- End Tabs Component Refactor ---
 
 
-export function ProjectList({ onEdit, onShare }) {
+export function ProjectList({ onEdit, onShare, filters }) {
   const dispatch = useDispatch();
   const { user } = useAuth(); // Get user from your auth hook
 
@@ -132,6 +133,8 @@ export function ProjectList({ onEdit, onShare }) {
   const loading = useSelector(state => state.projects.isLoading);
   const error = useSelector(state => state.projects.error); // Get error state
 
+  const [filteredProjects, setFilteredProjects] = useState([]);
+
   // Removed useEffect for fetching projects as Dashboard now controls rendering based on these.
   // The Dashboard component dispatches fetchProjects, so ProjectList only needs to consume it.
   // useEffect(() => {
@@ -139,6 +142,38 @@ export function ProjectList({ onEdit, onShare }) {
   //     dispatch(fetchProjects(user.id));
   //   }
   // }, [user, dispatch, loading]);
+
+  useEffect(() => {
+    let result = projects.slice(); // Clone the array to avoid modifying the original
+
+    if (filters.query) {
+      result = result.filter((project) =>
+        project.title.toLowerCase().includes(filters.query.toLowerCase())
+      );
+    }
+
+    if (filters.tags) {
+      result = result.filter((project) =>
+        project.tags.some((tag) => tag.toLowerCase().includes(filters.tags.toLowerCase()))
+      );
+    }
+
+    if (filters.technologies) {
+      result = result.filter((project) =>
+        project.technologies.some((tech) =>
+          tech.toLowerCase().includes(filters.technologies.toLowerCase())
+        )
+      );
+    }
+
+    if (filters.sortBy === 'popularity') {
+      result = result.sort((a, b) => b.popularity - a.popularity);
+    } else if (filters.sortBy === 'recency') {
+      result = result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    setFilteredProjects(result);
+  }, [filters, projects]);
 
   const handleDeleteProject = async (projectId) => {
     toast('Are you sure you want to delete this project?', {
@@ -247,9 +282,11 @@ export function ProjectList({ onEdit, onShare }) {
     );
   }
 
+  const displayedProjects = filteredProjects.length > 0 ? filteredProjects : projects;
+
   return (
     <div className="space-y-6">
-      {projects.map((project) => {
+      {displayedProjects.map((project) => {
         // --- DEBUG LOG FOR EACH PROJECT ---
         console.log('ProjectList - Mapping project:', project);
         // --- END DEBUG LOG ---

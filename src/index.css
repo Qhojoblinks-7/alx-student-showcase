@@ -122,3 +122,26 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .card {
+    padding: 1rem;
+    margin: 0.5rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .button {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+  }
+}

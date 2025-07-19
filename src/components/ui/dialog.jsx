@@ -17,13 +17,14 @@ const Dialog = ({ open, onOpenChange, children }) => {
   );
 };
 
-const DialogContent = forwardRef(({ className, children, ...props }, ref) => (
+const DialogContent = forwardRef(({ className, children, descriptionId, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
       'relative z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg md:w-full',
       className
     )}
+    aria-describedby={descriptionId}
     {...props}
   >
     {children}
