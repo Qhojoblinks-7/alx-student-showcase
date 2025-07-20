@@ -10,7 +10,7 @@ import { Textarea } from '../ui/textarea.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar.jsx';
 import { toast } from 'sonner';
-import { Loader2, User, Github, Linkedin, BookOpen, Image, Info, Trophy, Star, Link as LinkIcon, Plus, Edit2, Lightbulb } from 'lucide-react'; // Added Plus and Edit2 icons
+import { Loader2, User, Github, Linkedin, BookOpen, Image, Info, Trophy, Star, Link as LinkIcon, Plus, Edit2 } from 'lucide-react'; // Added Plus and Edit2 icons
 import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog.jsx'; // Import Dialog components
 import { ProjectForm } from '../projects/ProjectForm.jsx'; // Import the ProjectForm component
@@ -337,236 +337,171 @@ export function UserProfile() {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-        {/* Left Column: Profile Settings */}
-        <Card className="shadow-sm rounded-lg h-fit"> {/* h-fit to prevent card from stretching */}
-          <CardHeader className="mb-6">
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              <User className="h-6 w-6 text-blue-600" />
-              Profile Settings
-            </CardTitle>
-            <CardDescription className="text-base text-muted-foreground">
-              Update your profile information to showcase your ALX journey
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {/* Section: Basic Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <Info className="h-5 w-5 text-purple-500" /> Basic Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="full_name">Full Name</Label>
-                  <Input
-                    id="full_name"
-                    placeholder="John Doe"
-                    value={profile.full_name}
-                    onChange={(e) => updateProfile('full_name', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="alx_id">ALX ID</Label>
-                  <Input
-                    id="alx_id"
-                    placeholder="ALX_001234"
-                    value={profile.alx_id}
-                    onChange={(e) => updateProfile('alx_id', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Section: Social Links */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <LinkIcon className="h-5 w-5 text-green-500" /> Social Links
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="github_username">GitHub Username</Label>
-                  <Input
-                    id="github_username"
-                    placeholder="johndoe"
-                    value={profile.github_username}
-                    onChange={(e) => updateProfile('github_username', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-                  <Input
-                    id="linkedin_url"
-                    placeholder="https://linkedin.com/in/johndoe"
-                    value={profile.linkedin_url}
-                    onChange={(e) => updateProfile('linkedin_url', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Section: About Me */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <BookOpen className="h-5 w-5 text-yellow-500" /> About Me
-              </h3>
+      <Card className="w-full   p-4 sm:p-6 shadow-sm rounded-lg">
+        <CardHeader className="mb-6">
+          <CardTitle className="text-2xl font-bold flex items-center gap-2">
+            <User className="h-6 w-6 text-blue-600" />
+            Profile Settings
+          </CardTitle>
+          <CardDescription className="text-base text-muted-foreground">
+            Update your profile information to showcase your ALX journey
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          {/* Section: Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <Info className="h-5 w-5 text-purple-500" /> Basic Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  placeholder="Tell us about yourself and your coding journey..."
-                  rows={4}
-                  value={profile.bio}
-                  onChange={(e) => updateProfile('bio', e.target.value)}
+                <Label htmlFor="full_name">Full Name</Label>
+                <Input
+                  id="full_name"
+                  placeholder="John Doe"
+                  value={profile.full_name}
+                  onChange={(e) => updateProfile('full_name', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="alx_id">ALX ID</Label>
+                <Input
+                  id="alx_id"
+                  placeholder="ALX_001234"
+                  value={profile.alx_id}
+                  onChange={(e) => updateProfile('alx_id', e.target.value)}
                 />
               </div>
             </div>
+          </div>
 
-            {/* Section: Avatar */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <Image className="h-5 w-5 text-orange-500" /> Avatar
-              </h3>
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-                <Avatar className="h-24 w-24 flex-shrink-0 border-2 border-blue-200 shadow-md">
-                  <AvatarImage src={profile.avatar_url} alt="User Avatar" />
-                  <AvatarFallback className="text-3xl font-bold bg-blue-100 text-blue-600">
-                    {profile.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || (user?.email ? user.email.substring(0, 2).toUpperCase() : 'U')}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 w-full">
-                  <Label htmlFor="avatar_url">Avatar URL</Label>
-                  <Input
-                    id="avatar_url"
-                    placeholder="https://example.com/avatar.jpg"
-                    value={profile.avatar_url}
-                    onChange={(e) => updateProfile('avatar_url', e.target.value)}
-                    className="w-full"
-                  />
-                </div>
+          {/* Section: Social Links */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <LinkIcon className="h-5 w-5 text-green-500" /> Social Links
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="github_username">GitHub Username</Label>
+                <Input
+                  id="github_username"
+                  placeholder="johndoe"
+                  value={profile.github_username}
+                  onChange={(e) => updateProfile('github_username', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="linkedin_url">LinkedIn URL</Label>
+                <Input
+                  id="linkedin_url"
+                  placeholder="https://linkedin.com/in/johndoe"
+                  value={profile.linkedin_url}
+                  onChange={(e) => updateProfile('linkedin_url', e.target.value)}
+                />
               </div>
             </div>
+          </div>
 
-            {/* Section: Certifications, Skills, Achievements */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <Info className="h-5 w-5 text-purple-500" /> Additional Information
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <Label htmlFor="certifications">Certifications</Label>
-                  <Textarea
-                    id="certifications"
-                    placeholder="Enter certifications, separated by commas..."
-                    value={profile.certifications.join(', ')}
-                    onChange={(e) => updateProfile('certifications', e.target.value.split(',').map(item => item.trim()))}
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="skills">Skills</Label>
-                  <Textarea
-                    id="skills"
-                    placeholder="Enter skills, separated by commas..."
-                    value={profile.skills.join(', ')}
-                    onChange={(e) => updateProfile('skills', e.target.value.split(',').map(item => item.trim()))}
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="achievements">Achievements</Label>
-                  <Textarea
-                    id="achievements"
-                    placeholder="Enter achievements, separated by commas..."
-                    value={profile.achievements.join(', ')}
-                    onChange={(e) => updateProfile('achievements', e.target.value.split(',').map(item => item.trim()))}
-                    rows={3}
-                  />
-                </div>
+          {/* Section: About Me */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <BookOpen className="h-5 w-5 text-yellow-500" /> About Me
+            </h3>
+            <div>
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                placeholder="Tell us about yourself and your coding journey..."
+                rows={4}
+                value={profile.bio}
+                onChange={(e) => updateProfile('bio', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Section: Avatar */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <Image className="h-5 w-5 text-orange-500" /> Avatar
+            </h3>
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+              <Avatar className="h-24 w-24 flex-shrink-0 border-2 border-blue-200 shadow-md">
+                <AvatarImage src={profile.avatar_url} alt="User Avatar" />
+                <AvatarFallback className="text-3xl font-bold bg-blue-100 text-blue-600">
+                  {profile.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || (user?.email ? user.email.substring(0, 2).toUpperCase() : 'U')}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 w-full">
+                <Label htmlFor="avatar_url">Avatar URL</Label>
+                <Input
+                  id="avatar_url"
+                  placeholder="https://example.com/avatar.jpg"
+                  value={profile.avatar_url}
+                  onChange={(e) => updateProfile('avatar_url', e.target.value)}
+                  className="w-full"
+                />
               </div>
             </div>
+          </div>
 
-            {/* Section: Badges */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <Trophy className="h-5 w-5 text-yellow-500" /> Badges
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {badges.length > 0 ? (
-                  badges.map((badge) => (
-                    <div key={badge.id} className="flex items-center space-x-4 p-4 border rounded-lg shadow-sm">
-                      {badge.icon}
-                      <div>
-                        <h4 className="font-bold text-lg">{badge.name}</h4>
-                        <p className="text-sm text-muted-foreground">{badge.description}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="col-span-full text-center text-muted-foreground">No badges awarded yet.</p>
-                )}
+          {/* Section: Certifications, Skills, Achievements */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <Info className="h-5 w-5 text-purple-500" /> Additional Information
+            </h3>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label htmlFor="certifications">Certifications</Label>
+                <Textarea
+                  id="certifications"
+                  placeholder="Enter certifications, separated by commas..."
+                  value={profile.certifications.join(', ')}
+                  onChange={(e) => updateProfile('certifications', e.target.value.split(',').map(item => item.trim()))}
+                  rows={3}
+                />
+              </div>
+              <div>
+                <Label htmlFor="skills">Skills</Label>
+                <Textarea
+                  id="skills"
+                  placeholder="Enter skills, separated by commas..."
+                  value={profile.skills.join(', ')}
+                  onChange={(e) => updateProfile('skills', e.target.value.split(',').map(item => item.trim()))}
+                  rows={3}
+                />
+              </div>
+              <div>
+                <Label htmlFor="achievements">Achievements</Label>
+                <Textarea
+                  id="achievements"
+                  placeholder="Enter achievements, separated by commas..."
+                  value={profile.achievements.join(', ')}
+                  onChange={(e) => updateProfile('achievements', e.target.value.split(',').map(item => item.trim()))}
+                  rows={3}
+                />
               </div>
             </div>
+          </div>
 
-            {/* Section: AI Recommendations */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <Lightbulb className="h-5 w-5 text-blue-500" /> AI-Powered Recommendations
-              </h3>
-              {recommendations.length > 0 ? (
-                <ul className="list-disc pl-5">
-                  {recommendations.map((rec, index) => (
-                    <li key={index}>{rec}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted-foreground">No recommendations available. Fill in your skills and bio to get AI-powered project recommendations!</p>
-              )}
-            </div>
-
-            {/* Section: AI Summary */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-                <BookOpen className="h-5 w-5 text-green-500" /> AI-Generated Summary
-              </h3>
-              {summary ? (
-                <p>{summary}</p>
-              ) : (
-                <p className="text-muted-foreground">No summary available. Fill in your portfolio, skills, and bio to generate an AI-powered project summary!</p>
-              )}
-            </div>
-
-            <Button onClick={handleSave} disabled={saving} className="w-full mt-6">
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Profile
-            </Button>
-            <Button onClick={handleBackup} className="w-full mt-2">
-              Back Up Project Data
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Right Column: Portfolio */}
-        <Card className="shadow-sm rounded-lg h-fit"> {/* h-fit to prevent card from stretching */}
-          <CardHeader className="mb-6">
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-blue-600" /> Portfolio Projects
-            </CardTitle>
-            <CardDescription className="text-base text-muted-foreground">
-              Your showcase of completed ALX projects
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-end mb-4">
+          {/* Section: Portfolio */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <BookOpen className="h-5 w-5 text-yellow-500" /> Portfolio
               <Button
                 type="button"
-                variant="default"
+                variant="outline"
                 size="sm"
-                className="flex items-center gap-1"
+                className="ml-auto flex items-center gap-1"
                 onClick={handleOpenAddProjectForm}
               >
-                <Plus className="h-4 w-4" /> Add New Project
+                <Plus className="h-4 w-4" /> Add Project
               </Button>
-            </div>
+            </h3>
+            {/*
+              NOTE: The ProjectList component needs to be updated to accept 'projects', 'loading', and 'error'
+              as props instead of using useSelector internally to fetch them from Redux.
+              Once updated, uncomment the following and remove the manual mapping below.
+            */}
             <ProjectList
               projects={profile.portfolio}
               loading={loading} // Pass loading state from UserProfile
@@ -575,9 +510,103 @@ export function UserProfile() {
               onShare={handleShareProject}
               filters={{}} // Pass any relevant filters, or an empty object if none
             />
-          </CardContent>
-        </Card>
-      </div>
+            {/* Original manual mapping (remove this once ProjectList is updated and uncommented above) */}
+            {/* {profile.portfolio.length > 0 ? (
+              profile.portfolio.map((project) => (
+                <Card key={project.id} className="p-4 shadow-md flex flex-col justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-semibold mb-1">{project.title}</CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground line-clamp-2">
+                      {project.description || 'No description provided.'}
+                    </CardDescription>
+                    {project.technologies && project.technologies.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {project.technologies.map((tech, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5">
+                            {tech}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditProjectForm(project)}
+                      className="text-blue-500 hover:text-blue-600"
+                    >
+                      <Edit2 className="h-4 w-4 mr-1" /> Edit
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <p className="col-span-full text-center text-muted-foreground">
+                No projects added yet. Click "Add Project" to get started!
+              </p>
+            )} */}
+          </div>
+
+          {/* Section: Badges */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <Info className="h-5 w-5 text-purple-500" /> Badges
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {badges.length > 0 ? (
+                badges.map((badge) => (
+                  <div key={badge.id} className="flex items-center space-x-4 p-4 border rounded-lg shadow-sm">
+                    {badge.icon}
+                    <div>
+                      <h4 className="font-bold text-lg">{badge.name}</h4>
+                      <p className="text-sm text-muted-foreground">{badge.description}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="col-span-full text-center text-muted-foreground">No badges awarded yet.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Section: AI Recommendations */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <Info className="h-5 w-5 text-purple-500" /> AI-Powered Recommendations
+            </h3>
+            {recommendations.length > 0 ? (
+              <ul className="list-disc pl-5">
+                {recommendations.map((rec, index) => (
+                  <li key={index}>{rec}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">No recommendations available. Fill in your skills and bio to get AI-powered project recommendations!</p>
+            )}
+          </div>
+
+          {/* Section: AI Summary */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+              <Info className="h-5 w-5 text-purple-500" /> AI-Generated Summary
+            </h3>
+            {summary ? (
+              <p>{summary}</p>
+            ) : (
+              <p className="text-muted-foreground">No summary available. Fill in your portfolio, skills, and bio to generate an AI-powered project summary!</p>
+            )}
+          </div>
+
+          <Button onClick={handleSave} disabled={saving} className="w-full mt-6">
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Profile
+          </Button>
+          <Button onClick={handleBackup} className="w-full mt-2">
+            Back Up Project Data
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Project Form Dialog */}
       <Dialog open={isProjectFormOpen} onOpenChange={handleProjectFormCancel}>
@@ -603,4 +632,3 @@ UserProfile.propTypes = {
 UserProfile.defaultProps = {
   // Default props can be defined here if needed
 };
-export default UserProfile;
