@@ -1,6 +1,6 @@
 // src/lib/ai-service.js
 import axios from 'axios';
-import { fetchRecentCommitMessages } from './githubService'; // Ensure this import is correct
+import { fetchRecentCommitMessages } from './github-service'; // Ensure this import is correct
 
 const OPENAI_CHAT_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
