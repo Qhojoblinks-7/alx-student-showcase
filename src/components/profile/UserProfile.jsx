@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
 import { supabase, subscribeToProjectChanges, backupProjectData, fetchUserBadges, awardBadge } from '../../lib/supabase.js';
-import { getProjectRecommendations, generateProjectSummary } from '../../lib/openai-service.js';
+import { getProjectRecommendations, generateProjectSummary } from '../../lib/ai-service.js';
 import { Button } from '../ui/button.jsx';
 import { Input } from '../ui/input.jsx';
 import { Label } from '../ui/label.jsx';
@@ -13,8 +13,8 @@ import { toast } from 'sonner';
 import { Loader2, User, Github, Linkedin, BookOpen, Image, Info, Trophy, Star, Link as LinkIcon, Plus, Edit2 } from 'lucide-react'; // Added Plus and Edit2 icons
 import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog.jsx'; // Import Dialog components
-import { ProjectForm } from './ProjectForm.jsx'; // Import the ProjectForm component
-import { ProjectList } from '../components/projects/ProjectList.jsx'; // Import the ProjectList component
+import {ProjectForm } from '../projects/ProjectForm'; // Import the ProjectForm component)
+import { ProjectList } from '../projects/ProjectList.jsx'; // Import the ProjectList component
 
 export function UserProfile() {
   const { user } = useAuth();

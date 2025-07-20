@@ -18,8 +18,8 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['axios']
+      // Remove the 'external' array if you want axios to be bundled
+      // external: ['axios'] // <-- REMOVE THIS LINE
     }
   }
-  ,
 });

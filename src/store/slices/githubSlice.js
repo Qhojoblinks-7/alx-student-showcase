@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { GitHubService, ALXProjectDetector } from '../../lib/github-service.js';
 import { GitHubCommitsService } from '../../lib/github-commits-service.js'; // New import for commit fetching
-import { OpenAIService } from '../../lib/openai-service.js'; // New import for AI services
+import { generateProjectSummary as aiGenerateProjectSummary, generateWorkLogSummary as aiGenerateWorkLogSummary } from '../../lib/ai-service.js'; // Corrected import for AI services
 import { supabase } from '../../lib/supabase.js'; // Import Supabase client
 
 // Async Thunks
@@ -53,7 +53,7 @@ export const processProjectsWithAI = createAsyncThunk(
         let ai_summary = null;
         // Generate project summary if description or technologies exist
         if (project.description || project.technologies) {
-          ai_summary = await OpenAIService.generateProjectSummary({
+          ai_summary = await aiGenerateProjectSummary({ // Corrected call
             title: project.title,
             description: project.description,
             technologies: project.technologies,
@@ -64,12 +64,12 @@ export const processProjectsWithAI = createAsyncThunk(
         let ai_work_log = null;
         // Generate work log if GitHub URL exists
         if (project.github_url) {
-          // fetchRepositoryCommits now expects the full URL
-          const rawCommits = await GitHubCommitsService.fetchRepositoryCommits(project.github_url);
-          if (rawCommits && rawCommits.length > 0) {
-            // Pass raw commit messages to OpenAI for humanized summary
-            ai_work_log = await OpenAIService.generateWorkLogSummary(project.github_url, rawCommits.length); // Pass URL and limit
-          }
+          // fetchRepositoryCommits is not a method of GitHubCommitsService.
+          // You should use GitHubCommitsService.fetchCommits to get raw commits
+          // and then pass the messages to aiGenerateWorkLogSummary.
+          // Or, if aiGenerateWorkLogSummary directly takes the URL, use that.
+          // Assuming aiGenerateWorkLogSummary takes the URL directly:
+          ai_work_log = await aiGenerateWorkLogSummary(project.github_url); // Pass URL, commitLimit is optional
         }
 
         processedProjects.push({
@@ -352,3 +352,9 @@ export const {
 } = githubSlice.actions;
 
 export default githubSlice.reducer;
+export const githubActions = {
+  fetchUserRepositories,
+  detectALXProjects,
+  importSelectedProjects,
+  processProjectsWithAI, // Export the AI processing thunk
+};

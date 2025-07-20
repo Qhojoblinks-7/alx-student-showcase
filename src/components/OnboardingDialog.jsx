@@ -1,12 +1,11 @@
-// src/components/OnboardingDialog.jsx
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import * as Dialog from '@radix-ui/react-dialog';
+import * as Dialog from '@radix-ui/react-dialog'; // Keep this for Dialog.Root
 import {
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  DialogHeader, // This is the correct import for Header
+  DialogTitle,  // This is the correct import for Title
+  DialogDescription, // This is the correct import for Description
 } from '@/components/ui/dialog.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Separator } from '@/components/ui/separator.jsx';
@@ -117,8 +116,8 @@ export function OnboardingDialog({ isOpen, onClose, onAction }) {
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
-      <Dialog.Content className="max-w-md sm:max-w-lg p-6 rounded-lg shadow-xl">
-        <Dialog.Header className="text-center space-y-4">
+      <DialogContent className="max-w-md sm:max-w-lg p-6 rounded-lg shadow-xl">
+        <DialogHeader className="text-center space-y-4"> {/* Changed from Dialog.Header */}
           <div className="flex justify-end">
             <Button variant="ghost" onClick={toggleTheme} className="text-muted-foreground">
               {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -127,13 +126,13 @@ export function OnboardingDialog({ isOpen, onClose, onAction }) {
           <div className="mx-auto flex items-center justify-center mb-4">
             {currentStepData.icon}
           </div>
-          <Dialog.Title className="text-2xl font-bold text-gray-800 dark:text-white">
+          <DialogTitle className="text-2xl font-bold text-gray-800 dark:text-white"> {/* Changed from Dialog.Title */}
             {currentStepData.title}
-          </Dialog.Title>
-          <Dialog.Description className="text-base text-muted-foreground px-4">
+          </DialogTitle>
+          <DialogDescription className="text-base text-muted-foreground px-4"> {/* Changed from Dialog.Description */}
             {currentStepData.description}
-          </Dialog.Description>
-        </Dialog.Header>
+          </DialogDescription>
+        </DialogHeader>
 
         <Separator className="my-6" />
 
@@ -167,10 +166,11 @@ export function OnboardingDialog({ isOpen, onClose, onAction }) {
         )}
 
         {/* Temporary test case for DialogContent accessibility verification */}
+        {/* This DialogContent is already correctly imported from '@/components/ui/dialog.jsx' */}
         <DialogContent descriptionId="test-description">
           <p id="test-description">This is a test description for accessibility.</p>
         </DialogContent>
-      </Dialog.Content>
+      </DialogContent>
     </Dialog.Root>
   );
 }

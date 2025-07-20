@@ -1,0 +1,1 @@
+import{j as t,P as a}from"./index-CnHO3zIo.js";import{e as o}from"./card-BvCKHF_O.js";function r({className:s,...e}){return t.jsx("div",{"data-slot":"skeleton",className:o("bg-accent animate-pulse rounded-md",s),...e})}r.propTypes={className:a.string};export{r as S};

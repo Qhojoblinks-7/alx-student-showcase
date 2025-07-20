@@ -1,123 +1,110 @@
-// github-commits-service.js
+// src/lib/social-optimizer.js
 
-// Import the base GitHubService to reuse authentication headers and possibly other utilities
-// Assuming github-service.js is in the same directory or accessible via '@/lib/github-service.js'
-// If you want to keep this entirely separate and not extend, you'd copy getHeaders() here.
-import { GitHubService } from './github-service.js'; 
+/**
+ * @file SocialContentOptimizer provides utilities for optimizing content for various social media platforms.
+ * @module SocialContentOptimizer
+ */
 
-const GITHUB_API_BASE = 'https://api.github.com';
-const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN; // Ensure token is accessible
-
-// Helper to get authentication headers
-const getHeaders = () => {
-  const headers = {
-    'Accept': 'application/vnd.github.v3+json',
-  };
-  if (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) {
-    headers['Authorization'] = `token ${GITHUB_TOKEN}`;
-  }
-  return headers;
-};
-
-export class GitHubCommitsService {
+/**
+ * Generates platform-specific content for social media sharing.
+ * It takes a project object, an AI-generated work log summary, and an optional custom message.
+ * It also considers raw commits for internal analysis (e.g., to identify most active areas).
+ */
+class SocialContentOptimizerClass { // Using a class structure for better organization
   /**
-   * Parses a GitHub repository URL to extract the owner and repository name.
-   * Handles both full URLs and owner/repo format.
-   * @param {string} repoUrl - The GitHub repository URL (e.g., 'https://github.com/owner/repo' or 'owner/repo').
-   * @returns {{owner: string, repo: string}|null} An object with owner and repo, or null if invalid.
+   * Generates optimized content for various social media platforms.
+   * @param {object} project - The project object (e.g., from your database).
+   * @param {string} aiWorkLogSummaryText - The AI-generated humanized work log summary.
+   * @param {Array<Object>} [rawCommits=[]] - Optional raw commit data for deeper analysis (e.g., for hashtags).
+   * @param {string} [customMessage=''] - An optional custom message provided by the user.
+   * @returns {object} An object with platform-specific content (e.g., { twitter: { content: '...', length: ... }, linkedin: { content: '...', length: ... } }).
    */
-  static parseGitHubUrl(repoUrl) {
-    if (!repoUrl) return null;
+  generatePlatformContent(project, aiWorkLogSummaryText, rawCommits = [], customMessage = '') {
+    const baseContent = customMessage || aiWorkLogSummaryText;
+    const projectLink = project.live_url || project.github_url || '';
+    const projectTitle = project.title || 'My ALX Project';
+    const projectDescription = project.description || '';
+    const projectTechnologies = project.technologies || [];
 
-    try {
-      let owner, repo;
-      const url = new URL(repoUrl);
-      const pathParts = url.pathname.split('/').filter(Boolean);
+    // Basic hashtags from technologies and categories
+    const relevantTags = [...projectTechnologies, project.category]
+      .filter(Boolean)
+      .map(tag => `#${tag.replace(/[^a-zA-Z0-9]/g, '')}`);
 
-      if (pathParts.length >= 2) {
-        owner = pathParts[0];
-        repo = pathParts[1];
-      } else {
-        // Fallback for 'owner/repo' format if not a full URL
-        const directParts = repoUrl.split('/');
-        if (directParts.length === 2) {
-          owner = directParts[0];
-          repo = directParts[1];
-        } else {
-          return null;
-        }
-      }
-      return { owner, repo: repo.replace(/\.git$/, '') }; // Remove .git suffix if present
-    } catch (e) {
-      // If it's not a valid URL, try splitting as 'owner/repo'
-      const directParts = repoUrl.split('/');
-      if (directParts.length === 2) {
-        return { owner: directParts[0], repo: directParts[1].replace(/\.git$/, '') };
-      }
-      console.error('Invalid GitHub repository URL format:', repoUrl, e);
-      return null;
+    // Add general ALX-related hashtags
+    relevantTags.push('#ALXSE', '#SoftwareEngineering', '#TechPortfolio');
+
+    // Deduplicate and limit hashtags
+    const uniqueTags = [...new Set(relevantTags)].slice(0, 5).join(' '); // Limit to 5 hashtags
+
+    // Function to truncate content and add ellipses if needed
+    const truncate = (text, maxLength) => {
+      if (!text) return '';
+      if (text.length <= maxLength) return text;
+      return text.substring(0, maxLength - 3) + '...';
+    };
+
+    // Twitter/X content (max 280 chars)
+    let twitterContent = `${baseContent}\n\nCheck out "${projectTitle}" here: ${projectLink}\n${uniqueTags}`;
+    if (twitterContent.length > 280) {
+      const availableSpace = 280 - (projectLink.length + uniqueTags.length + 20); // 20 for "Check out "" here: " and newlines
+      twitterContent = `${truncate(baseContent, availableSpace)}\n\nCheck out "${projectTitle}" here: ${projectLink}\n${uniqueTags}`;
     }
+
+    // LinkedIn content (more professional, longer, up to 1300 chars)
+    let linkedinContent = `🚀 Just wrapped up some exciting work on my latest ALX project, "${projectTitle}"!
+
+${baseContent}
+
+Key technologies used include: ${projectTechnologies.join(', ') || 'various tools'}.
+
+Explore the project and its code: ${projectLink}
+
+#${projectTitle.replace(/[^a-zA-Z0-9]/g, '')} ${uniqueTags}`;
+    if (linkedinContent.length > 1300) {
+      linkedinContent = truncate(linkedinContent, 1300);
+    }
+
+
+    // Facebook content (can be longer, up to 400 chars for good engagement)
+    let facebookContent = `🎉 Project Update: "${projectTitle}"!
+
+${baseContent}
+
+I've been focusing on ${projectTechnologies.join(', ') || 'various aspects'} to bring this to life.
+
+Check it out and let me know what you think!
+Link: ${projectLink}
+${uniqueTags}`;
+    if (facebookContent.length > 400) {
+      facebookContent = truncate(facebookContent, 400);
+    }
+
+    // Discord content (even longer, up to 2000 chars, supports Markdown)
+    let discordContent = `**Project Update: __${projectTitle}__**
+${projectDescription ? `\n_${projectDescription}_\n` : ''}
+\`\`\`
+${baseContent}
+\`\`\`
+**Technologies:** ${projectTechnologies.map(tech => `\`${tech}\``).join(', ') || 'N/A'}
+**GitHub:** ${project.github_url || 'N/A'}
+**Live Demo:** ${project.live_url || 'N/A'}
+`;
+    if (discordContent.length > 2000) {
+      discordContent = truncate(discordContent, 2000);
+    }
+
+
+    return {
+      twitter: { content: twitterContent, length: twitterContent.length, optimized: true },
+      linkedin: { content: linkedinContent, length: linkedinContent.length, optimized: true },
+      facebook: { content: facebookContent, length: facebookContent.length, optimized: true },
+      discord: { content: discordContent, length: discordContent.length, optimized: true },
+    };
   }
-
-  /**
-   * Fetches recent commit data for a given GitHub repository.
-   * This method now uses authentication headers.
-   *
-   * @param {string} githubUrl - The full GitHub repository URL (e.g., 'https://github.com/owner/repo').
-   * @param {number} limit - The maximum number of commits to fetch (default: 10).
-   * @returns {Promise<Array<Object>>} A promise that resolves to an array of commit objects.
-   */
-  static async fetchRepositoryCommits(githubUrl, limit = 10) {
-    const parsed = this.parseGitHubUrl(githubUrl);
-    if (!parsed) {
-      console.warn('Could not parse repository URL for commit fetching:', githubUrl);
-      return [];
-    }
-
-    const { username, repoName } = parsed;
-
-    if (!GITHUB_TOKEN) {
-      console.error('GitHub Personal Access Token (VITE_GITHUB_TOKEN) is not set. Cannot fetch commits.');
-      // Return an empty array or throw an error based on desired behavior
-      throw new Error('GitHub token missing. Cannot fetch commits.');
-    }
-
-    try {
-      const response = await fetch(
-        `${GITHUB_API_BASE}/repos/${username}/${repoName}/commits?per_page=${limit}`,
-        {
-          headers: getHeaders(), // Use authentication headers
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`Repository '${username}/${repoName}' not found or incorrect URL/permissions.`);
-        }
-        if (response.status === 401) {
-          throw new Error('GitHub token invalid or insufficient permissions for this repository.');
-        }
-        if (response.status === 403) {
-          throw new Error('GitHub API rate limit exceeded or forbidden. Ensure you have a valid GitHub PAT with `public_repo` scope.');
-        }
-        throw new Error(`Failed to fetch commits from GitHub: ${response.statusText || response.status}`);
-      }
-
-      const commits = await response.json();
-      // Map to a simplified, consistent format
-      return commits.map(commit => ({
-        sha: commit.sha,
-        message: commit.commit.message,
-        author: commit.commit.author?.name || 'Unknown', // Defensive check for author
-        date: commit.commit.author?.date,
-        url: commit.html_url
-      }));
-    } catch (error) {
-      console.error(`Error fetching commits for ${username}/${repoName}:`, error.message ? String(error.message) : String(error));
-      throw error; // Re-throw to allow calling function (e.g., Redux thunk) to handle
-    }
-  }
-
-  // Removed generateWorkLog and analyzeCommits as they are now handled by OpenAI service
-  // and SocialContentOptimizer (for internal content generation logic) respectively.
 }
+
+// Export an instance of the class as a named export
+export const SocialContentOptimizer = new SocialContentOptimizerClass();
+// If you need to use this as a default export, you can do so by uncommenting the line below
+// export default SocialContentOptimizer;

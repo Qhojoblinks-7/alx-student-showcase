@@ -1,8 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 // Corrected import path for GitHubCommitsService and SocialContentOptimizer
 import { GitHubCommitsService } from '../../lib/github-commits-service.js'; // For fetching raw commits
-import { OpenAIService } from '../../lib/openai-service.js'; // For AI-generated summaries
-import { SocialContentOptimizer } from '../../lib/social-content-optimizer.js'; // For platform-specific content optimization
+import { generateWorkLogSummary as aiGenerateWorkLogSummary } from '../../lib/ai-service.js'; // Corrected import for AI-generated summaries
+import { SocialContentOptimizer } from '../../lib/social-optimizer.js'; // For platform-specific content optimization
 
 // Async thunks for sharing operations
 
@@ -16,10 +16,10 @@ export const generateWorkLog = createAsyncThunk(
   'sharing/generateWorkLog',
   async ({ githubUrl, timeframe }, { rejectWithValue }) => {
     try {
-      // The OpenAIService.generateWorkLogSummary now handles fetching commits internally.
+      // The aiGenerateWorkLogSummary now handles fetching commits internally.
       // It expects the githubUrl and optionally a commit limit.
       // We'll pass a higher limit (e.g., 50) to ensure enough data for AI.
-      const aiWorkLogSummary = await OpenAIService.generateWorkLogSummary(
+      const aiWorkLogSummary = await aiGenerateWorkLogSummary( // Corrected call
         githubUrl,
         50 // Fetch up to 50 recent commits for AI analysis
       );
@@ -304,3 +304,9 @@ export const selectSharingErrors = (state) => ({
 });
 
 export default sharingSlice.reducer;
+export const sharingActions = {
+  generateWorkLog,
+  generateSocialContent,
+  fetchRepositoryInfo,
+  ...sharingSlice.actions, // Export all actions from the slice
+};

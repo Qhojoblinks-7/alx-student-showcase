@@ -1,6 +1,6 @@
-// src/lib/openaiService.js
-import axios from 'axios';
-import { fetchRecentCommitMessages } from './githubService'; // Ensure this import is correct
+// src/lib/ai-service.js
+import axios from "https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js";
+import { GitHubCommitsService } from './github-commits-service'; // Corrected import
 
 const OPENAI_CHAT_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
@@ -124,8 +124,14 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
   }
 
   try {
-    // 1. Fetch recent commit messages from GitHub
-    const commitMessages = await fetchRecentCommitMessages(githubRepoUrl, commitLimit);
+    // 1. Parse the GitHub URL to get username and repoName
+    const githubInfo = GitHubCommitsService.parseGitHubUrl(githubRepoUrl);
+    if (!githubInfo) {
+      throw new Error('Invalid GitHub URL provided for work log generation.');
+    }
+
+    // 2. Fetch recent commit messages from GitHub using the correct service method
+    const commitMessages = await GitHubCommitsService.fetchRecentCommitMessages(githubInfo.username, githubInfo.repoName, commitLimit);
 
     if (commitMessages.length === 0) {
       return 'No recent commit activity found to generate a work log.';
@@ -134,7 +140,7 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
     const commitsString = commitMessages.map((msg, index) => `- ${msg}`).join('\n'); // Use bullet points for input clarity
 
     const promptMessage = `As an ALX Software Engineering student reflecting on recent work, generate a detailed and humanized work log entry based on the following GitHub commit messages.
-    
+
     Structure the work log with a brief introductory sentence, then describe the key developments and challenges overcome in a narrative style. Group related tasks and explain their impact. Aim for 3-5 sentences, making it sound like a personal update from a developer.
 
     Recent GitHub Commit Messages:
@@ -142,7 +148,7 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
 
     Work Log:`;
 
-    // 2. Use OpenAI to summarize the commit messages
+    // 3. Use OpenAI to summarize the commit messages
     const response = await axios.post(
       OPENAI_CHAT_API_URL,
       {
