@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
@@ -12,6 +11,7 @@ import AuthForm from './components/auth/AuthForm';
 import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Direct import for named export
 import { AuthRedirect } from './components/AuthRedirect'
 import { Dashboard } from './components/Dashboard'; // Direct import for named export
+import { LandingPage } from './components/LandingPage'; // Import the LandingPage
 import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state in ProtectedRoute/AuthRedirect
 
 const SetNewPasswordPage = () => (
@@ -20,8 +20,6 @@ const SetNewPasswordPage = () => (
     <AuthForm mode="update_password" />
   </div>
 );
-
-// Removed safeLog function as it's no longer needed for debugging.
 
 export default function App() {
   // Use useAuth to get the initialization status for the whole app
@@ -51,14 +49,11 @@ export default function App() {
       <Routes>
         {/* Public Routes - Wrapped with AuthRedirect to redirect authenticated users */}
         {/* These routes should only be accessible if the user is NOT authenticated */}
+        <Route path="/" element={<AuthRedirect><LandingPage /></AuthRedirect>} /> {/* Set LandingPage as the root */}
         <Route path="/signin" element={<AuthRedirect><SignInPage /></AuthRedirect>} />
         <Route path="/signup" element={<AuthRedirect><SignUpPage /></AuthRedirect>} />
         <Route path="/reset-password" element={<AuthRedirect><PasswordResetPage /></AuthRedirect>} />
         <Route path="/reset-password-confirm" element={<AuthRedirect><SetNewPasswordPage /></AuthRedirect>} />
-        
-        {/* The root path "/" should also be protected and lead to the dashboard for authenticated users,
-            or to signin for unauthenticated users. This replaces the previous AuthRedirect on "/". */}
-        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
         {/* Protected Route - Wrapped with ProtectedRoute to guard access */}
         {/* These routes should only be accessible if the user IS authenticated */}
@@ -70,7 +65,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        
+
         {/* Fallback route for any unmatched paths.
             It will attempt to render the Dashboard, and ProtectedRoute will handle
             redirection to signin if the user is not authenticated. */}

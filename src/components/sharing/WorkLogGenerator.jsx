@@ -14,16 +14,17 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card.jsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { useAuth } from '@/hooks/use-auth.js';
-import { GitHubCommitsService, SocialContentOptimizer } from '@/lib/social-optimizer.js';
+import { GitHubCommitsService } from '@/lib/github-commits-service.js'; // Corrected import path for GitHubCommitsService
+import { SocialContentOptimizer } from '@/lib/social-optimizer.js'; // Corrected import path for SocialContentOptimizer
 import { toast } from 'sonner';
-import { 
-  Copy, 
-  Twitter, 
-  Linkedin, 
-  Facebook, 
-  MessageSquare, 
-  GitCommit, 
-  TrendingUp, 
+import {
+  Copy,
+  Twitter,
+  Linkedin,
+  Facebook,
+  MessageSquare,
+  GitCommit,
+  TrendingUp,
   Loader2,
   Calendar,
   BarChart3,
@@ -55,8 +56,9 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
       };
 
       const content = SocialContentOptimizer.generatePlatformContent(
-        mockProject, 
-        workLog, 
+        mockProject,
+        workLog,
+        [], // rawCommits are not needed here if AI summary is primary
         customMessage
       );
       setOptimizedContent(content);
@@ -84,10 +86,10 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
 
       // Fetch repository info and commits in parallel
       const [repoResponse, log] = await Promise.all([
-        fetch(`https://api.github.com/repos/${githubInfo.username}/${githubInfo.repoName}`),
+        fetch(`https://api.github.com/repos/${githubInfo.owner}/${githubInfo.repo}`), // Use owner/repo from parsed info
         GitHubCommitsService.generateWorkLog(
-          githubInfo.username, 
-          githubInfo.repoName, 
+          githubInfo.owner, // Use owner
+          githubInfo.repo, // Use repo
           parseInt(timeframe)
         )
       ]);
@@ -140,19 +142,19 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
   const shareToSocial = (platform, content) => {
     const encodedContent = encodeURIComponent(content);
     const projectUrl = repoInfo?.homepage || githubUrl || '';
-    
+
     const urls = {
       twitter: `https://twitter.com/intent/tweet?text=${encodedContent}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(projectUrl)}&summary=${encodedContent}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(projectUrl)}&quote=${encodedContent}`
     };
-    
+
     if (urls[platform]) {
       window.open(urls[platform], '_blank', 'width=600,height=400');
     }
   };
 
-  const generateTemplateMessages = () => {
+  const generateTemplateMessages = useCallback(() => {
     if (!workLog) return [];
 
     const { commitCount, timeframe, summary } = workLog;
@@ -165,12 +167,12 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
       `🔥 ${commitCount} commits and counting! Working hard on ${repoInfo?.name || 'this project'}`,
       `✨ Weekly dev summary: ${commitCount} commits with a focus on ${mostActiveArea}`
     ];
-  };
+  }, [workLog, repoInfo]);
 
   const PlatformCard = ({ platform, icon: Icon, title, content, length, limit, isOptimized }) => {
     const warningThreshold = limit ? limit * 0.9 : 1000;
     const isNearLimit = length > warningThreshold;
-    
+
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -227,7 +229,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
     if (!workLog || !repoInfo) return null;
 
     const { commitCount, timeframe, summary, latestCommit } = workLog;
-    
+
     return (
       <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
         <CardContent className="p-4">
@@ -238,7 +240,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
               Last {timeframe} days
             </Badge>
           </div>
-          
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{commitCount}</div>
@@ -292,7 +294,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
             Work Log Generator
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* GitHub Repository Input */}
           <Card className="bg-gradient-to-r from-green-50 to-blue-50">
@@ -301,13 +303,14 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                 <div>
                   <Label htmlFor="github-url">GitHub Repository URL</Label>
                   {/* Changed to flex-col on mobile, then flex on sm and up */}
-                  <div className="flex flex-col sm:flex-row gap-2 mt-1"> 
+                  <div className="flex flex-col sm:flex-row gap-2 mt-1">
                     <Input
                       id="github-url"
                       placeholder="https://github.com/username/repository"
                       value={githubUrl}
                       onChange={(e) => setGithubUrl(e.target.value)}
-                      className="flex-1"
+                      onKeyPress={(e) => e.key === 'Enter' && fetchWorkLog()}
+                      disabled={loadingWorkLog}
                     />
                     <Select value={timeframe} onValueChange={setTimeframe}>
                       <SelectTrigger className="w-full sm:w-32"> {/* Adjusted width for mobile */}
@@ -327,9 +330,9 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                       className="w-full sm:w-auto" /* Adjusted width for mobile */
                     >
                       {loadingWorkLog ? (
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
-                        <Search className="h-4 w-4 mr-1" />
+                        <Search className="mr-2 h-4 w-4" />
                       )}
                       Generate
                     </Button>
@@ -389,7 +392,7 @@ export function WorkLogGenerator({ onClose, defaultRepo = '' }) {
                 <TrendingUp className="h-5 w-5" />
                 Optimized Content for Social Platforms
               </h3>
-              
+
               <div className="grid gap-4 md:grid-cols-2">
                 <PlatformCard
                   platform="twitter"

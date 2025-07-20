@@ -1,7 +1,7 @@
 // src/store/githubSlice.js (or wherever your slice is)
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { GitHubService, ALXProjectDetector } from '@/lib/github-api-service.js';
-import { OpenAIService } from '@/lib/openai-service.js'; // Assuming you have this service
+import { OpenAIService } from '@/lib/ai-service.js'; // Assuming you have this service
 
 // Async Thunks (existing ones)
 export const fetchRepositories = createAsyncThunk(
