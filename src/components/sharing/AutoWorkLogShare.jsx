@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react'; // Added useMemo
 import PropTypes from 'prop-types';
 import {
   Dialog,
@@ -17,14 +17,14 @@ import { Label } from '@/components/ui/label.jsx';
 import { useAuth } from '@/hooks/use-auth.js';
 import { GitHubCommitsService, SocialContentOptimizer } from '@/lib/social-optimizer.js';
 import { toast } from 'sonner';
-import { 
-  Copy, 
-  Twitter, 
-  Linkedin, 
-  Facebook, 
-  MessageSquare, 
-  GitCommit, 
-  TrendingUp, 
+import {
+  Copy,
+  Twitter,
+  Linkedin,
+  Facebook,
+  MessageSquare,
+  GitCommit,
+  TrendingUp,
   Loader2,
   Zap,
   BarChart3,
@@ -39,11 +39,30 @@ export function AutoWorkLogShare({ project, onClose }) {
   const [loadingWorkLog, setLoadingWorkLog] = useState(false);
   const [autoMode, setAutoMode] = useState(true);
   const [timeframe, setTimeframe] = useState('7');
-  const [optimizedContent, setOptimizedContent] = useState({});
+  // Removed optimizedContent state, will use useMemo directly
+
   const [selectedPlatforms, setSelectedPlatforms] = useState(new Set(['twitter', 'linkedin']));
   const [activeTab, setActiveTab] = useState('auto'); // State to control active tab
 
-  // Auto-fetch work log on component mount
+  // Memoize the optimized content based on project, workLog, and customMessage
+  const memoizedOptimizedContent = useMemo(() => {
+    console.log('[AutoWorkLogShare Debug] useMemo: Recalculating optimized content...');
+    // Generate if workLog exists OR if there's a custom message
+    if (project && (workLog || customMessage)) {
+      const content = SocialContentOptimizer.generatePlatformContent(
+        project,
+        workLog,
+        customMessage
+      );
+      console.log('[AutoWorkLogShare Debug] Optimized Content (from useMemo):', content);
+      return content;
+    }
+    console.log('[AutoWorkLogShare Debug] No work log or custom message, returning empty optimized content.');
+    return {}; // Return empty object if conditions not met
+  }, [project, workLog, customMessage]);
+
+
+  // Auto-fetch work log on component mount or when dependencies change
   useEffect(() => {
     console.log('[AutoWorkLogShare Debug] useEffect: autoMode changed or project.github_url changed. autoMode:', autoMode, 'github_url:', project.github_url);
     if (autoMode && project.github_url) {
@@ -55,32 +74,7 @@ export function AutoWorkLogShare({ project, onClose }) {
       console.log('[AutoWorkLogShare Debug] No GitHub URL provided. Cannot fetch work log.');
       setWorkLog(null);
     }
-  }, [project.github_url, timeframe, autoMode]);
-
-  // Generate optimized content when work log or custom message changes
-  useEffect(() => {
-    console.log('[AutoWorkLogShare Debug] useEffect: workLog or customMessage changed.');
-    console.log('[AutoWorkLogShare Debug] Current workLog:', workLog);
-    console.log('[AutoWorkLogShare Debug] Current customMessage:', customMessage);
-
-    // Ensure project and workLog are available before generating content
-    if (project && (workLog || customMessage)) { // Generate if workLog exists OR if there's a custom message
-      console.log('[AutoWorkLogShare Debug] Generating optimized content...');
-      const content = SocialContentOptimizer.generatePlatformContent(
-        project, 
-        workLog, 
-        customMessage
-      );
-      setOptimizedContent(content);
-      // This log is crucial! Check your browser's console for this output.
-      // If you see content here, it means the generation is working, but rendering is not.
-      console.log('[AutoWorkLogShare Debug] Optimized Content:', content);
-    } else if (!workLog && !customMessage) {
-      console.log('[AutoWorkLogShare Debug] No work log or custom message, clearing optimized content.');
-      // Clear optimized content if no work log and no custom message
-      setOptimizedContent({});
-    }
-  }, [project, workLog, customMessage]);
+  }, [project.github_url, timeframe, autoMode, fetchWorkLog]); // Added fetchWorkLog to deps
 
   const fetchWorkLog = useCallback(async () => {
     console.log('[AutoWorkLogShare Debug] fetchWorkLog called.');
@@ -99,8 +93,8 @@ export function AutoWorkLogShare({ project, onClose }) {
       console.log('[AutoWorkLogShare Debug] Parsed GitHub Info:', githubInfo);
 
       const log = await GitHubCommitsService.generateWorkLog(
-        githubInfo.username, 
-        githubInfo.repoName, 
+        githubInfo.username,
+        githubInfo.repoName,
         parseInt(timeframe)
       );
 
@@ -139,13 +133,13 @@ export function AutoWorkLogShare({ project, onClose }) {
     console.log(`[AutoWorkLogShare Debug] Attempting to share to ${platform} with content:`, content);
     const encodedContent = encodeURIComponent(content);
     const projectUrl = project.live_url || project.github_url || '';
-    
+
     const urls = {
       twitter: `https://twitter.com/intent/tweet?text=${encodedContent}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(projectUrl)}&summary=${encodedContent}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(projectUrl)}&quote=${encodedContent}`
     };
-    
+
     if (urls[platform]) {
       window.open(urls[platform], '_blank', 'width=600,height=400');
     }
@@ -165,9 +159,9 @@ export function AutoWorkLogShare({ project, onClose }) {
   const shareToAllSelected = () => {
     console.log('[AutoWorkLogShare Debug] Sharing to all selected platforms.');
     selectedPlatforms.forEach(platform => {
-      if (optimizedContent[platform] && platform !== 'discord') {
+      if (memoizedOptimizedContent[platform] && platform !== 'discord') { // Use memoized content
         setTimeout(() => {
-          shareToSocial(platform, optimizedContent[platform].content);
+          shareToSocial(platform, memoizedOptimizedContent[platform].content); // Use memoized content
         }, 300); // Small delay between opens
       }
     });
@@ -175,20 +169,20 @@ export function AutoWorkLogShare({ project, onClose }) {
   };
 
   // This is the component that renders each social media card.
-  // It receives the content from the 'optimizedContent' state.
+  // It receives the content from the 'memoizedOptimizedContent'
   const PlatformCard = ({ platform, icon: Icon, title, content, isOptimized, length, limit }) => {
     const isSelected = selectedPlatforms.has(platform);
     const warningThreshold = limit ? limit * 0.9 : 1000;
     const isNearLimit = length > warningThreshold;
-    
+
     console.log(`[AutoWorkLogShare Debug] Rendering PlatformCard for ${platform}. Content length: ${length}, Is selected: ${isSelected}`);
-    
+
     return (
       <Card className={`transition-all ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div 
+              <div
                 className={`p-2 rounded-lg cursor-pointer transition-all ${
                   isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
                 }`}
@@ -247,7 +241,7 @@ export function AutoWorkLogShare({ project, onClose }) {
     if (!workLog) return null;
 
     const { commitCount, timeframe, summary, latestCommit } = workLog;
-    
+
     return (
       <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
         <CardContent className="p-4">
@@ -258,7 +252,7 @@ export function AutoWorkLogShare({ project, onClose }) {
               Last {timeframe} days
             </Badge>
           </div>
-          
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{commitCount}</div>
@@ -284,7 +278,6 @@ export function AutoWorkLogShare({ project, onClose }) {
                 <GitCommit className="h-4 w-4 text-gray-500" />
                 <span className="text-sm font-medium">Latest commit:</span>
               </div>
-              {/* Removed 'truncate' and added 'break-words' to ensure full message wraps */}
               <p className="text-sm text-gray-700 break-words">{latestCommit.message}</p>
               <p className="text-xs text-gray-500 mt-1">
                 {new Date(latestCommit.date).toLocaleDateString()}
@@ -305,7 +298,7 @@ export function AutoWorkLogShare({ project, onClose }) {
             Smart Share: "{project.title}"
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Auto Work Log Controls */}
           <Card className="bg-gradient-to-r from-green-50 to-blue-50">
@@ -363,7 +356,6 @@ export function AutoWorkLogShare({ project, onClose }) {
 
           {/* Project Overview */}
           <div className="bg-blue-50 p-4 rounded-lg">
-            {/* Added 'break-words' to title and description */}
             <h3 className="font-semibold text-lg mb-2 break-words">{project.title}</h3>
             <p className="text-gray-700 mb-2 break-words">{project.description}</p>
             <div className="flex flex-wrap gap-1 mb-2">
@@ -376,14 +368,14 @@ export function AutoWorkLogShare({ project, onClose }) {
             {(project.github_url || project.live_url) && (
               <div className="flex gap-2 text-sm">
                 {project.github_url && (
-                  <a href={project.github_url} target="_blank" rel="noopener noreferrer" 
-                      className="text-blue-600 hover:underline">
+                  <a href={project.github_url} target="_blank" rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline">
                     GitHub
                   </a>
                 )}
                 {project.live_url && (
-                  <a href={project.live_url} target="_blank" rel="noopener noreferrer" 
-                      className="text-blue-600 hover:underline">
+                  <a href={project.live_url} target="_blank" rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline">
                     Live Demo
                   </a>
                 )}
@@ -392,14 +384,14 @@ export function AutoWorkLogShare({ project, onClose }) {
           </div>
 
           {/* This is the Tabs component where the social media cards should appear */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full"> {/* Changed to controlled component */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="auto">Auto-Generated Content</TabsTrigger>
               <TabsTrigger value="custom">Custom Message</TabsTrigger>
             </TabsList>
-            
+
             {/* Content for Auto-Generated Tab */}
-            <TabsContent value="auto" className="space-y-4 rounded-md min-h-[200px]"> {/* Removed temporary background */}
+            <TabsContent value="auto" className="space-y-4 rounded-md min-h-[200px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
@@ -412,58 +404,52 @@ export function AutoWorkLogShare({ project, onClose }) {
                   disabled={selectedPlatforms.size === 0}
                   className="flex items-center gap-2"
                 >
-                  
                   Share ({selectedPlatforms.size})
                 </Button>
               </div>
 
-              {/* Debugging log before rendering PlatformCards */}
-              {console.log('[AutoWorkLogShare Debug] Rendering PlatformCards. Optimized content keys:', Object.keys(optimizedContent))}
-
-              {/* These are the PlatformCards that should be visible */}
-              {/* They will only render if optimizedContent has data for them */}
               <div className="grid gap-4 md:grid-cols-2">
                 <PlatformCard
                   platform="twitter"
                   icon={Twitter}
                   title="Twitter/X"
-                  content={optimizedContent.twitter?.content || ''}
-                  isOptimized={optimizedContent.twitter?.optimized}
-                  length={optimizedContent.twitter?.length || 0}
+                  content={memoizedOptimizedContent.twitter?.content || ''}
+                  isOptimized={memoizedOptimizedContent.twitter?.optimized}
+                  length={memoizedOptimizedContent.twitter?.length || 0}
                   limit={280}
                 />
                 <PlatformCard
                   platform="linkedin"
                   icon={Linkedin}
                   title="LinkedIn"
-                  content={optimizedContent.linkedin?.content || ''}
-                  isOptimized={optimizedContent.linkedin?.optimized}
-                  length={optimizedContent.linkedin?.length || 0}
+                  content={memoizedOptimizedContent.linkedin?.content || ''}
+                  isOptimized={memoizedOptimizedContent.linkedin?.optimized}
+                  length={memoizedOptimizedContent.linkedin?.length || 0}
                   limit={1300}
                 />
                 <PlatformCard
                   platform="facebook"
                   icon={Facebook}
                   title="Facebook"
-                  content={optimizedContent.facebook?.content || ''}
-                  isOptimized={optimizedContent.facebook?.optimized}
-                  length={optimizedContent.facebook?.length || 0}
+                  content={memoizedOptimizedContent.facebook?.content || ''}
+                  isOptimized={memoizedOptimizedContent.facebook?.optimized}
+                  length={memoizedOptimizedContent.facebook?.length || 0}
                   limit={400}
                 />
                 <PlatformCard
                   platform="discord"
                   icon={MessageSquare}
                   title="Discord"
-                  content={optimizedContent.discord?.content || ''}
-                  isOptimized={optimizedContent.discord?.optimized}
-                  length={optimizedContent.discord?.length || 0}
+                  content={memoizedOptimizedContent.discord?.content || ''}
+                  isOptimized={memoizedOptimizedContent.discord?.optimized}
+                  length={memoizedOptimizedContent.discord?.length || 0}
                   limit={2000}
                 />
               </div>
             </TabsContent>
-            
+
             {/* Content for Custom Message Tab */}
-            <TabsContent value="custom" className="space-y-4 rounded-md min-h-[200px]"> {/* Removed temporary background */}
+            <TabsContent value="custom" className="space-y-4 rounded-md min-h-[200px]">
               <div>
                 <Label className="block text-sm font-medium mb-2">
                   Custom Message
@@ -475,7 +461,7 @@ export function AutoWorkLogShare({ project, onClose }) {
                   className="min-h-[100px]"
                 />
               </div>
-              
+
               {/* These PlatformCards will only show if a customMessage is present */}
               {customMessage && (
                 <div className="grid gap-4 md:grid-cols-2">
@@ -483,34 +469,37 @@ export function AutoWorkLogShare({ project, onClose }) {
                     platform="twitter"
                     icon={Twitter}
                     title="Twitter/X"
-                    content={optimizedContent.twitter?.content || ''}
-                    isOptimized={optimizedContent.twitter?.optimized}
-                    length={optimizedContent.twitter?.length || 0}
+                    content={memoizedOptimizedContent.twitter?.content || ''}
+                    isOptimized={memoizedOptimizedContent.twitter?.optimized}
+                    length={memoizedOptimizedContent.twitter?.length || 0}
                     limit={280}
                   />
                   <PlatformCard
                     platform="linkedin"
                     icon={Linkedin}
                     title="LinkedIn"
-                    content={optimizedContent.linkedin?.content || ''}
-                    isOptimized={optimizedContent.linkedin?.optimized}
-                    length={optimizedContent.linkedin?.length || 0}
+                    content={memoizedOptimizedContent.linkedin?.content || ''}
+                    isOptimized={memoizedOptimizedContent.linkedin?.optimized}
+                    length={memoizedOptimizedContent.linkedin?.length || 0}
+                    limit={1300}
                   />
                   <PlatformCard
                     platform="facebook"
                     icon={Facebook}
                     title="Facebook"
-                    content={optimizedContent.facebook?.content || ''}
-                    isOptimized={optimizedContent.facebook?.optimized}
-                    length={optimizedContent.facebook?.length || 0}
+                    content={memoizedOptimizedContent.facebook?.content || ''}
+                    isOptimized={memoizedOptimizedContent.facebook?.optimized}
+                    length={memoizedOptimizedContent.facebook?.length || 0}
+                    limit={400}
                   />
                   <PlatformCard
                     platform="discord"
                     icon={MessageSquare}
                     title="Discord"
-                    content={optimizedContent.discord?.content || ''}
-                    isOptimized={optimizedContent.discord?.optimized}
-                    length={optimizedContent.discord?.length || 0}
+                    content={memoizedOptimizedContent.discord?.content || ''}
+                    isOptimized={memoizedOptimizedContent.discord?.optimized}
+                    length={memoizedOptimizedContent.discord?.length || 0}
+                    limit={2000}
                   />
                 </div>
               )}

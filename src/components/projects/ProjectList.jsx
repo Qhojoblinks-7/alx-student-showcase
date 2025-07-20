@@ -1,31 +1,32 @@
-import { forwardRef, createContext, useContext } from 'react'; // Added createContext, useContext, forwardRef
-import { useDispatch, useSelector } from 'react-redux'; // Import useDispatch and useSelector
+import { forwardRef, createContext, useContext } from 'react';
+import { useDispatch } from 'react-redux'; // Import useDispatch
 import PropTypes from 'prop-types';
 import { useAuth } from '../../hooks/use-auth.js';
 import { toast } from 'sonner';
-import { cn } from '../../lib/utils'; // Assuming cn utility is here or accessible
+import { cn } from '../../lib/utils';
 
-// Import Redux thunks and selectors
-import { 
-  deleteProject, 
-  updateProject // For toggleVisibility
-} from '../../store/slices/projectsSlice.js'; // Removed fetchProjects from import as it's handled by Dashboard
+// Import Redux thunks
+import {
+  deleteProject,
+  updateProject, // For toggleVisibility
+  fetchProjects // Re-import fetchProjects for the retry button if needed
+} from '../../store/slices/projectsSlice.js';
 
 import { Button } from '../ui/button.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
 import { Badge } from '../ui/badge.jsx';
 import { Skeleton } from '../ui/skeleton.jsx';
-import { 
-  Github, 
-  ExternalLink, 
-  Calendar, 
-  Clock, 
-  Eye, 
+import {
+  Github,
+  ExternalLink,
+  Calendar,
+  Clock,
+  Eye,
   EyeOff,
   Share2,
   Edit,
   Trash2,
-  AlertTriangle // Added AlertTriangle for error display
+  AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
@@ -33,10 +34,10 @@ import { useState, useEffect } from 'react';
 // --- Tabs Component Refactor (from tabs.jsx) ---
 const TabsContext = createContext(null);
 
-const Tabs = forwardRef(({ className, value, onValueChange, children, ...props }, ref) => ( // Destructure children explicitly
+const Tabs = forwardRef(({ className, value, onValueChange, children, ...props }, ref) => (
   <TabsContext.Provider value={{ value, onValueChange }}>
     <div ref={ref} className={cn('w-full', className)} {...props}>
-      {children} {/* Render children inside the div */}
+      {children}
     </div>
   </TabsContext.Provider>
 ));
@@ -49,7 +50,7 @@ const TabsList = forwardRef(({ className, ...props }, ref) => (
       'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
       className
     )}
-    role="tablist" // Added for accessibility
+    role="tablist"
     {...props}
   />
 ));
@@ -64,13 +65,13 @@ const TabsTrigger = forwardRef(({ className, value, ...props }, ref) => {
       ref={ref}
       className={cn(
         'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-        isActive ? 'bg-background text-foreground shadow-sm' : 'data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground', // Dynamically apply active/inactive styles
+        isActive ? 'bg-background text-foreground shadow-sm' : 'data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground',
         className
       )}
-      data-state={isActive ? 'active' : 'inactive'} // Set data-state attribute
-      onClick={() => context.onValueChange?.(value)} // Call onValueChange from context
-      role="tab" // Added for accessibility
-      aria-selected={isActive} // Added for accessibility
+      data-state={isActive ? 'active' : 'inactive'}
+      onClick={() => context.onValueChange?.(value)}
+      role="tab"
+      aria-selected={isActive}
       {...props}
     />
   );
@@ -81,7 +82,7 @@ const TabsContent = forwardRef(({ className, value, ...props }, ref) => {
   const context = useContext(TabsContext);
   const isActive = context.value === value;
 
-  if (!isActive) return null; // Only render content if it's the active tab
+  if (!isActive) return null;
 
   return (
     <div
@@ -90,7 +91,7 @@ const TabsContent = forwardRef(({ className, value, ...props }, ref) => {
         'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         className
       )}
-      role="tabpanel" // Added for accessibility
+      role="tabpanel"
       {...props}
     />
   );
@@ -102,7 +103,7 @@ Tabs.propTypes = {
   className: PropTypes.string,
   value: PropTypes.string.isRequired,
   onValueChange: PropTypes.func.isRequired,
-  children: PropTypes.node.isRequired, // Ensure children are passed
+  children: PropTypes.node.isRequired,
 };
 
 TabsList.propTypes = {
@@ -112,39 +113,26 @@ TabsList.propTypes = {
 
 TabsTrigger.propTypes = {
   className: PropTypes.string,
-  value: PropTypes.string.isRequired, // Value is now required for trigger
+  value: PropTypes.string.isRequired,
   children: PropTypes.node.isRequired,
 };
 
 TabsContent.propTypes = {
   className: PropTypes.string,
-  value: PropTypes.string.isRequired, // Value is now required for content
+  value: PropTypes.string.isRequired,
   children: PropTypes.node.isRequired,
 };
 // --- End Tabs Component Refactor ---
 
 
-export function ProjectList({ onEdit, onShare, filters }) {
+export function ProjectList({ onEdit, onShare, filters = {}, projects, loading, error, onRetry }) { // Added projects, loading, error, onRetry props
   const dispatch = useDispatch();
   const { user } = useAuth(); // Get user from your auth hook
 
-  // Get projects, loading, and error states from Redux store using direct useSelector
-  const projects = useSelector(state => state.projects.projects);
-  const loading = useSelector(state => state.projects.isLoading);
-  const error = useSelector(state => state.projects.error); // Get error state
-
   const [filteredProjects, setFilteredProjects] = useState([]);
 
-  // Removed useEffect for fetching projects as Dashboard now controls rendering based on these.
-  // The Dashboard component dispatches fetchProjects, so ProjectList only needs to consume it.
-  // useEffect(() => {
-  //   if (user && !loading) {
-  //     dispatch(fetchProjects(user.id));
-  //   }
-  // }, [user, dispatch, loading]);
-
   useEffect(() => {
-    let result = projects.slice(); // Clone the array to avoid modifying the original
+    let result = projects ? projects.slice() : []; // Use props.projects
 
     if (filters.query) {
       result = result.filter((project) =>
@@ -167,13 +155,14 @@ export function ProjectList({ onEdit, onShare, filters }) {
     }
 
     if (filters.sortBy === 'popularity') {
-      result = result.sort((a, b) => b.popularity - a.popularity);
+      // Assuming 'popularity' field exists or can be derived
+      result = result.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
     } else if (filters.sortBy === 'recency') {
-      result = result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      result = result.sort((a, b) => new Date(b.created_at || b.last_updated) - new Date(a.created_at || a.last_updated)); // Use created_at or last_updated
     }
 
     setFilteredProjects(result);
-  }, [filters, projects]);
+  }, [filters, projects]); // Depend on filters and projects props
 
   const handleDeleteProject = async (projectId) => {
     toast('Are you sure you want to delete this project?', {
@@ -189,7 +178,7 @@ export function ProjectList({ onEdit, onShare, filters }) {
           }
         },
       },
-      duration: 5000, 
+      duration: 5000,
     });
   };
 
@@ -219,8 +208,8 @@ export function ProjectList({ onEdit, onShare, filters }) {
       case 'mobile': return 'bg-purple-100 text-purple-80';
       case 'backend': return 'bg-orange-100 text-orange-800';
       case 'data-science': return 'bg-pink-100 text-pink-800';
-      case 'ai': return 'bg-teal-100 text-teal-800'; // Added AI category
-      case 'devops': return 'bg-indigo-100 text-indigo-800'; // Added DevOps category
+      case 'ai': return 'bg-teal-100 text-teal-800';
+      case 'devops': return 'bg-indigo-100 text-indigo-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -258,9 +247,11 @@ export function ProjectList({ onEdit, onShare, filters }) {
           <AlertTriangle className="h-12 w-12 mx-auto text-red-500 mb-4" />
           <h3 className="text-lg font-semibold mb-2">Error Loading Projects</h3>
           <p className="text-sm">{error}</p>
-          <Button onClick={() => user && dispatch(fetchProjects(user.id))} className="mt-4">
-            Retry
-          </Button>
+          {onRetry && (
+            <Button onClick={onRetry} className="mt-4">
+              Retry
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -287,29 +278,26 @@ export function ProjectList({ onEdit, onShare, filters }) {
   return (
     <div className="space-y-6">
       {displayedProjects.map((project) => {
-        // --- DEBUG LOG FOR EACH PROJECT ---
-        console.log('ProjectList - Mapping project:', project);
-        // --- END DEBUG LOG ---
         return (
           <Card key={project.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               {/* Flex container for title/description and action buttons */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
-                <div className="flex-1 min-w-0"> {/* flex-1 and min-w-0 to allow shrinking */}
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold break-words"> {/* Added break-words */}
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold break-words">
                     {project.title}
                     {project.is_public ? (
-                      <Eye className="h-4 w-4 text-green-600 flex-shrink-0" /> /* flex-shrink-0 for icons */
+                      <Eye className="h-4 w-4 text-green-600 flex-shrink-0" />
                     ) : (
-                      <EyeOff className="h-4 w-4 text-gray-400 flex-shrink-0" /> /* flex-shrink-0 for icons */
+                      <EyeOff className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     )}
                   </CardTitle>
-                  <CardDescription className="mt-2 text-sm text-muted-foreground break-words"> {/* Added break-words */}
+                  <CardDescription className="mt-2 text-sm text-muted-foreground break-words">
                     {project.description}
                   </CardDescription>
                 </div>
                 {/* Button group: flex-shrink-0 to prevent shrinking, flex-wrap for mobile */}
-                <div className="flex flex-wrap gap-2 flex-shrink-0 mt-2 sm:mt-0"> 
+                <div className="flex flex-wrap gap-2 flex-shrink-0 mt-2 sm:mt-0">
                   <Button
                     size="sm"
                     variant="outline"
@@ -321,7 +309,7 @@ export function ProjectList({ onEdit, onShare, filters }) {
                     size="sm"
                     variant="outline"
                     onClick={() => onShare?.(project)}
-                    
+
                   >
                     <Share2 className="h-4 w-4" />
                   </Button>
@@ -360,18 +348,17 @@ export function ProjectList({ onEdit, onShare, filters }) {
                 <Badge className={getDifficultyColor(project.difficulty_level)}>
                   {project.difficulty_level}
                 </Badge>
-                {/* Corrected from project_type to category */}
-                <Badge className={getProjectTypeColor(project.category)}> 
+                <Badge className={getProjectTypeColor(project.category)}>
                   {project.category}
                 </Badge>
-                {project.technologies?.map((tech, index) => ( // Use technologies instead of tech_stack
+                {project.technologies?.map((tech, index) => (
                   <Badge key={index} variant="secondary">
                     {tech}
                   </Badge>
                 ))}
               </div>
 
-              {project.tags?.length > 0 && ( // Check if tags exist and have length
+              {project.tags?.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {project.tags.map((tag, index) => (
                     <Badge key={index} variant="outline">
@@ -381,7 +368,7 @@ export function ProjectList({ onEdit, onShare, filters }) {
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground"> {/* Added flex-wrap */}
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 {project.completion_date && (
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
@@ -396,7 +383,7 @@ export function ProjectList({ onEdit, onShare, filters }) {
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2"> {/* Added flex-wrap */}
+              <div className="flex flex-wrap gap-2">
                 {project.github_url && (
                   <Button size="sm" variant="outline" asChild>
                     <a href={project.github_url} target="_blank" rel="noopener noreferrer">
@@ -405,7 +392,7 @@ export function ProjectList({ onEdit, onShare, filters }) {
                     </a>
                   </Button>
                 )}
-                {project.live_url && ( // Use live_url instead of live_demo_url
+                {project.live_url && (
                   <Button size="sm" variant="outline" asChild>
                     <a href={project.live_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-4 w-4 mr-2" />
@@ -420,13 +407,13 @@ export function ProjectList({ onEdit, onShare, filters }) {
                   {project.key_learnings && (
                     <div>
                       <h4 className="font-semibold text-sm mb-2">Key Learnings</h4>
-                      <p className="text-sm text-muted-foreground break-words">{project.key_learnings}</p> {/* Added break-words */}
+                      <p className="text-sm text-muted-foreground break-words">{project.key_learnings}</p>
                     </div>
                   )}
                   {project.challenges_faced && (
                     <div>
                       <h4 className="font-semibold text-sm mb-2">Challenges Faced</h4>
-                      <p className="text-sm text-muted-foreground break-words">{project.challenges_faced}</p> {/* Added break-words */}
+                      <p className="text-sm text-muted-foreground break-words">{project.challenges_faced}</p>
                     </div>
                   )}
                 </div>
@@ -442,4 +429,16 @@ export function ProjectList({ onEdit, onShare, filters }) {
 ProjectList.propTypes = {
   onEdit: PropTypes.func,
   onShare: PropTypes.func,
+  filters: PropTypes.object,
+  projects: PropTypes.array.isRequired, // projects is now a required prop
+  loading: PropTypes.bool.isRequired,   // loading is now a required prop
+  error: PropTypes.string,              // error is now a prop
+  onRetry: PropTypes.func,              // onRetry is a new prop for the retry button
+};
+ProjectList.defaultProps = {
+  onEdit: null,
+  onShare: null,
+  filters: {},
+  error: null,
+  onRetry: null, // Default to null if not provided
 };
