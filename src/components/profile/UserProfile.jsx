@@ -10,7 +10,7 @@ import { Textarea } from '../ui/textarea.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar.jsx';
 import { toast } from 'sonner';
-import { Loader2, User, Github, Linkedin, BookOpen, Image, Info, Trophy, Star, Link as LinkIcon, Plus, Edit2 } from 'lucide-react'; // Added Plus and Edit2 icons
+import { Loader2, User, Github, Linkedin, BookOpen, Image, Info, Trophy, Star, Link as LinkIcon, Plus, Edit2, Lightbulb } from 'lucide-react'; // Added Plus and Edit2 icons
 import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog.jsx'; // Import Dialog components
 import { ProjectForm } from '../projects/ProjectForm.jsx'; // Import the ProjectForm component
