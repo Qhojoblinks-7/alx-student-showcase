@@ -94,11 +94,22 @@ export class SocialContentOptimizer {
       tests: 0,
       refactor: 0,
       style: 0,
-      chore: 0 // Added common 'chore' category
+      chore: 0
     };
+
+    let firstCommitDate = null;
+    let lastCommitDate = null;
 
     commits.forEach(commit => {
       const message = commit.message.toLowerCase();
+      const commitDate = new Date(commit.date); // Assuming commit.date is available and parsable
+
+      if (!firstCommitDate || commitDate < firstCommitDate) {
+        firstCommitDate = commitDate;
+      }
+      if (!lastCommitDate || commitDate > lastCommitDate) {
+        lastCommitDate = commitDate;
+      }
 
       // Categorize commits based on common prefixes/keywords
       if (message.startsWith('feat') || message.includes('add') || message.includes('implement')) {
@@ -125,7 +136,7 @@ export class SocialContentOptimizer {
     const totalCommits = commits.length;
     const mostActiveArea = Object.keys(categories).reduce((a, b) =>
       categories[a] > categories[b] ? a : b
-      , 'none'); // Default to 'none' if no categories match
+      , 'none');
 
     return {
       features: features.slice(0, 3), // Top 3 feature messages
@@ -134,6 +145,8 @@ export class SocialContentOptimizer {
       categories, // Counts per category
       mostActiveArea, // The category with the highest count
       totalCommits, // Total commits analyzed
+      firstCommitDate, // Added for dynamic timeframe calculation
+      lastCommitDate,  // Added for dynamic timeframe calculation
     };
   }
 
@@ -304,12 +317,8 @@ export class SocialContentOptimizer {
       .replace(/💻 New project alert: /, '💻 ');
   }
 
-  // Removed getMinimalProgress as AI summary is now the main source
-  // If you need a progress indicator from internal analysis, you'd re-add it here
-  // based on internalWorkLogSummary.
-
   static getMinimalTech(tech) {
-    const cleanTech = tech.replace(/^(Tech:|Built with:|🛠️\s*)/i, '');
+    const cleanTech = tech.replace(/^(Tech:|Built with:|�️\s*)/i, '');
     const techs = cleanTech.split(/[,\s]+/).filter(Boolean);
     return techs.slice(0, 2).join(',');
   }
@@ -326,7 +335,7 @@ export class SocialContentOptimizer {
     const achievement = this.generateAchievement(project, internalWorkLogSummary, 'linkedin');
     const tech = this.generateTechStack(project.technologies, 'linkedin');
     // Use AI summary for the main work log progress
-    const progress = aiWorkLogSummaryText ? `Recent progress:\n${aiWorkLogSummaryText}` : ''; 
+    const progress = aiWorkLogSummaryText ? `Recent progress:\n${aiWorkLogSummaryText}` : '';
     const reflection = this.generateReflection(project, internalWorkLogSummary);
     const hashtags = this.generateHashtags(project, 'linkedin');
     const url = project.live_url || project.github_url || '';
@@ -493,9 +502,6 @@ export class SocialContentOptimizer {
 
     const { categories, mostActiveArea, totalCommits } = internalWorkLogSummary;
 
-    // Removed timeframe from here as it's not directly in internalWorkLogSummary
-    // If you need timeframe, pass it from where rawCommits are filtered (e.g., last 7 days)
-
     if (platform === 'twitter') {
       // Ultra-compact for Twitter
       if (totalCommits > 20) return `${totalCommits}c 🔥`;
@@ -521,7 +527,7 @@ export class SocialContentOptimizer {
   static generateSmartHashtags(project, internalWorkLogSummary, platform) {
     const baseTags = ['#ALXStudents', '#SoftwareEngineering'];
 
-    // Add technology-specific tags
+    // Add technology-specific tags using the robust normalizeTechTag
     const techTags = project.technologies?.slice(0, 2).map(tech =>
       `#${this.normalizeTechTag(tech)}`
     ) || [];
@@ -576,19 +582,31 @@ export class SocialContentOptimizer {
   }
 
   static generateAchievement(project, internalWorkLogSummary, platform) {
-    if (!internalWorkLogSummary) return '';
+    if (!internalWorkLogSummary || !internalWorkLogSummary.firstCommitDate || !internalWorkLogSummary.lastCommitDate) return '';
 
-    const { totalCommits } = internalWorkLogSummary;
-    const timeframe = 'past week'; // Assuming 'past week' for this context, adjust as needed
+    const { totalCommits, firstCommitDate, lastCommitDate } = internalWorkLogSummary;
 
-    if (platform === 'twitter') {
-      return `${totalCommits} commits in ${timeframe}`;
+    // Calculate timeframe dynamically
+    const diffTime = Math.abs(lastCommitDate.getTime() - firstCommitDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    let timeframeDescription = '';
+    if (diffDays <= 1) {
+      timeframeDescription = 'past 24 hours';
+    } else if (diffDays <= 7) {
+      timeframeDescription = 'past week';
+    } else if (diffDays <= 30) {
+      timeframeDescription = 'past month';
+    } else {
+      timeframeDescription = `${diffDays} days`;
     }
 
-    return `📈 Development highlights: ${totalCommits} commits over the ${timeframe}`;
-  }
+    if (platform === 'twitter') {
+      return `${totalCommits} commits in ${timeframeDescription}`;
+    }
 
-  // Removed generateProgress as it's now handled by generateSmartProgress or directly by AI summary
+    return `📈 Development highlights: ${totalCommits} commits over the ${timeframeDescription}`;
+  }
 
   static generateStory(project, internalWorkLogSummary) {
     const stories = [
@@ -633,8 +651,9 @@ export class SocialContentOptimizer {
 
   static generateHashtags(project, platform) {
     const baseTags = ['#ALXStudents', '#SoftwareEngineering', '#Coding'];
+    // Use normalizeTechTag for consistency
     const techTags = project.technologies?.slice(0, 2).map(tech =>
-      `#${tech.replace(/[^a-zA-Z0-9]/g, '')}`
+      `#${this.normalizeTechTag(tech)}`
     ) || [];
 
     const categoryTags = {
@@ -665,6 +684,4 @@ export class SocialContentOptimizer {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength - 3) + '...';
   }
-
-  // Removed generateWorkLogSummary as it's now handled by OpenAI service
 }

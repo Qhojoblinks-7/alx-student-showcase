@@ -16,48 +16,7 @@ export const loadUser = createAsyncThunk(
   }
 );
 
-export const signInAnonymously = createAsyncThunk(
-  'auth/signInAnonymously',
-  async (_, { rejectWithValue }) => {
-    try {
-      const user = await AuthService.signInAnonymously();
-      return user;
-    } catch (error) {
-      // Ensure the rejected value is always a string
-      return rejectWithValue(error.message ? String(error.message) : String(error));
-    }
-  }
-);
-
-//clearUser (Note: This thunk name might conflict with a reducer action if both are named 'clearUser')
-export const clearUser = createAsyncThunk(
-  'auth/clearUserThunk', // Renamed to avoid potential conflict with reducer action 'clearUser'
-  async (_, { rejectWithValue }) => {
-    try {
-      await AuthService.signOut();
-      return null; // Return null to indicate user is cleared
-    } catch (error) {
-      // Ensure the rejected value is always a string
-      return rejectWithValue(error.message ? String(error.message) : String(error));
-    }
-  }
-);
-
-//signOutUser (Note: This thunk name might conflict with 'signOut' thunk)
-export const signOutUser = createAsyncThunk(
-  'auth/signOutUserThunk', // Renamed to differentiate from 'signOut' thunk
-  async (_, { rejectWithValue }) => {
-    try {
-      await AuthService.signOut();
-      return null; // On successful sign out, user becomes null
-    } catch (error) {
-      // Ensure the rejected value is always a string
-      return rejectWithValue(error.message ? String(error.message) : String(error));
-    }
-  }
-);
-
-// signOut (This seems to be the primary sign out thunk based on useAuth hook)
+// signOut (This is the primary sign out thunk based on useAuth hook)
 export const signOut = createAsyncThunk(
   'auth/signOut',
   async (_, { rejectWithValue }) => {
@@ -85,7 +44,7 @@ export const updateUserProfile = createAsyncThunk(
 );
 
 
-export const initialState = { // Added export here
+export const initialState = {
   user: null, // Stores user object if authenticated
   isAuthenticated: false, // Added isAuthenticated state
   isInitialized: false, // Added isInitialized state
@@ -112,21 +71,7 @@ const authSlice = createSlice({
       state.error = null;
       state.profileError = null; // Clear profile error too
     },
-    // Renamed clearUser reducer action to avoid conflict with thunk
-    resetUser: (state) => {
-      state.user = null;
-      state.isAuthenticated = false;
-      state.isLoading = false;
-      state.error = null;
-      state.profileError = null;
-      state.isInitialized = true; // Still initialized, just no user
-    },
-    setAuthInitialized: (state, action) => {
-      state.isInitialized = action.payload;
-    },
-    setAuthLoading: (state, action) => { // Generic loading setter
-      state.isLoading = action.payload;
-    },
+    // Removed resetUser, setAuthInitialized, setAuthLoading as they are handled by setUser/loadUser thunks
   },
   extraReducers: (builder) => {
     builder
@@ -149,53 +94,6 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.error = String(action.payload); // Ensure error is a string
         state.isInitialized = true; // Mark as initialized even on rejection
-      })
-      // signInAnonymously
-      .addCase(signInAnonymously.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(signInAnonymously.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = action.payload;
-        state.isAuthenticated = !!action.payload;
-        state.error = null; // Clear any previous error
-      })
-      .addCase(signInAnonymously.rejected, (state, action) => {
-        state.isLoading = false;
-        state.user = null;
-        state.isAuthenticated = false;
-        state.error = String(action.payload); // Ensure error is a string
-      })
-      // clearUserThunk (formerly clearUser)
-      .addCase(clearUser.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(clearUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = null;
-        state.isAuthenticated = false;
-        state.error = null;
-      })
-      .addCase(clearUser.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = String(action.payload); // Ensure error is a string
-      })
-      // signOutUserThunk (formerly signOutUser)
-      .addCase(signOutUser.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(signOutUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = null; // User is null after sign out
-        state.isAuthenticated = false;
-        state.error = null;
-      })
-      .addCase(signOutUser.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = String(action.payload); // Ensure error is a string
       })
       // signOut (primary sign out thunk)
       .addCase(signOut.pending, (state) => {
@@ -233,10 +131,9 @@ const authSlice = createSlice({
   },
 });
 
-export const { setUser, clearAuthError, resetUser, setAuthInitialized, setAuthLoading } = authSlice.actions;
+export const { setUser, clearAuthError } = authSlice.actions;
 
 // Selectors
-// Ensure these selectors are explicitly exported
 export const selectUser = (state) => state.auth.user;
 export const selectAuthLoading = (state) => state.auth.isLoading;
 export const selectAuthError = (state) => state.auth.error;
@@ -246,54 +143,3 @@ export const selectIsUpdatingProfile = (state) => state.auth.isUpdatingProfile;
 export const selectProfileError = (state) => state.auth.profileError;
 
 export default authSlice.reducer;
-/**
- * Generates a concise project summary based on the provided project details.
- * Uses the Chat Completions API for better performance and cost.
- *
- * @param {object} projectDetails - An object containing details of a project (e.g., { title: 'My Awesome App', description: 'A mobile app that does X.', technologies: ['React Native', 'Firebase'] }).
- * @returns {Promise<string>} A promise that resolves to a concise project summary string.
- */
-
-import axios from 'axios';
-export const generateProjectSummary = async (projectDetails) => {
-  if (!OPENAI_API_KEY) {
-    console.error('OpenAI API Key is not set. Please check your .env.local file.');
-    throw new Error('OpenAI API Key is missing.');
-  }
-
-  try {
-    const promptMessage = `Generate a concise, 2-3 sentence summary for the following ALX Software Engineering project. Focus on its purpose, key features, and main technologies used.
-    Project Details: ${JSON.stringify(projectDetails, null, 2)}`;
-
-    const response = await axios.post(
-      OPENAI_CHAT_API_URL,
-      {
-        model: DEFAULT_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant specialized in summarizing software engineering projects for portfolios.',
-          },
-          {
-            role: 'user',
-            content: promptMessage,
-          },
-        ],
-        max_tokens: 80,
-        temperature: 0.5,
-        n: 1,
-      }, 
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-      }
-    );
-    const rawText = response.data.choices[0].message.content.trim();
-    return rawText.split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(line => line.length > 0);
-  } catch (error) {
-    console.error('Error fetching project summary:', error.response ? JSON.stringify(error.response.data) : error.message);
-    throw error;
-  }
-};
