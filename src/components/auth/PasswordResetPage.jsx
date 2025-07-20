@@ -15,7 +15,7 @@ import { Link } from 'react-router-dom'; // Assuming you use React Router for na
  *
  * Provides an interface for users to request a password reset email.
  */
-export function PasswordResetPage() {
+export default function PasswordResetPage() {
   const [loading, setLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
 

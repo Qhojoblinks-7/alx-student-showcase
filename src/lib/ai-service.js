@@ -1,6 +1,7 @@
 // src/lib/ai-service.js
 import axios from 'axios';
-import { fetchRecentCommitMessages } from './github-service'; // Ensure this import is correct
+// Changed import to use the new GitHubCommitsService
+import { GitHubCommitsService } from './github-commits-service.js'; 
 
 const OPENAI_CHAT_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
@@ -54,7 +55,7 @@ export const getProjectRecommendations = async (userPreferences) => {
     const rawText = response.data.choices[0].message.content.trim();
     return rawText.split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(line => line.length > 0);
   } catch (error) {
-    console.error('Error fetching project recommendations:', error.response ? error.response.data : error.message);
+    console.error('Error fetching project recommendations:', error.response ? JSON.stringify(error.response.data) : error.message);
     throw error;
   }
 };
@@ -104,7 +105,7 @@ export const generateProjectSummary = async (projectDetails) => {
 
     return response.data.choices[0].message.content.trim();
   } catch (error) {
-    console.error('Error generating project summary:', error.response ? error.response.data : error.message);
+    console.error('Error generating project summary:', error.response ? JSON.stringify(error.response.data) : error.message);
     throw error;
   }
 };
@@ -124,14 +125,10 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
   }
 
   try {
-    // 1. Parse the GitHub URL to get username and repoName
-    const githubInfo = GitHubCommitsService.parseGitHubUrl(githubRepoUrl);
-    if (!githubInfo) {
-      throw new Error('Invalid GitHub URL provided for work log generation.');
-    }
-
-    // 2. Fetch recent commit messages from GitHub using the correct service method
-    const commitMessages = await GitHubCommitsService.fetchRecentCommitMessages(githubInfo.username, githubInfo.repoName, commitLimit);
+    // 1. Fetch recent commit messages from GitHub using GitHubCommitsService
+    // We only need the message strings for the AI, so map them here.
+    const rawCommits = await GitHubCommitsService.fetchRepositoryCommits(githubRepoUrl, commitLimit);
+    const commitMessages = rawCommits.map(commit => commit.message);
 
     if (commitMessages.length === 0) {
       return 'No recent commit activity found to generate a work log.';
@@ -140,7 +137,7 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
     const commitsString = commitMessages.map((msg, index) => `- ${msg}`).join('\n'); // Use bullet points for input clarity
 
     const promptMessage = `As an ALX Software Engineering student reflecting on recent work, generate a detailed and humanized work log entry based on the following GitHub commit messages.
-
+    
     Structure the work log with a brief introductory sentence, then describe the key developments and challenges overcome in a narrative style. Group related tasks and explain their impact. Aim for 3-5 sentences, making it sound like a personal update from a developer.
 
     Recent GitHub Commit Messages:
@@ -148,7 +145,7 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
 
     Work Log:`;
 
-    // 3. Use OpenAI to summarize the commit messages
+    // 2. Use OpenAI to summarize the commit messages
     const response = await axios.post(
       OPENAI_CHAT_API_URL,
       {
@@ -163,7 +160,7 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
             content: promptMessage,
           },
         ],
-        max_tokens: 250, // Increased significantly for more detail (approx. 50-60 words per sentence * 5 sentences)
+        max_tokens: 250, // Increased significantly for more detail
         temperature: 0.7, // Slightly higher to encourage more natural, narrative phrasing
         n: 1,
       },
@@ -177,12 +174,11 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
 
     return response.data.choices[0].message.content.trim();
   } catch (error) {
-    console.error('Error generating work log summary:', error.response ? error.response.data : error.message);
-    if (error.response && error.response.status === 403 && error.response.data.message.includes('API rate limit exceeded')) {
-      return 'GitHub API rate limit exceeded. Please try again later for work log generation.';
-    } else if (error.message.includes('No recent commit activity')) {
-        return error.message;
+    console.error('Error generating work log summary:', error.response ? JSON.stringify(error.response.data) : error.message);
+    // Propagate specific error messages if they are user-friendly
+    if (error.message.includes('GitHub token missing') || error.message.includes('Repository not found') || error.message.includes('rate limit exceeded')) {
+      return `Failed to generate work log: ${error.message}`;
     }
-    return 'Failed to generate work log. Please check the repository URL and your GitHub token.';
+    return 'Failed to generate work log. Please check the repository URL and your GitHub token.'; // Generic fallback
   }
 };

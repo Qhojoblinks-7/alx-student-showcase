@@ -43,7 +43,7 @@ export const useAuth = () => {
     try {
       await dispatch(signOutAction()).unwrap();
     } catch (signOutError) {
-      console.error('Sign out error:', signOutError.message ? String(signOutError.message) : String(signOutError)); // Explicitly convert error to string
+      console.error('Sign out error:', String(signOutError)); // Explicitly convert error to string
     }
   };
 
@@ -51,7 +51,7 @@ export const useAuth = () => {
     user,
     isAuthenticated,
     loading: isLoading,
-    error,
+    error: error ? String(error) : null, // Ensure error is always a string or null
     isInitialized,
     signOut,
   };

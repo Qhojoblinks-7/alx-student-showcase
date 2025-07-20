@@ -216,3 +216,6 @@ export function ProjectSearch({ onSearch }) {
 ProjectSearch.propTypes = {
   onSearch: PropTypes.func.isRequired,
 };
+ProjectSearch.defaultProps = {
+  onSearch: () => {}, // Default to a no-op function if not provided
+};

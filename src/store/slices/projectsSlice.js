@@ -20,12 +20,13 @@ export const fetchProjects = createAsyncThunk(
         .order('created_at', { ascending: false });
 
       if (error) {
+        console.error('Supabase fetch projects error:', String(error)); // Explicitly stringify error for console
         throw error;
       }
       return data;
     } catch (error) {
-      console.error('Error fetching projects:', error.message);
-      return rejectWithValue(error.message);
+      console.error('Error fetching projects:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -44,7 +45,10 @@ export const fetchProjectStats = createAsyncThunk(
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId);
 
-      if (totalError) throw totalError;
+      if (totalError) {
+        console.error('Supabase fetch total projects error:', String(totalError)); // Explicitly stringify error for console
+        throw totalError;
+      }
 
       // Fetch public projects
       const { count: publicCount, error: publicError } = await supabase
@@ -53,7 +57,10 @@ export const fetchProjectStats = createAsyncThunk(
         .eq('user_id', userId)
         .eq('is_public', true);
 
-      if (publicError) throw publicError;
+      if (publicError) {
+        console.error('Supabase fetch public projects error:', String(publicError)); // Explicitly stringify error for console
+        throw publicError;
+      }
 
       // Fetch distinct technologies (this might be a large query, consider a separate RPC if performance is an issue)
       const { data: technologiesData, error: technologiesError } = await supabase
@@ -61,7 +68,10 @@ export const fetchProjectStats = createAsyncThunk(
         .select('technologies')
         .eq('user_id', userId);
 
-      if (technologiesError) throw technologiesError;
+      if (technologiesError) {
+        console.error('Supabase fetch technologies error:', String(technologiesError)); // Explicitly stringify error for console
+        throw technologiesError;
+      }
 
       const allTechnologies = new Set();
       technologiesData.forEach(project => {
@@ -76,8 +86,8 @@ export const fetchProjectStats = createAsyncThunk(
         technologies: allTechnologies.size,
       };
     } catch (error) {
-      console.error('Error fetching project stats:', error.message);
-      return rejectWithValue(error.message);
+      console.error('Error fetching project stats:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -92,12 +102,13 @@ export const addProject = createAsyncThunk(
         .select(); // Select the inserted data to return it
 
       if (error) {
+        console.error('Supabase add project error:', String(error)); // Explicitly stringify error for console
         throw error;
       }
       return data[0]; // Return the first (and only) inserted record
     } catch (error) {
-      console.error('Error adding project:', error.message);
-      return rejectWithValue(error.message);
+      console.error('Error adding project:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -113,12 +124,13 @@ export const updateProject = createAsyncThunk(
         .select(); // Select the updated data to return it
 
       if (error) {
+        console.error('Supabase update project error:', String(error)); // Explicitly stringify error for console
         throw error;
       }
       return data[0]; // Return the first (and only) updated record
     } catch (error) {
-      console.error('Error updating project:', error.message);
-      return rejectWithValue(error.message);
+      console.error('Error updating project:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -133,12 +145,13 @@ export const deleteProject = createAsyncThunk(
         .eq('id', projectId);
 
       if (error) {
+        console.error('Supabase delete project error:', String(error)); // Explicitly stringify error for console
         throw error;
       }
       return projectId; // Return the ID of the deleted project
     } catch (error) {
-      console.error('Error deleting project:', error.message);
-      return rejectWithValue(error.message);
+      console.error('Error deleting project:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -199,7 +212,7 @@ const projectsSlice = createSlice({
         state.stats = action.payload;
       })
       .addCase(fetchProjectStats.rejected, (state, action) => {
-        console.error('Failed to fetch project stats:', action.payload);
+        console.error('Failed to fetch project stats:', String(action.payload)); // Explicitly stringify error for console
         // Handle error for stats if necessary
       })
       // Add Project

@@ -107,37 +107,40 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
     try {
       let fetchedRepositories;
       if (platform === 'GitHub') {
+        // Removed fetchUserRepositories from dependency array as it's a stable thunk creator
         fetchedRepositories = await dispatch(fetchUserRepositories(usernameInput.trim())).unwrap();
       } else if (platform === 'GitLab') {
-        // Assuming GitLabService and BitbucketService also return an array of repositories
-        // and that setRepositories is the correct action to update the state.
         fetchedRepositories = await GitLabService.fetchUserRepositories(usernameInput.trim());
-        dispatch(setRepositories(fetchedRepositories)); // Dispatch for non-GitHub platforms
       } else if (platform === 'Bitbucket') {
         fetchedRepositories = await BitbucketService.fetchUserRepositories(usernameInput.trim());
-        dispatch(setRepositories(fetchedRepositories)); // Dispatch for non-GitHub platforms
       }
 
+      // The fetchUserRepositories thunk already sets the repositories in state
+      // For other platforms, we would dispatch setRepositories(fetchedRepositories);
+      if (platform !== 'GitHub') {
+        dispatch(setRepositories(fetchedRepositories));
+      }
       dispatch(setWizardStep('select_repos'));
     } catch (err) {
-      console.error('Error fetching repositories:', err);
+      console.error('Error fetching repositories:', String(err)); // Explicitly stringify error for console
       toast.error('Failed to fetch repositories: ' + getErrorMessage(err));
     }
-  }, [platform, usernameInput, dispatch]); // Removed fetchUserRepositories from dependencies
+  }, [platform, usernameInput, dispatch]); // Removed fetchUserRepositories from deps
 
   // Handle detecting ALX projects (for manual trigger from select_repos step)
   const handleDetectALXProjects = useCallback(async () => {
     dispatch(clearGitHubErrors()); // Clear previous errors
     try {
+      // Removed detectALXProjects from dependency array as it's a stable thunk creator
       // Pass repositories and username explicitly as required by the thunk
       await dispatch(detectALXProjects({ repositories: repositories, username: wizardData.username })).unwrap();
       dispatch(setWizardStep('review_import'));
     } catch (err) {
       // Log the full error object for debugging
-      console.error('Error in handleDetectALXProjects:', err);
+      console.error('Error in handleDetectALXProjects:', String(err)); // Explicitly stringify error for console
       toast.error('Failed to detect ALX projects: ' + getErrorMessage(err));
     }
-  }, [dispatch, repositories, wizardData.username]); // Removed detectALXProjects from dependencies
+  }, [dispatch, repositories, wizardData.username]); // Removed detectALXProjects from deps
 
   // Handle final import
   const handleImportSelectedProjects = useCallback(async () => {
@@ -188,21 +191,23 @@ export function GitHubImportWizard({ onClose, onImportComplete }) {
         return;
       }
 
+      // Removed importSelectedProjects from dependency array as it's a stable thunk creator
       // Pass projectsToInsert and userId as an object to the thunk
-      const result = await dispatch(importSelectedProjects({ projectsToImport: projectsToInsert, userId: user.id })).unwrap();
+      const result = await dispatch(importSelectedProjects({ projectsToInsert: projectsToInsert, userId: user.id })).unwrap();
       toast.success(`Successfully imported ${result.length} projects!`);
       onImportComplete(result);
       onClose();
     } catch (err) {
       toast.error('Failed to import projects: ' + getErrorMessage(err));
     }
-  }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose]); // Removed importSelectedProjects from dependencies
+  }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose]); // Removed importSelectedProjects from deps
 
   const handleToggleProject = useCallback(
     (projectId) => {
+      // Removed toggleProjectSelection from dependency array as it's a stable action creator
       dispatch(toggleProjectSelection(projectId));
     },
-    [dispatch] // Removed toggleProjectSelection from dependencies
+    [dispatch] // Removed toggleProjectSelection from deps
   );
 
   const handlePlatformChange = (event) => {

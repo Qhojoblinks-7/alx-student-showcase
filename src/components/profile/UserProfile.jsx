@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { Loader2, User, Github, Linkedin, BookOpen, Image, Info, Trophy, Star, Link as LinkIcon, Plus, Edit2 } from 'lucide-react'; // Added Plus and Edit2 icons
 import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog.jsx'; // Import Dialog components
-import {ProjectForm } from '../projects/ProjectForm'; // Import the ProjectForm component)
+import { ProjectForm } from '../projects/ProjectForm.jsx'; // Import the ProjectForm component
 import { ProjectList } from '../projects/ProjectList.jsx'; // Import the ProjectList component
 
 export function UserProfile() {
@@ -59,7 +59,7 @@ export function UserProfile() {
         .single();
 
       if (userError && userError.code !== 'PGRST116') { // PGRST116 means no rows found (new user)
-        console.error('Error fetching profile:', userError.message ? String(userError.message) : String(userError));
+        console.error('Error fetching profile:', String(userError)); // Explicitly stringify error for console
         toast.error('Failed to load profile: ' + (userError.message || 'Unknown error'));
         setProfile(prev => ({ // Reset to empty if error, but keep existing portfolio if already loaded
           ...prev,
@@ -89,7 +89,7 @@ export function UserProfile() {
         .order('created_at', { ascending: false });
 
       if (projectsError) {
-        console.error('Error fetching portfolio projects:', projectsError.message ? String(projectsError.message) : String(projectsError));
+        console.error('Error fetching portfolio projects:', String(projectsError)); // Explicitly stringify error for console
         toast.error('Failed to load portfolio projects: ' + (projectsError.message || 'Unknown error'));
         setProfile(prev => ({ ...prev, portfolio: [] })); // Clear portfolio on error
       } else if (projectsData) {
@@ -97,7 +97,7 @@ export function UserProfile() {
       }
 
     } catch (error) {
-      console.error('Unexpected error during profile/projects fetch:', error.message ? String(error.message) : String(error));
+      console.error('Unexpected error during profile/projects fetch:', String(error)); // Explicitly stringify error for console
       toast.error('An unexpected error occurred while loading profile data.');
     } finally {
       setLoading(false);
@@ -144,6 +144,7 @@ export function UserProfile() {
         }
       } catch (error) {
         toast.error('Failed to load badges.');
+        console.error('Error loading badges:', String(error)); // Explicitly stringify error for console
       }
     };
 
@@ -175,12 +176,13 @@ export function UserProfile() {
         }, { onConflict: 'id' }); // Use onConflict: 'id' for upserting by user ID
 
       if (error) {
+        console.error('Supabase update profile error:', String(error)); // Explicitly stringify error for console
         throw error;
       }
 
       toast.success('Profile updated successfully!');
     } catch (error) {
-      console.error('Error updating profile:', error.message ? String(error.message) : String(error));
+      console.error('Error updating profile:', String(error)); // Explicitly stringify error for console
       toast.error('Failed to update profile: ' + (error.message || 'Unknown error'));
     } finally {
       setSaving(false);
@@ -212,7 +214,7 @@ export function UserProfile() {
       await backupProjectData(backupData);
       toast.success('Project data backed up successfully!');
     } catch (error) {
-      console.error('Error backing up project data:', error.message ? String(error.message) : String(error));
+      console.error('Error backing up project data:', String(error)); // Explicitly stringify error for console
       toast.error('Failed to back up project data.');
     }
   };
@@ -262,7 +264,7 @@ export function UserProfile() {
       setBadges((prev) => [...prev, badge]); // Optimistically update UI
       toast.success(`Badge awarded: ${badge.name}`);
     } catch (error) {
-      console.error('Error awarding badge:', error.message ? String(error.message) : String(error));
+      console.error('Error awarding badge:', String(error)); // Explicitly stringify error for console
       toast.error('Failed to award badge.');
     }
   };
@@ -276,7 +278,7 @@ export function UserProfile() {
       const recommendedProjects = await getProjectRecommendations(userPreferences);
       setRecommendations(recommendedProjects);
     } catch (error) {
-      console.error('Error fetching project recommendations:', error.message ? String(error.message) : String(error));
+      console.error('Error fetching project recommendations:', String(error)); // Explicitly stringify error for console
       toast.error('Failed to fetch project recommendations.');
     }
   }, [profile.skills, profile.bio]);
@@ -299,7 +301,7 @@ export function UserProfile() {
       const projectSummary = await generateProjectSummary(combinedPortfolioData);
       setSummary(projectSummary);
     } catch (error) {
-      console.error('Error generating project summary:', error.message ? String(error.message) : String(error));
+      console.error('Error generating project summary:', String(error)); // Explicitly stringify error for console
       toast.error('Failed to generate project summary.');
     }
   }, [profile.portfolio, profile.bio, profile.skills, user]);
@@ -626,4 +628,7 @@ export function UserProfile() {
 
 UserProfile.propTypes = {
   // No specific props for this component, but PropTypes can be defined if needed later
+};
+UserProfile.defaultProps = {
+  // Default props can be defined here if needed
 };

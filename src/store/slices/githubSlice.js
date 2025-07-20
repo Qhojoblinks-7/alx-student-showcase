@@ -17,7 +17,8 @@ export const fetchUserRepositories = createAsyncThunk(
       const response = await GitHubService.fetchUserRepositories(username);
       return response;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Error in fetchUserRepositories thunk:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -34,7 +35,8 @@ export const detectALXProjects = createAsyncThunk(
       const detectionResult = await ALXProjectDetector.detectALXProjects(repositories, username);
       return detectionResult;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Error in detectALXProjects thunk:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -80,14 +82,14 @@ export const processProjectsWithAI = createAsyncThunk(
           is_ai_processed: !!ai_summary || !!ai_work_log
         });
       } catch (aiError) {
-        console.error(`Error processing project ${project.title} with AI:`, aiError);
+        console.error(`Error processing project ${project.title} with AI:`, String(aiError)); // Explicitly stringify error for console
         // Push the project even if AI failed for it, but note the failure
         processedProjects.push({
           ...project,
           ai_summary: null,
           ai_work_log: null,
           is_ai_processed: false,
-          ai_error: aiError.message // Store AI error message for this specific project
+          ai_error: aiError.message ? String(aiError.message) : String(aiError) // Ensure error is a string
         });
       }
     }
@@ -139,7 +141,7 @@ export const importSelectedProjects = createAsyncThunk(
           .select(); // Use .select() to get the newly inserted row
 
         if (error) {
-          console.error("Supabase insert error:", error);
+          console.error("Supabase insert error:", String(error)); // Explicitly stringify error for console
           throw new Error(`Failed to insert project ${project.title}: ${error.message}`);
         }
 
@@ -154,7 +156,8 @@ export const importSelectedProjects = createAsyncThunk(
 
       return processedWithAI; // Return the projects, now enriched with AI data
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Error in importSelectedProjects thunk:', String(error)); // Explicitly stringify error for console
+      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
     }
   }
 );
@@ -254,7 +257,7 @@ const githubSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // fetchUserRepositories
+      // Fetch Repositories
       .addCase(fetchUserRepositories.pending, (state) => {
         state.isLoadingRepositories = true;
         state.repositoryError = null;
@@ -268,7 +271,7 @@ const githubSlice = createSlice({
         state.repositoryError = action.payload;
         state.repositories = [];
       })
-      // detectALXProjects
+      // Detect ALX Projects
       .addCase(detectALXProjects.pending, (state) => {
         state.isDetectingALX = true;
         state.error = null;
@@ -293,7 +296,7 @@ const githubSlice = createSlice({
         state.error = action.payload;
         state.alxProjects = [];
       })
-      // importSelectedProjects
+      // Import Selected Projects
       .addCase(importSelectedProjects.pending, (state) => {
         state.isImporting = true;
         state.importError = null;
@@ -352,9 +355,3 @@ export const {
 } = githubSlice.actions;
 
 export default githubSlice.reducer;
-export const githubActions = {
-  fetchUserRepositories,
-  detectALXProjects,
-  importSelectedProjects,
-  processProjectsWithAI, // Export the AI processing thunk
-};

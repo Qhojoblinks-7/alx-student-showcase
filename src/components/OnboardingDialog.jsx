@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import * as Dialog from '@radix-ui/react-dialog'; // Keep this for Dialog.Root
+import { useDispatch, useSelector } from 'react-redux'; // Import useDispatch and useSelector
+import { toggleTheme } from '../store/slices/uiSlice'; // Import toggleTheme action
 import {
   DialogContent,
-  DialogHeader, // This is the correct import for Header
-  DialogTitle,  // This is the correct import for Title
-  DialogDescription, // This is the correct import for Description
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Separator } from '@/components/ui/separator.jsx';
@@ -32,6 +34,8 @@ import { cn } from '@/lib/utils.js'; // Assuming cn utility is here
  */
 export function OnboardingDialog({ isOpen, onClose, onAction }) {
   const [currentStep, setCurrentStep] = useState(0);
+  const dispatch = useDispatch(); // Initialize useDispatch
+  const theme = useSelector((state) => state.ui.theme); // Get theme from Redux store
 
   // Reset to first step when dialog opens
   useEffect(() => {
@@ -100,36 +104,22 @@ export function OnboardingDialog({ isOpen, onClose, onAction }) {
   const currentStepData = steps[currentStep];
   const isLastStep = currentStep === steps.length - 1;
 
-  // Add state for theme
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('theme') === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  // Function to toggle theme
-  const toggleTheme = () => {
-    const newTheme = isDarkMode ? 'light' : 'dark';
-    setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle('dark', !isDarkMode);
-    console.log('Dark mode toggled:', !isDarkMode);
-    localStorage.setItem('theme', newTheme);
-  };
-
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md sm:max-w-lg p-6 rounded-lg shadow-xl">
-        <DialogHeader className="text-center space-y-4"> {/* Changed from Dialog.Header */}
+        <DialogHeader className="text-center space-y-4">
           <div className="flex justify-end">
-            <Button variant="ghost" onClick={toggleTheme} className="text-muted-foreground">
-              {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            <Button variant="ghost" onClick={() => dispatch(toggleTheme())} className="text-muted-foreground">
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
           </div>
           <div className="mx-auto flex items-center justify-center mb-4">
             {currentStepData.icon}
           </div>
-          <DialogTitle className="text-2xl font-bold text-gray-800 dark:text-white"> {/* Changed from Dialog.Title */}
+          <DialogTitle className="text-2xl font-bold text-gray-800 dark:text-white">
             {currentStepData.title}
           </DialogTitle>
-          <DialogDescription className="text-base text-muted-foreground px-4"> {/* Changed from Dialog.Description */}
+          <DialogDescription className="text-base text-muted-foreground px-4">
             {currentStepData.description}
           </DialogDescription>
         </DialogHeader>
@@ -164,12 +154,6 @@ export function OnboardingDialog({ isOpen, onClose, onAction }) {
             ))}
           </div>
         )}
-
-        {/* Temporary test case for DialogContent accessibility verification */}
-        {/* This DialogContent is already correctly imported from '@/components/ui/dialog.jsx' */}
-        <DialogContent descriptionId="test-description">
-          <p id="test-description">This is a test description for accessibility.</p>
-        </DialogContent>
       </DialogContent>
     </Dialog.Root>
   );

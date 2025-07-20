@@ -47,7 +47,7 @@ import { ShareProjectModal } from '../components/sharing/ShareProjectModal';
 // import { AutoWorkLogShare } from '../components/sharing/AutoWorkLogShare'; // Removed as its functionality is now in ShareProjectModal
 import { WorkLogGenerator } from '../components/sharing/WorkLogGenerator'; // Kept for general work log generation
 import { DashboardStats } from '../components/DashboardStats';
-import { OnboardingDialog } from './OnboardingDialog';
+// import { OnboardingDialog } from './OnboardingDialog';
 import { ProjectSearch } from '../components/projects/ProjectSearch'; // Import ProjectSearch
 
 
@@ -62,7 +62,7 @@ export function Dashboard() {
 
   // Get other state values
   const projects = useAppSelector((state) => state.projects.projects); // Use useAppSelector
-  const { isLoading: projectsListLoading } = useAppSelector((state) => state.projects); // Correctly get isLoading from projects slice
+  const { isLoading: projectsListLoading, error: projectsError } = useAppSelector((state) => state.projects); // Correctly get isLoading and error from projects slice
   const { isLoadingRepositories: githubLoadingRepositories } = useAppSelector((state) => state.github); // Correctly get isLoadingRepositories from github slice
 
   const [editingProject, setEditingProject] = useState(null);
@@ -102,41 +102,41 @@ export function Dashboard() {
   }, [theme]);
 
 
-  const handleSignOut = useCallback(async () => {
+  const handleSignOut = async () => {
     try {
       await signOut();
       toast.success('Signed out successfully!');
     } catch (error) {
       toast.error('Failed to sign out: ' + (error.message || 'Unknown error'));
     }
-  }, [signOut]);
+  };
 
-  const handleAddProjectClick = useCallback(() => {
+  const handleAddProjectClick = () => {
     setEditingProject(null); // Clear any existing project for "Add New"
     dispatch(openModal({ modalName: 'projectForm' })); // Dispatch openModal action
-  }, [dispatch]);
+  };
 
-  const handleEditProject = useCallback((project) => {
+  const handleEditProject = (project) => {
     setEditingProject(project);
     dispatch(openModal({ modalName: 'projectForm', data: project })); // Dispatch openModal action with data
-  }, [dispatch]);
+  };
 
-  const handleShareProject = useCallback((project) => { // This now handles opening the comprehensive ShareProjectModal
+  const handleShareProject = (project) => { // This now handles opening the comprehensive ShareProjectModal
     setSharingProject(project);
     dispatch(openModal({ modalName: 'shareProject', data: project })); // Dispatch openModal action with data
-  }, [dispatch]);
+  };
 
   // Removed handleOpenAutoWorkLogShare and handleCloseAutoWorkLogShare as AutoWorkLogShare is integrated
 
-  const handleOpenWorkLogGenerator = useCallback(() => { // Kept for general work log generation
+  const handleOpenWorkLogGenerator = () => { // Kept for general work log generation
     setShowWorkLogGenerator(true);
-  }, []);
+  };
 
-  const handleCloseWorkLogGenerator = useCallback(() => { // Kept for general work log generation
+  const handleCloseWorkLogGenerator = () => { // Kept for general work log generation
     setShowWorkLogGenerator(false);
-  }, []);
+  };
 
-  const handleGitHubImportComplete = useCallback(() => {
+  const handleGitHubImportComplete = () => {
     dispatch(closeModal('gitHubImport')); // Dispatch closeModal action
     dispatch(setWizardStep('username')); // Reset wizard step
     if (user?.id) {
@@ -144,66 +144,66 @@ export function Dashboard() {
       dispatch(fetchProjectStats(user.id)); // Re-fetch stats after import
     }
     toast.success('GitHub projects imported successfully!');
-  }, [dispatch, user?.id]);
+  };
 
-  const handleProjectFormSuccess = useCallback(() => {
+  const handleProjectFormSuccess = () => {
     dispatch(closeModal('projectForm')); // Dispatch closeModal action
     setEditingProject(null);
     if (user?.id) {
       dispatch(fetchProjects(user.id)); // Re-fetch projects after add/edit
       dispatch(fetchProjectStats(user.id)); // Re-fetch stats after add/edit
     }
-  }, [dispatch, user?.id]);
+  };
 
-  const handleProjectFormCancel = useCallback(() => {
+  const handleProjectFormCancel = () => {
     dispatch(closeModal('projectForm')); // Dispatch closeModal action
     setEditingProject(null);
-  }, [dispatch]);
+  };
 
-  const handleShareModalClose = useCallback(() => {
+  const handleShareModalClose = () => {
     dispatch(closeModal('shareProject')); // Dispatch closeModal action
     setSharingProject(null);
-  }, [dispatch]);
+  };
 
-  const handleOpenUserProfile = useCallback(() => {
+  const handleOpenUserProfile = () => {
     dispatch(openModal({ modalName: 'userProfile' })); // Dispatch openModal action
-  }, [dispatch]);
+  };
 
-  const handleCloseUserProfile = useCallback(() => {
+  const handleCloseUserProfile = () => {
     dispatch(closeModal('userProfile')); // Dispatch closeModal action
-  }, [dispatch]);
+  };
 
-  const handleOpenGitHubImport = useCallback(() => {
+  const handleOpenGitHubImport = () => {
     dispatch(openModal({ modalName: 'gitHubImport' })); // Dispatch openModal action
-  }, [dispatch]);
+  };
 
-  const handleCloseGitHubImport = useCallback(() => {
+  const handleCloseGitHubImport = () => {
     dispatch(closeModal('gitHubImport')); // Dispatch closeModal action
     dispatch(setWizardStep('username')); // Reset wizard step on close
-  }, [dispatch]);
+  };
 
-  // Handle actions from the OnboardingDialog
-  const handleOnboardingAction = useCallback((actionType) => {
-    setShowOnboarding(false); // Close onboarding dialog
-    setIsSheetOpen(false); // Close mobile sheet if open
+  // // Handle actions from the OnboardingDialog
+  // const handleOnboardingAction = (actionType) => {
+  //   setShowOnboarding(false); // Close onboarding dialog
+  //   setIsSheetOpen(false); // Close mobile sheet if open
 
-    switch (actionType) {
-      case 'addProject':
-        handleAddProjectClick();
-        break;
-      case 'importGithub':
-        handleOpenGitHubImport();
-        break;
-      case 'viewProfile':
-        dispatch(setActiveTab('profile'));
-        break;
-      case 'viewStats':
-        dispatch(setActiveTab('stats'));
-        break;
-      default:
-        break;
-    }
-  }, [dispatch, handleAddProjectClick, handleOpenGitHubImport]); // Added missing dependencies
+  //   switch (actionType) {
+  //     case 'addProject':
+  //       handleAddProjectClick();
+  //       break;
+  //     case 'importGithub':
+  //       handleOpenGitHubImport();
+  //       break;
+  //     case 'viewProfile':
+  //       dispatch(setActiveTab('profile'));
+  //       break;
+  //     case 'viewStats':
+  //       dispatch(setActiveTab('stats'));
+  //       break;
+  //     default:
+  //       break;
+  //   }
+  // };
 
   // Render loading state if auth is still loading
   if (authLoading) {
@@ -388,7 +388,15 @@ export function Dashboard() {
             ) : (
               <div className="space-y-6">
                 <ProjectSearch onSearch={(newFilters) => setFilters(newFilters)} />
-                <ProjectList filters={filters} onEdit={handleEditProject} onShare={handleShareProject} /> {/* Changed onShare to use handleShareProject */}
+                {/* Pass projects, loading, and error props to ProjectList */}
+                <ProjectList
+                  projects={projects}
+                  loading={projectsListLoading}
+                  error={projectsError}
+                  onEdit={handleEditProject}
+                  onShare={handleShareProject}
+                  filters={filters}
+                />
               </div>
             )}
           </TabsContent>
@@ -447,12 +455,12 @@ export function Dashboard() {
         />
       )}
 
-      {/* Onboarding Dialog */}
+      {/* Onboarding Dialog
       <OnboardingDialog
         isOpen={showOnboarding}
         onClose={() => setShowOnboarding(false)}
         onAction={handleOnboardingAction}
-      />
+      /> */}
 
     </div>
   );

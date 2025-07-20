@@ -174,7 +174,7 @@ export function ProjectList({ onEdit, onShare, filters = {}, projects, loading, 
             toast.success('Project deleted successfully!');
           } catch (err) {
             toast.error('Failed to delete project: ' + (err.message || 'Unknown error'));
-            console.error('Error deleting project:', err);
+            console.error('Error deleting project:', String(err)); // Explicitly stringify error for console
           }
         },
       },
@@ -189,7 +189,7 @@ export function ProjectList({ onEdit, onShare, filters = {}, projects, loading, 
       toast.success(`Project visibility set to ${!isPublic ? 'public' : 'private'}`);
     } catch (err) {
       toast.error('Failed to update visibility: ' + (err.message || 'Unknown error'));
-      console.error('Error updating project visibility:', err);
+      console.error('Error updating project visibility:', String(err)); // Explicitly stringify error for console
     }
   };
 
@@ -436,9 +436,10 @@ ProjectList.propTypes = {
   onRetry: PropTypes.func,              // onRetry is a new prop for the retry button
 };
 ProjectList.defaultProps = {
-  onEdit: null,
-  onShare: null,
+  onEdit: () => {},
+  onShare: () => {},
   filters: {},
+  loading: false,
   error: null,
   onRetry: null, // Default to null if not provided
 };

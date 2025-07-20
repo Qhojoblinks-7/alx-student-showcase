@@ -2,53 +2,27 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useAuth } from './hooks/use-auth'; // Your useAuth hook
-import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state
 
-// Dynamically import route components using React.lazy
-// This will create separate JavaScript chunks for each of these components
-const LandingPage = React.lazy(() => import('./components/LandingPage'));
-const SignInPage = React.lazy(() => import('./components/auth/SignInPage'));
-const SignUpPage = React.lazy(() => import('./components/auth/SignUpPage'));
-const PasswordResetPage = React.lazy(() => import('./components/auth/PasswordResetPage'));
-const AuthForm = React.lazy(() => import('./components/auth/AuthForm')); // If AuthForm is a standalone route component
-const ProtectedRoute = React.lazy(() => import('./components/auth/ProtectedRoute'));
-const AuthRedirect = React.lazy(() => import('./components/AuthRedirect'));
-const Dashboard = React.lazy(() => import('./components/Dashboard'));
+// Directly import route components
+import { SignInPage } from './components/auth/SignInPage';
+import { SignUpPage } from './components/auth/SignUpPage';
+import  PasswordResetPage  from './components/auth/PasswordResetPage';
+import AuthForm from './components/auth/AuthForm';
+import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Direct import for named export
+import { AuthRedirect } from './components/AuthRedirect'
+import { Dashboard } from './components/Dashboard'; // Direct import for named export
+import { LandingPage } from './components/LandingPage'; // Import the LandingPage
+import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state in ProtectedRoute/AuthRedirect
 
-// Define SetNewPasswordPage as a lazy-loaded component as well
-const SetNewPasswordPage = React.lazy(() => (
-  // Wrap the content in a function that returns the JSX, so it can be lazy-loaded
-  // This structure is fine for simple components like this one
-  import('react').then(module => ({
-    default: () => (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
-        <h2 className="text-2xl font-bold mb-4 text-center">Set Your New Password</h2>
-        <AuthForm mode="update_password" />
-      </div>
-    )
-  }))
-));
-// // Directly import route components
-// import { SignInPage } from './components/auth/SignInPage';
-// import { SignUpPage } from './components/auth/SignUpPage';
-// import { PasswordResetPage } from './components/auth/PasswordResetPage';
-// import AuthForm from './components/auth/AuthForm';
-// import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Direct import for named export
-// import { AuthRedirect } from './components/AuthRedirect'
-// import { Dashboard } from './components/Dashboard'; // Direct import for named export
-// import { LandingPage } from './components/LandingPage'; // Import the LandingPage
-// import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state in ProtectedRoute/AuthRedirect
-
-// const SetNewPasswordPage = () => (
-//   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
-//     <h2 className="text-2xl font-bold mb-4 text-center">Set Your New Password</h2>
-//     <AuthForm mode="update_password" />
-//   </div>
-// );
-
-// Removed safeLog function as it's no longer needed for debugging.
+const SetNewPasswordPage = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
+    <h2 className="text-2xl font-bold mb-4 text-center">Set Your New Password</h2>
+    <AuthForm mode="update_password" />
+  </div>
+);
 
 export default function App() {
+  // Use useAuth to get the initialization status for the whole app
   const { isInitialized } = useAuth();
 
   useEffect(() => {
@@ -58,6 +32,9 @@ export default function App() {
     console.log('Document classes after applying theme:', document.documentElement.classList);
   }, []);
 
+  // Show a global loading indicator until authentication state is initialized
+  // This prevents content flickering and ensures routing decisions are made
+  // only when the auth state is fully known.
   if (!isInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">

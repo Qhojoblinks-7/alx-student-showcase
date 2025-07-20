@@ -22,7 +22,8 @@ export function useAuth() {
       setIsLoading(false);
       setIsInitialized(true);
 
-      console.log('Auth state changed:', event, 'User:', currentUser?.id || 'None');
+      // Explicitly stringify event and currentUser?.id for console.log
+      console.log('Auth state changed:', String(event), 'User:', String(currentUser?.id || 'None'));
     });
 
     const getInitialUser = async () => {
@@ -31,10 +32,39 @@ export function useAuth() {
       setIsLoading(true);
       try {
         const { data: { user: currentUser }, error } = await supabase.auth.getUser();
-        if (error) throw error;
+        if (error) {
+          // Robustly handle and throw the error
+          let errorMessage = 'Auth session missing!';
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          } else if (typeof error === 'object' && error !== null) {
+            // Attempt to stringify a complex object error
+            try {
+              errorMessage = JSON.stringify(error);
+            } catch (e) {
+              errorMessage = String(error); // Fallback to String() if JSON.stringify fails
+            }
+          } else {
+            errorMessage = String(error);
+          }
+          throw new Error(errorMessage);
+        }
         setUser(currentUser);
       } catch (error) {
-        console.error('Error getting initial user:', error.message || String(error));
+        // Ensure error is explicitly stringified for console.error
+        let logMessage = 'Unknown error during initial user fetch.';
+        if (error instanceof Error) {
+          logMessage = error.message;
+        } else if (typeof error === 'object' && error !== null) {
+          try {
+            logMessage = JSON.stringify(error);
+          } catch (e) {
+            logMessage = String(error);
+          }
+        } else {
+          logMessage = String(error);
+        }
+        console.error('Error getting initial user:', logMessage);
         setUser(null);
       } finally {
         if (mounted) {
@@ -64,7 +94,20 @@ export function useAuth() {
       setUser(null);
       return true;
     } catch (error) {
-      console.error('Error signing out:', error.message || String(error));
+      // Explicitly stringify error for console.error
+      let logMessage = 'Unknown error during sign out.';
+      if (error instanceof Error) {
+        logMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        try {
+          logMessage = JSON.stringify(error);
+        } catch (e) {
+          logMessage = String(error);
+        }
+      } else {
+        logMessage = String(error);
+      }
+      console.error('Error signing out:', logMessage);
       throw error;
     } finally {
       setIsLoading(false);

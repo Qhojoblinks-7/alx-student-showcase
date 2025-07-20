@@ -20,27 +20,29 @@ export const initializeAuth = async () => {
     if (initialAuthToken) {
       const { data, error } = await supabase.auth.signInWithCustomToken(initialAuthToken);
       if (error) {
-        console.error("Supabase custom token sign-in error:", error.message ? String(error.message) : String(error));
-        // Fallback to anonymous sign-in if custom token fails
-        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
-        if (anonError) console.error("Supabase anonymous sign-in error:", anonError.message ? String(anonError.message) : String(anonError));
-        else currentUserId = anonData.user?.id;
+        // Log custom token error. No fallback to anonymous sign-in.
+        const errorMessage = error.message || (error.response?.data ? JSON.stringify(error.response.data) : String(error));
+        console.error("Supabase custom token sign-in error:", errorMessage);
+        currentUserId = null; // User remains unauthenticated
       } else {
         currentUserId = data.user?.id;
       }
     } else {
-      const { data, error } = await supabase.auth.signInAnonymously();
-      if (error) console.error("Supabase anonymous sign-in error:", error.message ? String(error.message) : String(error));
-      else currentUserId = data.user?.id;
+      // If no initial token, user remains unauthenticated. No anonymous sign-in attempt.
+      console.log("No initial auth token provided. User will remain unauthenticated.");
+      currentUserId = null;
     }
   } catch (error) {
-    console.error("Error during initial Supabase authentication:", error.message ? String(error.message) : String(error));
-    currentUserId = crypto.randomUUID(); // Generate a random ID for unauthenticated users
+    // Catch-all for any unexpected errors during initial authentication
+    const catchErrorMessage = error.message || (error.response?.data ? JSON.stringify(error.response.data) : String(error));
+    console.error("Error during initial Supabase authentication:", catchErrorMessage);
+    currentUserId = null; // User remains unauthenticated
   }
 
   // Set up auth state change listener
   const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
     currentUserId = session?.user?.id || null;
+    // Ensure event and currentUserId are stringified for console.log
     console.log('Auth state changed:', String(event), 'User ID:', String(currentUserId));
     // Here you might dispatch a Redux action to update your store's auth state
     // e.g., store.dispatch(authSlice.actions.setUser(session?.user || null));
@@ -55,20 +57,29 @@ export const getCurrentUserId = () => currentUserId;
 
 // AuthService class for common authentication operations
 export class AuthService {
-  static async signInAnonymously() {
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error) throw error;
-    return data.user;
-  }
+  // Removed signInAnonymously method as it's no longer desired
+  // static async signInAnonymously() {
+  //   const { data, error } = await supabase.auth.signInAnonymously();
+  //   if (error) {
+  //     throw new Error(error.message || 'Anonymous sign-in failed.');
+  //   }
+  //   return data.user;
+  // }
 
   static async signOut() {
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) {
+      // Throw a standard Error object with a message
+      throw new Error(error.message || 'Sign out failed.');
+    }
   }
 
   static async getCurrentUser() {
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw error;
+    if (error) {
+      // Throw a standard Error object with a message
+      throw new Error(error.message || 'Failed to get current user.');
+    }
     return user;
   }
 
@@ -77,7 +88,10 @@ export class AuthService {
       .from('users')
       .upsert({ id: userId, ...updates })
       .select();
-    if (error) throw error;
+    if (error) {
+      // Throw a standard Error object with a message
+      throw new Error(error.message || 'Failed to update user profile.');
+    }
     return data;
   }
 }
