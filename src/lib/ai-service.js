@@ -1,6 +1,5 @@
 // src/lib/ai-service.js
-import axios from 'axios';
-// Corrected import to use GitHubCommitsService from its dedicated file
+// Removed: import axios from 'axios';
 import { GitHubCommitsService } from './github-commits-service.js';
 
 // IMPORTANT: These should be loaded securely from environment variables (e.g., .env.local)
@@ -45,27 +44,35 @@ export const getProjectRecommendations = async (userPreferences) => {
       n: 1,
     };
 
-    const response = await axios.post(
+    const response = await fetch( // Switched to fetch API
       OPENAI_CHAT_API_URL,
-      payload,
       {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
+        body: JSON.stringify(payload), // Stringify the body for fetch
       }
     );
 
+    if (!response.ok) { // Check for HTTP errors
+        const errorData = await response.json();
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json(); // Parse response as JSON
+
     // Corrected response parsing for OpenAI API
-    if (response.data && response.data.choices && response.data.choices.length > 0 &&
-        response.data.choices[0].message && response.data.choices[0].message.content) {
-      const rawText = response.data.choices[0].message.content.trim();
+    if (data && data.choices && data.choices.length > 0 &&
+        data.choices[0].message && data.choices[0].message.content) {
+      const rawText = data.choices[0].message.content.trim();
       return rawText.split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(line => line.length > 0);
     } else {
       throw new Error("Invalid response structure from OpenAI API for recommendations.");
     }
   } catch (error) {
-    console.error('AI Service: Error fetching project recommendations:', error.response ? JSON.stringify(error.response.data) : error.message);
+    console.error('AI Service: Error fetching project recommendations:', error.message);
     throw error;
   }
 };
@@ -104,26 +111,34 @@ export const generateProjectSummary = async (projectDetails) => {
       n: 1,
     };
 
-    const response = await axios.post(
+    const response = await fetch( // Switched to fetch API
       OPENAI_CHAT_API_URL,
-      payload,
       {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
+        body: JSON.stringify(payload), // Stringify the body for fetch
       }
     );
 
+    if (!response.ok) { // Check for HTTP errors
+        const errorData = await response.json();
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json(); // Parse response as JSON
+
     // Corrected response parsing for OpenAI API
-    if (response.data && response.data.choices && response.data.choices.length > 0 &&
-        response.data.choices[0].message && response.data.choices[0].message.content) {
-      return response.data.choices[0].message.content.trim();
+    if (data && data.choices && data.choices.length > 0 &&
+        data.choices[0].message && data.choices[0].message.content) {
+      return data.choices[0].message.content.trim();
     } else {
       throw new Error("Invalid response structure from OpenAI API for project summary.");
     }
   } catch (error) {
-    console.error('AI Service: Error generating project summary:', error.response ? JSON.stringify(error.response.data) : error.message);
+    console.error('AI Service: Error generating project summary:', error.message);
     throw error;
   }
 };
@@ -179,25 +194,33 @@ export const generateWorkLogSummary = async (githubRepoUrl, commitLimit = 10) =>
       n: 1,
     };
 
-    const response = await axios.post(
+    const response = await fetch( // Switched to fetch API
       OPENAI_CHAT_API_URL,
-      payload,
       {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
+        body: JSON.stringify(payload), // Stringify the body for fetch
       }
     );
 
-    if (response.data && response.data.choices && response.data.choices.length > 0 &&
-        response.data.choices[0].message && response.data.choices[0].message.content) {
-      return response.data.choices[0].message.content.trim();
+    if (!response.ok) { // Check for HTTP errors
+        const errorData = await response.json();
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json(); // Parse response as JSON
+
+    if (data && data.choices && data.choices.length > 0 &&
+        data.choices[0].message && data.choices[0].message.content) {
+      return data.choices[0].message.content.trim();
     } else {
       throw new Error("Invalid response structure from OpenAI API for work log summary.");
     }
   } catch (error) {
-    console.error('AI Service: Error generating work log summary:', error.response ? JSON.stringify(error.response.data) : error.message);
+    console.error('AI Service: Error generating work log summary:', error.message);
     // Propagate specific error messages if they are user-friendly
     if (error.message && (error.message.includes('GitHub token missing') || error.message.includes('Repository not found') || error.message.includes('rate limit exceeded'))) {
       return `Failed to generate work log: ${error.message}`;
