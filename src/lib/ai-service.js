@@ -1,5 +1,9 @@
 // src/lib/ai-service.js
+<<<<<<< HEAD
 import axios from "https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js";
+=======
+import axios from 'axios';
+>>>>>>> 4f55a7184f9095bbe4d6a2908be37121f0923d9a
 import { GitHubCommitsService } from './github-commits-service'; // Corrected import
 
 const OPENAI_CHAT_API_URL = 'https://api.openai.com/v1/chat/completions';
