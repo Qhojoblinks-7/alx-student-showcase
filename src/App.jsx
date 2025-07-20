@@ -29,7 +29,6 @@ const SetNewPasswordPage = React.lazy(() => (
   }))
 ));
 
-
 export default function App() {
   const { isInitialized } = useAuth();
 
