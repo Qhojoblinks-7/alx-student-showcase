@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { useAuth } from '@/hooks/use-auth.js';
-import { GitHubCommitsService, SocialContentOptimizer } from '@/lib/social-optimizer.js';
+import { GitHubCommitsService } from '@/lib/github-commits-service.js'; // Corrected import path for GitHubCommitsService
+import { SocialContentOptimizer } from '@/lib/social-optimizer.js'; // Corrected import path for SocialContentOptimizer
 import { toast } from 'sonner';
 import {
   Copy,
@@ -39,10 +40,11 @@ export function AutoWorkLogShare({ project, onClose }) {
   const [loadingWorkLog, setLoadingWorkLog] = useState(false);
   const [autoMode, setAutoMode] = useState(true);
   const [timeframe, setTimeframe] = useState('7');
-  // Removed optimizedContent state, will use useMemo directly
-
   const [selectedPlatforms, setSelectedPlatforms] = useState(new Set(['twitter', 'linkedin']));
   const [activeTab, setActiveTab] = useState('auto'); // State to control active tab
+
+  // New state to prevent re-fetching if config hasn't changed
+  const [hasFetchedForCurrentConfig, setHasFetchedForCurrentConfig] = useState(false);
 
   // Memoize the optimized content based on project, workLog, and customMessage
   const memoizedOptimizedContent = useMemo(() => {
@@ -52,6 +54,7 @@ export function AutoWorkLogShare({ project, onClose }) {
       const content = SocialContentOptimizer.generatePlatformContent(
         project,
         workLog,
+        [], // rawCommits are not directly used here for AI summary, but can be passed if SocialContentOptimizer needs them
         customMessage
       );
       console.log('[AutoWorkLogShare Debug] Optimized Content (from useMemo):', content);
@@ -62,20 +65,7 @@ export function AutoWorkLogShare({ project, onClose }) {
   }, [project, workLog, customMessage]);
 
 
-  // Auto-fetch work log on component mount or when dependencies change
-  useEffect(() => {
-    console.log('[AutoWorkLogShare Debug] useEffect: autoMode changed or project.github_url changed. autoMode:', autoMode, 'github_url:', project.github_url);
-    if (autoMode && project.github_url) {
-      fetchWorkLog();
-    } else if (!autoMode) {
-      console.log('[AutoWorkLogShare Debug] Auto mode is off. Not fetching work log.');
-      setWorkLog(null); // Clear work log if auto mode is off
-    } else if (!project.github_url) {
-      console.log('[AutoWorkLogShare Debug] No GitHub URL provided. Cannot fetch work log.');
-      setWorkLog(null);
-    }
-  }, [project.github_url, timeframe, autoMode, fetchWorkLog]); // Added fetchWorkLog to deps
-
+  // Memoized fetch function to prevent unnecessary re-creations
   const fetchWorkLog = useCallback(async () => {
     console.log('[AutoWorkLogShare Debug] fetchWorkLog called.');
     if (!project.github_url) {
@@ -93,30 +83,55 @@ export function AutoWorkLogShare({ project, onClose }) {
       console.log('[AutoWorkLogShare Debug] Parsed GitHub Info:', githubInfo);
 
       const log = await GitHubCommitsService.generateWorkLog(
-        githubInfo.username,
-        githubInfo.repoName,
+        githubInfo.owner,
+        githubInfo.repo,
         parseInt(timeframe)
       );
 
       if (log) {
         setWorkLog(log);
+        setHasFetchedForCurrentConfig(true); // Mark as fetched for this config
         toast.success(`Fetched ${log.commitCount} commits from the last ${timeframe} days`);
         console.log('[AutoWorkLogShare Debug] Work log fetched successfully:', log);
       } else {
         toast.warning(`No commits found in the last ${timeframe} days`);
         setWorkLog(null);
+        setHasFetchedForCurrentConfig(false); // Reset if no commits found
         console.log('[AutoWorkLogShare Debug] No commits found for work log.');
       }
     } catch (error) {
-      // Explicitly convert error to string for robust logging
       console.error('[AutoWorkLogShare Debug] Error fetching work log:', error.message ? String(error.message) : String(error));
       toast.error('Failed to fetch work log: ' + (error.message || 'Unknown error'));
       setWorkLog(null);
+      setHasFetchedForCurrentConfig(false); // Reset on error
     } finally {
       setLoadingWorkLog(false);
       console.log('[AutoWorkLogShare Debug] setLoadingWorkLog(false)');
     }
+  }, [project.github_url, timeframe]); // Dependencies for useCallback
+
+  // Effect to reset hasFetchedForCurrentConfig when relevant dependencies change
+  useEffect(() => {
+    console.log('[AutoWorkLogShare Debug] Resetting hasFetchedForCurrentConfig due to dependency change.');
+    setHasFetchedForCurrentConfig(false);
   }, [project.github_url, timeframe]);
+
+  // Effect to trigger fetching based on autoMode and fetch status
+  useEffect(() => {
+    console.log('[AutoWorkLogShare Debug] Main useEffect: autoMode:', autoMode, 'github_url:', project.github_url, 'hasFetchedForCurrentConfig:', hasFetchedForCurrentConfig);
+    if (autoMode && project.github_url && !hasFetchedForCurrentConfig) {
+      fetchWorkLog();
+    } else if (!autoMode) {
+      console.log('[AutoWorkLogShare Debug] Auto mode is off. Clearing work log.');
+      setWorkLog(null);
+      setHasFetchedForCurrentConfig(false); // Clear and reset if auto mode is off
+    } else if (!project.github_url) {
+      console.log('[AutoWorkLogShare Debug] No GitHub URL provided. Cannot fetch work log.');
+      setWorkLog(null);
+      setHasFetchedForCurrentConfig(false); // Clear and reset if no GitHub URL
+    }
+  }, [autoMode, project.github_url, fetchWorkLog, hasFetchedForCurrentConfig]);
+
 
   const copyToClipboard = async (text) => {
     try {
@@ -226,7 +241,7 @@ export function AutoWorkLogShare({ project, onClose }) {
                 size="sm"
                 onClick={() => shareToSocial(platform, content)}
                 className="flex-1"
-                disabled={!isSelected} // This button is disabled if the platform is not selected
+                disabled={!isSelected}
               >
                 Share
               </Button>
