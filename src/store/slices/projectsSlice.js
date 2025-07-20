@@ -1,6 +1,8 @@
 // src/store/slices/projectsSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { supabase } from '../../lib/supabase.js'; // Correct path to supabase client
+// Import the fulfilled action type from the githubSlice to listen for its completion
+import { importSelectedProjects } from './githubSlice.js'; // Ensure this path is correct
 
 // Async Thunks
 export const fetchProjects = createAsyncThunk(
@@ -13,7 +15,7 @@ export const fetchProjects = createAsyncThunk(
       // Select all necessary fields, using 'category' instead of 'project_type'
       const { data, error } = await supabase
         .from('projects')
-        .select('id, user_id, title, description, technologies, github_url, live_url, category, original_repo_name, alx_confidence, last_updated, is_public, created_at, updated_at, image_url, difficulty_level, completion_date, time_spent_hours, key_learnings, challenges_faced, tags')
+        .select('id, user_id, title, description, technologies, github_url, live_url, category, original_repo_name, alx_confidence, last_updated, is_public, created_at, updated_at, image_url, difficulty_level, completion_date, time_spent_hours, key_learnings, challenges_faced, tags, ai_summary, ai_work_log, is_ai_processed, ai_error') // ADDED AI fields
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -141,11 +143,22 @@ export const deleteProject = createAsyncThunk(
   }
 );
 
-export const initialState = { // Added 'export' keyword here
+export const initialState = {
   projects: [],
   stats: { total: 0, public: 0, technologies: 0 },
   isLoading: false,
   error: null,
+  filters: { // Added filters to initial state
+    category: 'all',
+    isPublic: 'all',
+    searchTerm: '',
+  },
+  currentProject: null, // Added currentProject to initial state
+  isCreating: false, // Added specific loading states
+  isUpdating: false,
+  isDeleting: false,
+  isImporting: false, // This refers to projectsSlice's own import status if any, not GitHub import
+  isFetchingSingleProject: false, // Added for fetching a single project
 };
 
 const projectsSlice = createSlice({
@@ -153,6 +166,15 @@ const projectsSlice = createSlice({
   initialState,
   reducers: {
     // Synchronous reducers if needed
+    setProjectFilters: (state, action) => { // Added reducer for filters
+      state.filters = { ...state.filters, ...action.payload };
+    },
+    setCurrentProject: (state, action) => { // Added reducer for current project
+      state.currentProject = action.payload;
+    },
+    clearCurrentProject: (state) => { // Added reducer to clear current project
+      state.currentProject = null;
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -182,50 +204,85 @@ const projectsSlice = createSlice({
       })
       // Add Project
       .addCase(addProject.pending, (state) => {
-        state.isLoading = true;
+        state.isCreating = true; // Use specific loading state
         state.error = null;
       })
       .addCase(addProject.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.isCreating = false;
         state.projects.unshift(action.payload); // Add new project to the beginning of the list
       })
       .addCase(addProject.rejected, (state, action) => {
-        state.isLoading = false;
+        state.isCreating = false;
         state.error = action.payload;
       })
       // Update Project
       .addCase(updateProject.pending, (state) => {
-        state.isLoading = true;
+        state.isUpdating = true; // Use specific loading state
         state.error = null;
       })
       .addCase(updateProject.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.isUpdating = false;
         const updatedProject = action.payload;
         state.projects = state.projects.map((project) =>
           project.id === updatedProject.id ? updatedProject : project
         );
+        // If the updated project is the current one, update it too
+        if (state.currentProject && state.currentProject.id === updatedProject.id) {
+          state.currentProject = updatedProject;
+        }
       })
       .addCase(updateProject.rejected, (state, action) => {
-        state.isLoading = false;
+        state.isUpdating = false;
         state.error = action.payload;
       })
       // Delete Project
       .addCase(deleteProject.pending, (state) => {
-        state.isLoading = true; // Or a specific isDeleting state
+        state.isDeleting = true; // Use specific loading state
         state.error = null;
       })
       .addCase(deleteProject.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.isDeleting = false;
         const deletedProjectId = action.payload;
         state.projects = state.projects.filter((project) => project.id !== deletedProjectId);
+        // Clear current project if it was the one deleted
+        if (state.currentProject && state.currentProject.id === deletedProjectId) {
+          state.currentProject = null;
+        }
       })
       .addCase(deleteProject.rejected, (state, action) => {
-        state.isLoading = false;
+        state.isDeleting = false;
         state.error = action.payload;
+      })
+      // NEW: Handle projects imported from GitHub (which are already AI-processed)
+      .addCase(importSelectedProjects.fulfilled, (state, action) => {
+        // action.payload here is an array of projects, already inserted into Supabase
+        // and processed with AI by the githubSlice's importSelectedProjects thunk.
+        // We need to add these to the projects state.
+        const newProjects = action.payload;
+        newProjects.forEach(newProject => {
+          // Check if the project already exists (e.g., if re-fetching all projects)
+          // If it doesn't, add it. This prevents duplicates if fetchProjects runs later.
+          const exists = state.projects.some(p => p.id === newProject.id);
+          if (!exists) {
+            state.projects.unshift(newProject); // Add to the beginning
+          } else {
+            // If it exists, update it (e.g., if AI processing updated an already fetched project)
+            state.projects = state.projects.map(p =>
+              p.id === newProject.id ? newProject : p
+            );
+          }
+        });
+        // Optionally, you might want to re-fetch stats here if they are not automatically updated
+        // dispatch(fetchProjectStats(userId)); // This would require dispatch from a thunk
+        // For now, rely on a separate dispatch of fetchProjectStats or a selector re-calculation
       });
   },
 });
 
-export const { } = projectsSlice.actions; // No synchronous actions currently
+export const {
+  setProjectFilters,
+  setCurrentProject,
+  clearCurrentProject,
+} = projectsSlice.actions;
 
 export default projectsSlice.reducer;

@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from './../lib/supabase.js'; // Added supabase import
-import { 
+import {
   // Removed checkAuthStatus as it's no longer exported or needed here
-  signOut as signOutAction, 
-  setUser, 
-  clearUser 
+  signOut as signOutAction,
+  setUser,
+  clearUser
 } from '../store/slices/authSlice.js'; // Added authSlice imports
 
 /**
@@ -30,43 +30,20 @@ export const useAppSelector = useSelector;
  * @returns {object} An object containing the 'auth' state and the dispatch function.
  */
 export const useAuth = () => {
-  const dispatch = useDispatch();
-  const { user, isAuthenticated, isLoading, error, isInitialized } = useSelector(state => state.auth);
+  const dispatch = useAppDispatch(); // Use useAppDispatch here
+  const { user, isAuthenticated, isLoading, error, isInitialized } = useAppSelector(state => state.auth); // Use useAppSelector
 
-  useEffect(() => {
-    // The initial auth status check and listener setup are now handled
-    // by the initializeSupabase function in auth-service.js and the
-    // useAuth hook in src/hooks/use-auth.js.
-    // This useEffect in custom-redux-hooks is no longer needed for auth initialization.
-
-    // 2. Set up the Supabase auth state change listener
-    // This listener should only be set up once and cleaned up on unmount.
-    // It dispatches Redux actions to keep the store in sync with real-time auth changes.
-    // Ensure supabase is initialized before attaching listener
-    if (supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        // Dispatch Redux actions to update the store based on auth state changes
-        if (session?.user) {
-          dispatch(setUser(session.user));
-        } else {
-          dispatch(clearUser());
-        }
-      });
-
-      // Cleanup function: unsubscribe from the auth listener when the component unmounts
-      return () => {
-        if (subscription && typeof subscription.unsubscribe === 'function') {
-          subscription.unsubscribe();
-        }
-      };
-    }
-  }, [dispatch]); // `dispatch` is stable, so this effect effectively runs once on mount.
+  // Removed the useEffect for supabase.auth.onAuthStateChange listener.
+  // This listener should be set up once at the application's root (e.g., in an AuthProvider component)
+  // or a dedicated initialization file (like auth-service.js), not in a hook that
+  // might be called multiple times by different components.
+  // The comment in the original code already noted this.
 
   const signOut = async () => {
     try {
       await dispatch(signOutAction()).unwrap();
-    } catch (error) {
-      console.error('Sign out error:', error.message ? String(error.message) : String(error)); // Explicitly convert error to string
+    } catch (signOutError) {
+      console.error('Sign out error:', signOutError.message ? String(signOutError.message) : String(signOutError)); // Explicitly convert error to string
     }
   };
 
@@ -88,7 +65,7 @@ export const useAuth = () => {
 export const useProjects = () => {
   const dispatch = useAppDispatch();
   const projects = useAppSelector(state => state.projects); // Assumes a 'projects' slice in your Redux store
-  
+
   return {
     ...projects,
     dispatch,
@@ -103,7 +80,7 @@ export const useProjects = () => {
 export const useUI = () => {
   const dispatch = useAppDispatch();
   const ui = useAppSelector(state => state.ui); // Assumes a 'ui' slice in your Redux store
-  
+
   return {
     ...ui,
     dispatch,
@@ -118,7 +95,7 @@ export const useUI = () => {
 export const useSharing = () => {
   const dispatch = useAppDispatch();
   const sharing = useAppSelector(state => state.sharing); // Assumes a 'sharing' slice in your Redux store
-  
+
   return {
     ...sharing,
     dispatch,
@@ -133,7 +110,7 @@ export const useSharing = () => {
 export const useGitHub = () => {
   const dispatch = useAppDispatch();
   const github = useAppSelector(state => state.github); // Assumes a 'github' slice in your Redux store
-  
+
   return {
     ...github,
     dispatch,

@@ -44,8 +44,8 @@ import { ProjectList } from '../components/projects/ProjectList';
 import { UserProfile } from '../components/profile/UserProfile';
 import { GitHubImportWizard } from '../components/github/GitHubImportWizard';
 import { ShareProjectModal } from '../components/sharing/ShareProjectModal';
-import { AutoWorkLogShare } from '../components/sharing/AutoWorkLogShare';
-import { WorkLogGenerator } from '../components/sharing/WorkLogGenerator';
+// import { AutoWorkLogShare } from '../components/sharing/AutoWorkLogShare'; // Removed as its functionality is now in ShareProjectModal
+import { WorkLogGenerator } from '../components/sharing/WorkLogGenerator'; // Kept for general work log generation
 import { DashboardStats } from '../components/DashboardStats';
 import { OnboardingDialog } from './OnboardingDialog';
 import { ProjectSearch } from '../components/projects/ProjectSearch'; // Import ProjectSearch
@@ -54,7 +54,7 @@ import { ProjectSearch } from '../components/projects/ProjectSearch'; // Import 
 export function Dashboard() {
   const dispatch = useDispatch();
   const { user, signOut, loading: authLoading } = useAuth(); // Get user and signOut from useAuth
-  
+
   // Get UI state values using their respective selectors
   const activeTab = useAppSelector((state) => state.ui.activeTab); // Use useAppSelector
   const modals = useAppSelector((state) => state.ui.modals); // Use useAppSelector
@@ -67,8 +67,8 @@ export function Dashboard() {
 
   const [editingProject, setEditingProject] = useState(null);
   const [sharingProject, setSharingProject] = useState(null);
-  const [showAutoWorkLogShare, setShowAutoWorkLogShare] = useState(false);
-  const [showWorkLogGenerator, setShowWorkLogGenerator] = useState(false);
+  // const [showAutoWorkLogShare, setShowAutoWorkLogShare] = useState(false); // Removed
+  const [showWorkLogGenerator, setShowWorkLogGenerator] = useState(false); // Kept
   const [isSheetOpen, setIsSheetOpen] = useState(false); // State to control Sheet visibility
   const [showOnboarding, setShowOnboarding] = useState(false); // State for onboarding dialog
   const [filters, setFilters] = useState({
@@ -96,55 +96,47 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-  document.documentElement.classList.remove('dark', 'light');
-  document.documentElement.classList.add(theme);
-  console.log('Document classes after toggling theme:', document.documentElement.classList);
-}, [theme]);
+    document.documentElement.classList.remove('dark', 'light');
+    document.documentElement.classList.add(theme);
+    console.log('Document classes after toggling theme:', document.documentElement.classList);
+  }, [theme]);
 
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       await signOut();
       toast.success('Signed out successfully!');
     } catch (error) {
       toast.error('Failed to sign out: ' + (error.message || 'Unknown error'));
     }
-  };
+  }, [signOut]);
 
-  const handleAddProjectClick = () => {
+  const handleAddProjectClick = useCallback(() => {
     setEditingProject(null); // Clear any existing project for "Add New"
     dispatch(openModal({ modalName: 'projectForm' })); // Dispatch openModal action
-  };
+  }, [dispatch]);
 
-  const handleEditProject = (project) => {
+  const handleEditProject = useCallback((project) => {
     setEditingProject(project);
     dispatch(openModal({ modalName: 'projectForm', data: project })); // Dispatch openModal action with data
-  };
+  }, [dispatch]);
 
-  const handleShareProject = (project) => {
+  const handleShareProject = useCallback((project) => { // This now handles opening the comprehensive ShareProjectModal
     setSharingProject(project);
     dispatch(openModal({ modalName: 'shareProject', data: project })); // Dispatch openModal action with data
-  };
+  }, [dispatch]);
 
-  const handleOpenAutoWorkLogShare = (project) => {
-    setSharingProject(project);
-    setShowAutoWorkLogShare(true);
-  };
+  // Removed handleOpenAutoWorkLogShare and handleCloseAutoWorkLogShare as AutoWorkLogShare is integrated
 
-  const handleCloseAutoWorkLogShare = () => {
-    setShowAutoWorkLogShare(false);
-    setSharingProject(null);
-  };
-
-  const handleOpenWorkLogGenerator = () => {
+  const handleOpenWorkLogGenerator = useCallback(() => { // Kept for general work log generation
     setShowWorkLogGenerator(true);
-  };
+  }, []);
 
-  const handleCloseWorkLogGenerator = () => {
+  const handleCloseWorkLogGenerator = useCallback(() => { // Kept for general work log generation
     setShowWorkLogGenerator(false);
-  };
+  }, []);
 
-  const handleGitHubImportComplete = () => {
+  const handleGitHubImportComplete = useCallback(() => {
     dispatch(closeModal('gitHubImport')); // Dispatch closeModal action
     dispatch(setWizardStep('username')); // Reset wizard step
     if (user?.id) {
@@ -152,46 +144,46 @@ export function Dashboard() {
       dispatch(fetchProjectStats(user.id)); // Re-fetch stats after import
     }
     toast.success('GitHub projects imported successfully!');
-  };
+  }, [dispatch, user?.id]);
 
-  const handleProjectFormSuccess = () => {
+  const handleProjectFormSuccess = useCallback(() => {
     dispatch(closeModal('projectForm')); // Dispatch closeModal action
     setEditingProject(null);
     if (user?.id) {
       dispatch(fetchProjects(user.id)); // Re-fetch projects after add/edit
       dispatch(fetchProjectStats(user.id)); // Re-fetch stats after add/edit
     }
-  };
+  }, [dispatch, user?.id]);
 
-  const handleProjectFormCancel = () => {
+  const handleProjectFormCancel = useCallback(() => {
     dispatch(closeModal('projectForm')); // Dispatch closeModal action
     setEditingProject(null);
-  };
+  }, [dispatch]);
 
-  const handleShareModalClose = () => {
+  const handleShareModalClose = useCallback(() => {
     dispatch(closeModal('shareProject')); // Dispatch closeModal action
     setSharingProject(null);
-  };
+  }, [dispatch]);
 
-  const handleOpenUserProfile = () => {
+  const handleOpenUserProfile = useCallback(() => {
     dispatch(openModal({ modalName: 'userProfile' })); // Dispatch openModal action
-  };
+  }, [dispatch]);
 
-  const handleCloseUserProfile = () => {
+  const handleCloseUserProfile = useCallback(() => {
     dispatch(closeModal('userProfile')); // Dispatch closeModal action
-  };
+  }, [dispatch]);
 
-  const handleOpenGitHubImport = () => {
+  const handleOpenGitHubImport = useCallback(() => {
     dispatch(openModal({ modalName: 'gitHubImport' })); // Dispatch openModal action
-  };
+  }, [dispatch]);
 
-  const handleCloseGitHubImport = () => {
+  const handleCloseGitHubImport = useCallback(() => {
     dispatch(closeModal('gitHubImport')); // Dispatch closeModal action
     dispatch(setWizardStep('username')); // Reset wizard step on close
-  };
+  }, [dispatch]);
 
   // Handle actions from the OnboardingDialog
-  const handleOnboardingAction = (actionType) => {
+  const handleOnboardingAction = useCallback((actionType) => {
     setShowOnboarding(false); // Close onboarding dialog
     setIsSheetOpen(false); // Close mobile sheet if open
 
@@ -211,7 +203,7 @@ export function Dashboard() {
       default:
         break;
     }
-  };
+  }, [dispatch, handleAddProjectClick, handleOpenGitHubImport]); // Added missing dependencies
 
   // Render loading state if auth is still loading
   if (authLoading) {
@@ -269,7 +261,7 @@ export function Dashboard() {
           </h1>
         </div>
 
-        
+
 
         {/* Right side: Add Project, GitHub Import, Theme Toggle, User Dropdown */}
         <div className="flex items-center gap-2 sm:gap-4"> {/* Adjusted gap for smaller screens */}
@@ -310,7 +302,7 @@ export function Dashboard() {
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleOpenWorkLogGenerator}>
+              <DropdownMenuItem onClick={handleOpenWorkLogGenerator}> {/* This now opens the standalone WorkLogGenerator */}
                 <CalendarDays className="mr-2 h-4 w-4" />
                 Work Log Generator
               </DropdownMenuItem>
@@ -396,7 +388,7 @@ export function Dashboard() {
             ) : (
               <div className="space-y-6">
                 <ProjectSearch onSearch={(newFilters) => setFilters(newFilters)} />
-                <ProjectList filters={filters} onEdit={handleEditProject} onShare={handleOpenAutoWorkLogShare} />
+                <ProjectList filters={filters} onEdit={handleEditProject} onShare={handleShareProject} /> {/* Changed onShare to use handleShareProject */}
               </div>
             )}
           </TabsContent>
@@ -448,14 +440,8 @@ export function Dashboard() {
         />
       )}
 
-      {showAutoWorkLogShare && sharingProject && (
-        <AutoWorkLogShare
-          project={sharingProject}
-          onClose={handleCloseAutoWorkLogShare}
-        />
-      )}
-
-      {showWorkLogGenerator && (
+      {/* Removed showAutoWorkLogShare modal */}
+      {showWorkLogGenerator && ( // Kept for general work log generation
         <WorkLogGenerator
           onClose={handleCloseWorkLogGenerator}
         />
@@ -475,4 +461,3 @@ export function Dashboard() {
 Dashboard.propTypes = {
   // No specific props for Dashboard, but can be defined if needed.
 };
-
