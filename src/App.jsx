@@ -1,15 +1,9 @@
-<<<<<<< HEAD
-import React, { useEffect, Suspense } from 'react'; // Import Suspense
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-=======
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
->>>>>>> 4f55a7184f9095bbe4d6a2908be37121f0923d9a
 import { Toaster } from 'sonner';
 import { useAuth } from './hooks/use-auth'; // Your useAuth hook
 import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state
 
-<<<<<<< HEAD
 // Dynamically import route components using React.lazy
 // This will create separate JavaScript chunks for each of these components
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -34,25 +28,25 @@ const SetNewPasswordPage = React.lazy(() => (
     )
   }))
 ));
-=======
-// Directly import route components
-import { SignInPage } from './components/auth/SignInPage';
-import { SignUpPage } from './components/auth/SignUpPage';
-import { PasswordResetPage } from './components/auth/PasswordResetPage';
-import AuthForm from './components/auth/AuthForm';
-import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Direct import for named export
-import { AuthRedirect } from './components/AuthRedirect'
-import { Dashboard } from './components/Dashboard'; // Direct import for named export
-import { LandingPage } from './components/LandingPage'; // Import the LandingPage
-import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state in ProtectedRoute/AuthRedirect
+// // Directly import route components
+// import { SignInPage } from './components/auth/SignInPage';
+// import { SignUpPage } from './components/auth/SignUpPage';
+// import { PasswordResetPage } from './components/auth/PasswordResetPage';
+// import AuthForm from './components/auth/AuthForm';
+// import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Direct import for named export
+// import { AuthRedirect } from './components/AuthRedirect'
+// import { Dashboard } from './components/Dashboard'; // Direct import for named export
+// import { LandingPage } from './components/LandingPage'; // Import the LandingPage
+// import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state in ProtectedRoute/AuthRedirect
 
-const SetNewPasswordPage = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
-    <h2 className="text-2xl font-bold mb-4 text-center">Set Your New Password</h2>
-    <AuthForm mode="update_password" />
-  </div>
-);
->>>>>>> 4f55a7184f9095bbe4d6a2908be37121f0923d9a
+// const SetNewPasswordPage = () => (
+//   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
+//     <h2 className="text-2xl font-bold mb-4 text-center">Set Your New Password</h2>
+//     <AuthForm mode="update_password" />
+//   </div>
+// );
+
+// Removed safeLog function as it's no longer needed for debugging.
 
 export default function App() {
   const { isInitialized } = useAuth();
@@ -75,37 +69,6 @@ export default function App() {
 
   return (
     <Router>
-<<<<<<< HEAD
-      {/* Wrap your Routes with Suspense to show a fallback while lazy components load */}
-      <Suspense fallback={
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          <span className="ml-2 text-lg text-gray-600">Loading page...</span>
-        </div>
-      }>
-        <Routes>
-          {/* Public Routes - Wrapped with AuthRedirect to redirect authenticated users */}
-          <Route path="/" element={<AuthRedirect><LandingPage /></AuthRedirect>} />
-          <Route path="/signin" element={<AuthRedirect><SignInPage /></AuthRedirect>} />
-          <Route path="/signup" element={<AuthRedirect><SignUpPage /></AuthRedirect>} />
-          <Route path="/reset-password" element={<AuthRedirect><PasswordResetPage /></AuthRedirect>} />
-          <Route path="/reset-password-confirm" element={<AuthRedirect><SetNewPasswordPage /></AuthRedirect>} />
-
-          {/* Protected Route - Wrapped with ProtectedRoute to guard access */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Fallback route for any unmatched paths. */}
-          <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        </Routes>
-      </Suspense>
-=======
       <Routes>
         {/* Public Routes - Wrapped with AuthRedirect to redirect authenticated users */}
         {/* These routes should only be accessible if the user is NOT authenticated */}
@@ -131,7 +94,6 @@ export default function App() {
             redirection to signin if the user is not authenticated. */}
         <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
->>>>>>> 4f55a7184f9095bbe4d6a2908be37121f0923d9a
       <Toaster position="bottom-right" richColors />
     </Router>
   );
