@@ -34,7 +34,7 @@ import {
 // Corrected import path for GitHubCommitsService
 import { GitHubCommitsService } from '@/lib/github-commits-service.js';
 import { SocialContentOptimizer } from '@/lib/social-optimizer.js'; // Import SocialContentOptimizer
-
+import { Tabs } from '../ui/tabs';
 export function ShareProjectModal({ project, onClose }) {
   const projectUrl = project.live_url || project.github_url || '';
   const [copied, setCopied] = useState(false);
