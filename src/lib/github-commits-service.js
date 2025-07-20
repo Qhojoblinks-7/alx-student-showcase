@@ -8,6 +8,7 @@
 // Placeholder for an actual API key if needed for higher rate limits or private repos.
 // For public repositories, GitHub's unauthenticated rate limit is usually sufficient.
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const GITHUB_API_TOKEN = import.meta.env.VITE_GITHUB_API_TOKEN; // Load GitHub API token from environment variables
 
 /**
  * Parses a GitHub repository URL to extract the username and repository name.
