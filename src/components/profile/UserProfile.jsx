@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog.jsx'; // Import Dialog components
 import { ProjectForm } from '../projects/ProjectForm.jsx'; // Import the ProjectForm component
 import { ProjectList } from '../projects/ProjectList.jsx'; // Import the ProjectList component
+import { openModal } from '@/store/slices/uiSlice.js';
 
 export function UserProfile() {
   const { user } = useAuth();
@@ -38,6 +39,8 @@ export function UserProfile() {
   ]);
   const [recommendations, setRecommendations] = useState([]);
   const [summary, setSummary] = useState('');
+  const [sharingProject, setSharingProject] = useState(null);
+  const [loadingWorkLog, setLoadingWorkLog] = useState(false);
 
   // State for ProjectForm modal
   const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
@@ -248,6 +251,9 @@ export function UserProfile() {
   };
 
   const handleShareProject = (project) => {
+
+    setSharingProject(project);
+    dispatch(openModal({ modalName: 'shareProject', data: project }));
     // This function would typically open a share modal or trigger share logic
     toast.info(`Share functionality triggered for project: ${project.title}`);
     // You might dispatch an action here to open a Redux-managed share modal
