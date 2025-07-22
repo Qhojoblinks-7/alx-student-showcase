@@ -16,7 +16,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog.j
 import { ProjectForm } from '../projects/ProjectForm.jsx'; // Import the ProjectForm component
 import { ProjectList } from '../projects/ProjectList.jsx'; // Import the ProjectList component
 import { openModal } from '@/store/slices/uiSlice.js';
+<<<<<<< HEAD
 import { useDispatch } from 'react-redux';
+=======
+>>>>>>> f1104ef493a8804b00c9a7046787abab60828f78
 
 export function UserProfile() {
   const dispatch = useDispatch();
