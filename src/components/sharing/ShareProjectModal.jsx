@@ -471,7 +471,7 @@ export function ShareProjectModal({ project, onClose }) {
                           {loadingWorkLog ? (
                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                           ) : (
-                            <RefreshCw className="h-4 w-4 mr-1" />
+                            <RefreshCw className="h-4 w-4 mr-1 dark:text-gray-50" />
                           )}
                           Refresh
                         </Button>
