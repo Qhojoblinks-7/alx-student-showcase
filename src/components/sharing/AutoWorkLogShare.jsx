@@ -316,7 +316,7 @@ export function AutoWorkLogShare({ project, onClose }) {
 
         <div className="space-y-6">
           {/* Auto Work Log Controls */}
-          <Card className="bg-gradient-to-r from-green-50 to-blue-50">
+          <Card className="bg-gradient-to-r from-green-100 to-blue-100">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">

@@ -435,7 +435,7 @@ export function ShareProjectModal({ project, onClose }) {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <Zap className="h-5 w-5 text-green-600" />
-                        <Label htmlFor="auto-mode" className="font-semibold">Auto Work Log</Label>
+                        <Label htmlFor="auto-mode" className="font-semibold dark:text-gray-800">Auto Work Log</Label>
                       </div>
                       <Switch
                         id="auto-mode"
