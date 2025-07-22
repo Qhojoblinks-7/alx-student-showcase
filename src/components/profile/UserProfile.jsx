@@ -58,7 +58,7 @@ export function UserProfile() {
     try {
       // Fetch user profile data
       const { data: userData, error: userError } = await supabase
-        .from('users')
+        .from('profiles') // Assuming 'profiles' is the correct table for user profiles
         .select('*')
         .eq('id', user.id)
         .single();
@@ -167,7 +167,7 @@ export function UserProfile() {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('users')
+        .from('profiles')
         .upsert({
           id: user.id,
           email: user.email, // Ensure email is also passed for upsert

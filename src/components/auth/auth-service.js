@@ -74,7 +74,7 @@ export class AuthService {
 
   static async updateUserProfile(userId, updates) {
     const { data, error } = await supabase
-      .from('users')
+      .from('priofiles')
       .upsert({ id: userId, ...updates })
       .select();
     if (error) throw error;

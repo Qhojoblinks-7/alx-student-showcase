@@ -30,7 +30,7 @@ export function DatabaseErrorHandler({ children }) {
       // This attempts to select a count from the 'users' table.
       // If the table doesn't exist, Supabase's PostgREST API will return an error with code 'PGRST116'.
       const { data: tablesData, error: tablesError } = await supabase
-        .from('users') // Assuming 'users' is a critical, required table for your app
+        .from('profiles') // Assuming 'users' is a critical, required table for your app
         .select('count')
         .limit(1);
 
@@ -76,7 +76,7 @@ export function DatabaseErrorHandler({ children }) {
 
           for (let i = 0; i < MAX_RETRIES; i++) {
             const { data: profileData, error: profileError } = await supabase
-              .from('users')
+              .from(profiles)
               .select('id') // Just need to confirm existence
               .eq('id', testUser.id)
               .single(); // Use .single() as we expect one row for a specific ID

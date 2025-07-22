@@ -51,7 +51,7 @@ export class GitHubService {
   // Fetch user repositories
   static async fetchUserRepositories(username) {
     try {
-      const response = await fetch(`${GITHUB_API_BASE}/users/${username}/repos?per_page=100&sort=updated`, {
+      const response = await fetch(`${GITHUB_API_BASE}/profiles/${username}/repos?per_page=100&sort=updated`, {
         headers: getHeaders(), // Use authenticated headers
       });
       
