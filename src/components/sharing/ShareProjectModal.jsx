@@ -445,15 +445,15 @@ export function ShareProjectModal({ project, onClose }) {
                     </div>
 
                     {autoMode && (
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 dark:text-gray-800">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="timeframe">Timeframe:</Label>
                           <Select value={timeframe} onValueChange={setTimeframe}>
-                            <SelectTrigger className="w-32">
+                            <SelectTrigger className="w-32 ">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="1">1 day</SelectItem>
+                              <SelectItem value="1" >1 day</SelectItem>
                               <SelectItem value="3">3 days</SelectItem>
                               <SelectItem value="7">7 days</SelectItem>
                               <SelectItem value="14">14 days</SelectItem>
