@@ -445,14 +445,14 @@ export function ShareProjectModal({ project, onClose }) {
                     </div>
 
                     {autoMode && (
-                      <div className="flex items-center gap-4 dark:text-gray-800">
+                      <div className="flex items-center gap-4 dark:text-gray-50">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="timeframe" className="dark:text-gray-800">Timeframe:</Label>
                           <Select value={timeframe} onValueChange={setTimeframe}>
-                            <SelectTrigger className="w-32 ">
+                            <SelectTrigger className="w-32 dark:text-gray-800">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className={"dark:bg-gray-800 dark:text-gray-50"}>
                               <SelectItem value="1" >1 day</SelectItem>
                               <SelectItem value="3">3 days</SelectItem>
                               <SelectItem value="7">7 days</SelectItem>
@@ -467,6 +467,7 @@ export function ShareProjectModal({ project, onClose }) {
                           size="sm"
                           onClick={fetchWorkLog}
                           disabled={loadingWorkLog}
+                          className="dark:text-gray-50"
                         >
                           {loadingWorkLog ? (
                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
