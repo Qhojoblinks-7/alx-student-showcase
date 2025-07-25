@@ -1,357 +1,431 @@
+// src/store/slices/githubSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { GitHubService, ALXProjectDetector } from '../../lib/github-service.js';
-import { GitHubCommitsService } from '../../lib/github-commits-service.js'; // New import for commit fetching
-import { generateProjectSummary as aiGenerateProjectSummary, generateWorkLogSummary as aiGenerateWorkLogSummary } from '../../lib/ai-service.js'; // Corrected import for AI services
-import { supabase } from '../../lib/supabase.js'; // Import Supabase client
+import { githubService, ALXProjectDetector } from '../../components/service/github-service'; // Import the consolidated githubService
+import { aiService } from '../../components/service/ai-service'; // Assuming this path is correct
+import  selectGithubAccessToken  from './profileSlice'; // Import the selector
+
+// Initial State
+const initialState = {
+  repos: [],
+  status: 'idle', // 'idle' | 'loading_repos' | 'loading_alx' | 'analyzing_repo' | 'failed' | 'succeeded' | 'generating_worklog'
+  error: null,
+  currentStep: 1, // 1: Select Repo, 2: Review/Edit Project, 3: AI Insights, 4: Import Confirmation
+  isWizardOpen: false,
+  selectedRepo: null, // The currently selected repo object (from GitHub API, before AI analysis)
+  projectFormFields: { // Fields that map to the 'projects' table in Supabase
+    id: null, // This will be the UUID for the Supabase project entry
+    user_id: null,
+    github_id: null, // GitHub's internal ID
+    title: '',
+    description: '',
+    github_url: '',
+    is_public: true,
+    is_alx_project: false,
+    category: '', // Mapped from suggested_category
+    technologies: [], // Mapped from suggested_technologies
+    difficulty: '', // Mapped from suggested_difficulty
+    start_date: null,
+    end_date: null,
+    status: 'completed', // e.g., 'completed', 'in-progress', 'planned'
+    key_learnings: '',
+    challenges_faced: '',
+    solutions: '',
+    collaborators: [],
+    ai_summary: '',
+    ai_work_log: '',
+    ai_last_updated: null,
+        ai_social_posts: null, // <--- ADD THIS LINE
+
+    // Add any other fields your 'projects' table has
+  },
+  alxProjectsDetected: [],
+  selectedALXProject: null, // The project selected from the ALX detected list
+  workLogContent: '',
+  rawCommits: [], // Store raw commits for potential re-use/display
+    socialPosts: null, // <--- ADD THIS LINE (this will hold the generated social posts)
+
+};
 
 // Async Thunks
 
 /**
- * Fetches all repositories for a given GitHub username.
- * @param {string} username - The GitHub username.
+ * Fetches the current user's GitHub repositories.
+ * The githubAccessToken is passed from the profile state.
  */
-export const fetchUserRepositories = createAsyncThunk(
-  'github/fetchUserRepositories',
-  async (username, { rejectWithValue }) => {
+export const fetchRepos = createAsyncThunk(
+  'github/fetchRepos',
+  async (_, { getState, rejectWithValue }) => {
+    const githubAccessToken = selectGithubAccessToken(getState());
+    if (!githubAccessToken) {
+      return rejectWithValue('GitHub access token not available. Please connect your GitHub account.');
+    }
     try {
-      const response = await GitHubService.fetchUserRepositories(username);
-      return response;
+      const repos = await githubService.fetchUserRepositories(githubAccessToken);
+      return repos;
     } catch (error) {
-      console.error('Error in fetchUserRepositories thunk:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
+      console.error("Error in fetchRepos:", error);
+      if (error.message.includes('Unauthorized') || error.message.includes('Invalid or expired')) {
+        return rejectWithValue('Failed to fetch repositories. Please ensure your GitHub account is properly connected and re-authenticate.');
+      }
+      return rejectWithValue(error.message || 'Failed to fetch repositories.');
     }
   }
 );
 
 /**
- * Detects ALX projects from a list of repositories using ALXProjectDetector.
- * @param {object} payload - Contains repositories array and username string.
+ * Detects ALX projects from the fetched repositories.
  */
 export const detectALXProjects = createAsyncThunk(
   'github/detectALXProjects',
-  async ({ repositories, username }, { rejectWithValue }) => {
+  async (_, { getState, rejectWithValue }) => {
     try {
-      // ALXProjectDetector.detectALXProjects now returns an object { alxProjects: [...], skippedProjects: [...] }
-      const detectionResult = await ALXProjectDetector.detectALXProjects(repositories, username);
-      return detectionResult;
+      const { github: { repos } } = getState();
+      if (!repos || repos.length === 0) {
+        // This is not necessarily an error if no repos were found, just no ALX projects.
+        // But if `repos` is null/empty and we expect to operate on it, it indicates a preceding issue.
+        return []; // Return empty array if no repos, not an error
+      }
+      const detected = ALXProjectDetector.detectALXProjects(repos);
+      return detected;
     } catch (error) {
-      console.error('Error in detectALXProjects thunk:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
+      console.error("Error detecting ALX projects:", error);
+      return rejectWithValue(error.message || 'Failed to detect ALX projects.');
     }
   }
 );
 
 /**
- * Processes a list of projects with AI to generate summaries and work logs.
- * This thunk is designed to be chained after projects are imported or fetched.
- * @param {Array<Object>} projects - An array of project objects to process.
+ * Analyzes a selected GitHub repository, fetches additional info, and generates AI content.
  */
-export const processProjectsWithAI = createAsyncThunk(
-  'github/processProjectsWithAI',
-  async (projects, { rejectWithValue }) => {
-    const processedProjects = [];
-    for (const project of projects) {
-      try {
-        let ai_summary = null;
-        // Generate project summary if description or technologies exist
-        if (project.description || project.technologies) {
-          ai_summary = await aiGenerateProjectSummary({ // Corrected call
-            title: project.title,
-            description: project.description,
-            technologies: project.technologies,
-            github_url: project.github_url // Include GitHub URL for context if AI needs it
-          });
-        }
-
-        let ai_work_log = null;
-        // Generate work log if GitHub URL exists
-        if (project.github_url) {
-          // fetchRepositoryCommits is not a method of GitHubCommitsService.
-          // You should use GitHubCommitsService.fetchCommits to get raw commits
-          // and then pass the messages to aiGenerateWorkLogSummary.
-          // Or, if aiGenerateWorkLogSummary directly takes the URL, use that.
-          // Assuming aiGenerateWorkLogSummary takes the URL directly:
-          ai_work_log = await aiGenerateWorkLogSummary(project.github_url); // Pass URL, commitLimit is optional
-        }
-
-        processedProjects.push({
-          ...project,
-          ai_summary,
-          ai_work_log,
-          // Mark as AI processed if at least one AI field was generated
-          is_ai_processed: !!ai_summary || !!ai_work_log
-        });
-      } catch (aiError) {
-        console.error(`Error processing project ${project.title} with AI:`, String(aiError)); // Explicitly stringify error for console
-        // Push the project even if AI failed for it, but note the failure
-        processedProjects.push({
-          ...project,
-          ai_summary: null,
-          ai_work_log: null,
-          is_ai_processed: false,
-          ai_error: aiError.message ? String(aiError.message) : String(aiError) // Ensure error is a string
-        });
-      }
+export const analyzeRepository = createAsyncThunk(
+  'github/analyzeRepository',
+  async ({ owner, repoName, useAI = true }, { dispatch, getState, rejectWithValue }) => {
+    const githubAccessToken = selectGithubAccessToken(getState());
+    if (!githubAccessToken) {
+      return rejectWithValue('GitHub access token not available for repository analysis. Please connect your GitHub account.');
     }
-    return processedProjects;
+
+    try {
+      dispatch(githubSlice.actions.setStatus('analyzing_repo'));
+      dispatch(githubSlice.actions.setError(null));
+
+      // Fetch more detailed repo info using the user's token
+      const repoInfo = await githubService.fetchRepositoryInfo(owner, repoName, githubAccessToken);
+
+      // Extract default branch, falling back to 'main' or 'master' if needed
+      const defaultBranch = repoInfo.default_branch || 'main'; // GitHub's default is usually 'main' now
+
+      // Fetch commits for AI work log, passing the user's token
+      const rawCommits = await githubService.fetchRepositoryCommits(
+        owner,
+        repoName,
+        githubAccessToken, // Pass the user access token
+        null, // No sinceDate filter for now, get all
+        defaultBranch
+      );
+
+      let aiSummary = '';
+      let aiWorkLog = '';
+
+      if (useAI) {
+        // Generate AI Project Summary
+        aiSummary = await aiService.generateProjectSummary({
+          title: repoInfo.name,
+          description: repoInfo.description,
+          // Technologies can be inferred from repoInfo.language or repoInfo.topics
+          technologies: [...(repoInfo.topics || []), repoInfo.language].filter(Boolean),
+          key_learnings: '', // Not available from GitHub API
+          challenges_faced: '', // Not available from GitHub API
+        });
+
+        // Generate AI Work Log Summary from commits
+        if (rawCommits && rawCommits.length > 0) {
+          aiWorkLog = await aiService.generateWorkLogSummary(rawCommits);
+        } else {
+          aiWorkLog = "No recent commit data available to generate a detailed work log.";
+        }
+      } else {
+        aiSummary = "AI analysis skipped for this project.";
+        aiWorkLog = "AI work log generation skipped.";
+      }
+
+      // Prepare project form fields based on GitHub data and AI insights
+      const projectData = {
+        github_id: repoInfo.id,
+        title: repoInfo.name,
+        description: repoInfo.description,
+        github_url: repoInfo.html_url,
+        is_public: !repoInfo.is_private, // Use is_private from repoInfo
+        category: ALXProjectDetector.detectALXProjects([repoInfo])[0]?.suggested_category || 'Uncategorized',
+        technologies: ALXProjectDetector.detectALXProjects([repoInfo])[0]?.suggested_technologies || [repoInfo.language].filter(Boolean),
+        difficulty: ALXProjectDetector.detectALXProjects([repoInfo])[0]?.suggested_difficulty || 'Intermediate',
+        start_date: repoInfo.created_at ? new Date(repoInfo.created_at).toISOString().split('T')[0] : null,
+        end_date: repoInfo.updated_at ? new Date(repoInfo.updated_at).toISOString().split('T')[0] : null,
+        ai_summary: aiSummary,
+        ai_work_log: aiWorkLog,
+        ai_last_updated: new Date().toISOString(),
+        // Default values for other fields
+        status: 'completed',
+        key_learnings: '',
+        challenges_faced: '',
+        solutions: '',
+        collaborators: [],
+      };
+
+      dispatch(githubSlice.actions.setProjectFormFields(projectData));
+      dispatch(githubSlice.actions.setRawCommits(rawCommits)); // Store raw commits for potential display
+      dispatch(githubSlice.actions.setStatus('succeeded'));
+
+      return projectData;
+
+    } catch (error) {
+      console.error('Error analyzing repository:', error.message);
+      dispatch(githubSlice.actions.setError(error.message));
+      dispatch(githubSlice.actions.setStatus('failed'));
+      return rejectWithValue(error.message);
+    }
   }
 );
 
 /**
- * Imports selected projects into the Supabase database and then triggers AI processing.
- * @param {object} payload - Contains projectsToImport array and userId string.
+ * Fetches commits and generates a work log summary for a selected project.
  */
-export const importSelectedProjects = createAsyncThunk(
-  'github/importSelectedProjects',
-  async ({ projectsToImport, userId }, { rejectWithValue, dispatch }) => { // Added 'dispatch' here
-    console.log("[importSelectedProjects] Projects received for import:", projectsToImport);
+export const fetchCommitsAndGenerateWorkLog = createAsyncThunk(
+  'github/fetchCommitsAndGenerateWorkLog',
+  async ({ owner, repoName, branch, timeframe = 'all' }, { getState, rejectWithValue }) => {
+    const githubAccessToken = selectGithubAccessToken(getState());
+    if (!githubAccessToken) {
+      return rejectWithValue('GitHub access token not available for work log generation. Please connect your GitHub account.');
+    }
+
     try {
-      const importedFromDb = [];
-      for (const project of projectsToImport) {
-        // Prepare project data for Supabase insertion
-        const projectDataForDb = {
-          user_id: userId,
-          title: project.title,
-          description: project.description,
-          technologies: project.technologies || [],
-          github_url: project.github_url,
-          live_url: project.live_url,
-          category: project.category,
-          original_repo_name: project.original_repo_name,
-          alx_confidence: project.alx_confidence,
-          last_updated: project.last_updated,
-          is_public: project.is_public,
-          completion_date: project.completion_date || null,
-          time_spent_hours: project.time_spent_hours || null,
-          key_learnings: project.key_learnings || '',
-          challenges_faced: project.challenges_faced || '',
-          image_url: project.image_url || '',
-          tags: project.tags || [],
-          // Initialize AI-generated fields as null or empty
-          ai_summary: null,
-          ai_work_log: null,
-          is_ai_processed: false,
-          ai_error: null,
-        };
+      let sinceDate = null;
+      const now = new Date();
 
-        // Insert project into Supabase database
-        const { data, error } = await supabase
-          .from('projects')
-          .insert([projectDataForDb])
-          .select(); // Use .select() to get the newly inserted row
-
-        if (error) {
-          console.error("Supabase insert error:", String(error)); // Explicitly stringify error for console
-          throw new Error(`Failed to insert project ${project.title}: ${error.message}`);
-        }
-
-        if (data && data.length > 0) {
-          importedFromDb.push(data[0]); // Add the newly created project to the imported list
-        }
+      if (timeframe === 'last_week') {
+        const oneWeekAgo = new Date(now.setDate(now.getDate() - 7));
+        sinceDate = oneWeekAgo.toISOString();
+      } else if (timeframe === 'last_month') {
+        const oneMonthAgo = new Date(now.setMonth(now.getMonth() - 1));
+        sinceDate = oneMonthAgo.toISOString();
+      } else if (timeframe === 'last_3_months') {
+        const threeMonthsAgo = new Date(now.setMonth(now.getMonth() - 3));
+        sinceDate = threeMonthsAgo.toISOString();
       }
 
-      // After successful Supabase import, trigger AI processing for the newly imported projects
-      // The `unwrap()` method will either return the fulfilled value or throw the rejected value.
-      const processedWithAI = await dispatch(processProjectsWithAI(importedFromDb)).unwrap();
+      // Use the consolidated githubService.fetchRepositoryCommits
+      const commits = await githubService.fetchRepositoryCommits(
+        owner,
+        repoName,
+        githubAccessToken, // Pass the user's access token
+        sinceDate,
+        branch
+      );
 
-      return processedWithAI; // Return the projects, now enriched with AI data
+      if (!commits || commits.length === 0) {
+        return { workLog: 'No commits found for the selected repository or timeframe.', rawCommits: [] };
+      }
+
+      const workLogContent = await aiService.generateWorkLogSummary(commits);
+
+      return { workLog: workLogContent, rawCommits: commits };
     } catch (error) {
-      console.error('Error in importSelectedProjects thunk:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
+      console.error("Error generating work log:", error);
+      return rejectWithValue(error.message || 'Failed to generate work log.');
     }
   }
 );
 
 
-export const initialState = {
-  repositories: [],
-  alxProjects: [],
-  selectedProjects: [], // Projects selected for import (by ID)
-  importedProjects: [], // Projects successfully imported into the app (with DB IDs and AI data)
-  isLoadingRepositories: false,
-  isDetectingALX: false,
-  isImporting: false,
-  isProcessingAI: false, // New state for AI processing loading
-  error: null, // General error
-  repositoryError: null, // Error specific to fetching repositories
-  importError: null, // Error specific to importing projects to DB
-  aiProcessingError: null, // Error specific to AI processing
-  wizardStep: 'username', // 'username', 'select_repos', 'review_import'
-  wizardData: {
-    username: '',
-    selectedRepoIds: [],
-  },
-};
-
+// Slice Definition
 const githubSlice = createSlice({
   name: 'github',
   initialState,
   reducers: {
-    setRepositories: (state, action) => {
-      state.repositories = action.payload;
-    },
-    setALXProjects: (state, action) => {
-      state.alxProjects = action.payload;
-    },
-    toggleProjectSelection: (state, action) => {
-      const projectId = action.payload;
-      const isSelected = state.selectedProjects.includes(projectId);
-      if (isSelected) {
-        state.selectedProjects = state.selectedProjects.filter(id => id !== projectId);
-      } else {
-        state.selectedProjects.push(projectId);
-      }
-    },
-    setSelectedProjects: (state, action) => {
-      state.selectedProjects = action.payload;
-    },
-    setWizardStep: (state, action) => {
-      state.wizardStep = action.payload;
-    },
-    setWizardData: (state, action) => { // Corrected name from updateWizardData
-      state.wizardData = { ...state.wizardData, ...action.payload };
-    },
-    resetGitHubState: (state) => {
-      state.repositories = [];
-      state.alxProjects = [];
-      state.selectedProjects = [];
-      state.importedProjects = []; // Reset imported projects
-      state.isLoadingRepositories = false;
-      state.isDetectingALX = false;
-      state.isImporting = false;
-      state.isProcessingAI = false; // Reset AI loading state
+    openWizard: (state) => {
+    state.isWizardOpen = true;
+
+      state.currentStep = 1;
+      state.selectedRepo = null;
+      state.projectFormFields = initialState.projectFormFields;
+      state.alxProjectsDetected = [];
+      state.selectedALXProject = null;
+      state.workLogContent = '';
+      state.rawCommits = [];
       state.error = null;
-      state.repositoryError = null;
-      state.importError = null;
-      state.aiProcessingError = null; // Reset AI error state
-      state.wizardStep = 'username';
-      state.wizardData = {
-        username: '',
-        selectedRepoIds: [],
-      };
+      state.status = 'idle';
     },
-    clearGitHubErrors: (state) => {
-      state.error = null;
-      state.repositoryError = null;
-      state.importError = null;
-      state.aiProcessingError = null; // Clear AI errors
+    closeWizard: (state) => {
+      // Reset all state to initial when closing
+      Object.assign(state, initialState);
     },
-    clearSelection: (state) => {
-      state.selectedProjects = [];
+    setCurrentStep: (state, action) => {
+      state.currentStep = action.payload;
     },
-    resetWizard: (state) => {
-      state.repositories = [];
-      state.alxProjects = [];
-      state.selectedProjects = [];
-      state.isLoadingRepositories = false;
-      state.isDetectingALX = false;
-      state.isImporting = false;
-      state.isProcessingAI = false;
-      state.error = null;
-      state.repositoryError = null;
-      state.importError = null;
-      state.aiProcessingError = null;
-      state.wizardStep = 'username';
-      state.wizardData = { username: '', selectedRepoIds: [] };
-    }
+    selectRepo: (state, action) => {
+      state.selectedRepo = action.payload;
+      // Optionally pre-fill some form fields here if selecting from fetched repos
+      state.projectFormFields.github_id = action.payload.id;
+      state.projectFormFields.title = action.payload.name;
+      state.projectFormFields.description = action.payload.description;
+      state.projectFormFields.github_url = action.payload.html_url;
+      state.projectFormFields.is_public = action.payload.is_public; // Should come from is_private in githubService
+      state.projectFormFields.category = action.payload.suggested_category || 'Uncategorized'; // Will be refined by ALX detection
+      state.projectFormFields.technologies = action.payload.suggested_technologies || [action.payload.language].filter(Boolean); // Will be refined
+      state.projectFormFields.difficulty = action.payload.suggested_difficulty || 'Intermediate'; // Will be refined
+      state.projectFormFields.start_date = action.payload.created_at ? new Date(action.payload.created_at).toISOString().split('T')[0] : null;
+      state.projectFormFields.end_date = action.payload.updated_at ? new Date(action.payload.updated_at).toISOString().split('T')[0] : null;
+
+      // Reset AI content if a new repo is selected
+      state.projectFormFields.ai_summary = '';
+      state.projectFormFields.ai_work_log = '';
+      state.projectFormFields.ai_last_updated = null;
+      state.rawCommits = [];
+    },
+    setProjectFormFields: (state, action) => {
+      state.projectFormFields = { ...state.projectFormFields, ...action.payload };
+    },
+    setALXProjectsDetected: (state, action) => {
+      state.alxProjectsDetected = action.payload;
+    },
+    selectALXProject: (state, action) => {
+      state.selectedALXProject = action.payload;
+      // When an ALX project is specifically selected from detection, update form fields
+      state.projectFormFields.github_id = action.payload.github_id;
+      state.projectFormFields.title = action.payload.title;
+      state.projectFormFields.description = action.payload.description;
+      state.projectFormFields.github_url = action.payload.github_url;
+      state.projectFormFields.is_public = action.payload.is_public;
+      state.projectFormFields.is_alx_project = action.payload.is_alx_project;
+      state.projectFormFields.category = action.payload.suggested_category;
+      state.projectFormFields.technologies = action.payload.suggested_technologies;
+      state.projectFormFields.difficulty = action.payload.suggested_difficulty;
+      state.projectFormFields.ai_summary = action.payload.ai_summary;
+      state.projectFormFields.ai_last_updated = new Date().toISOString(); // Update timestamp
+      // Also potentially update start/end dates if available in the ALX detection result
+      state.projectFormFields.start_date = action.payload.created_at ? new Date(action.payload.created_at).toISOString().split('T')[0] : null;
+      state.projectFormFields.end_date = action.payload.updated_at ? new Date(action.payload.updated_at).toISOString().split('T')[0] : null;
+    },
+    setWorkLogContent: (state, action) => {
+      state.workLogContent = action.payload;
+      state.projectFormFields.ai_work_log = action.payload; // Update work log in form fields too
+    },
+    setRawCommits: (state, action) => {
+      state.rawCommits = action.payload;
+    },
+    setStatus: (state, action) => {
+      state.status = action.payload;
+    },
+    setError: (state, action) => {
+      state.error = action.payload;
+    },
+    addManualRepo: (state, action) => { // New reducer for manual repo
+      state.repos.unshift(action.payload); // Add to the beginning of the list
+    },
+    setSocialPosts: (state, action) => { // <--- ADD THIS NEW REDUCER
+      state.socialPosts = action.payload;
+      state.projectFormFields.ai_social_posts = action.payload; // Update projectFormFields too
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Repositories
-      .addCase(fetchUserRepositories.pending, (state) => {
-        state.isLoadingRepositories = true;
-        state.repositoryError = null;
-      })
-      .addCase(fetchUserRepositories.fulfilled, (state, action) => {
-        state.isLoadingRepositories = false;
-        state.repositories = action.payload;
-      })
-      .addCase(fetchUserRepositories.rejected, (state, action) => {
-        state.isLoadingRepositories = false;
-        state.repositoryError = action.payload;
-        state.repositories = [];
-      })
-      // Detect ALX Projects
-      .addCase(detectALXProjects.pending, (state) => {
-        state.isDetectingALX = true;
+      .addCase(fetchRepos.pending, (state) => {
+        state.status = 'loading_repos';
         state.error = null;
+        state.repos = []; // Clear previous repos
+      })
+      .addCase(fetchRepos.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.repos = action.payload;
+        // After fetching repos, immediately try to detect ALX projects
+        // This is handled by a separate dispatch in the component, or could be chained here.
+      })
+      .addCase(fetchRepos.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+        state.repos = [];
+      })
+      .addCase(detectALXProjects.pending, (state) => {
+        state.status = 'loading_alx';
+        state.error = null;
+        state.alxProjectsDetected = [];
       })
       .addCase(detectALXProjects.fulfilled, (state, action) => {
-        state.isDetectingALX = false;
-        // Corrected: action.payload is now an object { alxProjects: [...], skippedProjects: [...] }
-        state.alxProjects = action.payload.alxProjects;
-        // Automatically select all detected ALX projects for import
-        state.selectedProjects = action.payload.alxProjects.map(project => project.id);
-
-        console.log("[detectALXProjects.fulfilled] Payload:", action.payload);
-        console.log("[detectALXProjects.fulfilled] Resulting state.alxProjects:", state.alxProjects);
-        console.log("[detectALXProjects.fulfilled] Resulting state.selectedProjects:", state.selectedProjects);
-
-        if (action.payload.skippedProjects && action.payload.skippedProjects.length > 0) {
-          console.warn("Skipped projects during ALX detection:", action.payload.skippedProjects);
-        }
+        state.status = 'succeeded';
+        state.alxProjectsDetected = action.payload;
       })
       .addCase(detectALXProjects.rejected, (state, action) => {
-        state.isDetectingALX = false;
+        state.status = 'failed';
         state.error = action.payload;
-        state.alxProjects = [];
+        state.alxProjectsDetected = [];
       })
-      // Import Selected Projects
-      .addCase(importSelectedProjects.pending, (state) => {
-        state.isImporting = true;
-        state.importError = null;
+      .addCase(analyzeRepository.pending, (state) => {
+        state.status = 'analyzing_repo';
+        state.error = null;
+        // Do not clear selectedRepo or projectFormFields here, as they are being populated
       })
-      .addCase(importSelectedProjects.fulfilled, (state, action) => {
-        state.isImporting = false;
-        state.importedProjects = action.payload; // Store the AI-enriched projects
-        state.selectedProjects = []; // Clear selected projects after import
-        state.wizardStep = 'username'; // Reset wizard or move to a "review import" step
-        state.wizardData = { username: '', selectedRepoIds: [] };
+      .addCase(analyzeRepository.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        // projectFormFields is updated via setProjectFormFields reducer inside the thunk
+        // rawCommits is updated via setRawCommits reducer inside the thunk
       })
-      .addCase(importSelectedProjects.rejected, (state, action) => {
-        state.isImporting = false;
-        state.importError = action.payload;
+      .addCase(analyzeRepository.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
       })
-      // NEW: processProjectsWithAI
-      .addCase(processProjectsWithAI.pending, (state) => {
-        state.isProcessingAI = true;
-        state.aiProcessingError = null;
+      .addCase(fetchCommitsAndGenerateWorkLog.pending, (state) => {
+        state.status = 'generating_worklog';
+        state.error = null;
+        state.workLogContent = '';
       })
-      .addCase(processProjectsWithAI.fulfilled, (state, action) => {
-        state.isProcessingAI = false;
-        // Update the imported projects with AI-generated data
-        // This assumes importedProjects is the source of truth for projects being processed by AI
-        // Since `importSelectedProjects` now returns the AI-processed projects, this case might
-        // not be strictly necessary for `importedProjects` if `importSelectedProjects.fulfilled`
-        // is updated to handle the `action.payload` from `processProjectsWithAI`.
-        // However, it's good to have if you process AI data separately later.
-        action.payload.forEach(processedProject => {
-          const index = state.importedProjects.findIndex(p => p.id === processedProject.id);
-          if (index !== -1) {
-            state.importedProjects[index] = processedProject; // Replace with updated project
-          }
-        });
+      .addCase(fetchCommitsAndGenerateWorkLog.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.workLogContent = action.payload.workLog;
+        state.rawCommits = action.payload.rawCommits;
+        // Update the ai_work_log in projectFormFields as well
+        state.projectFormFields.ai_work_log = action.payload.workLog;
+        state.projectFormFields.ai_last_updated = new Date().toISOString();
       })
-      .addCase(processProjectsWithAI.rejected, (state, action) => {
-        state.isProcessingAI = false;
-        state.aiProcessingError = action.payload;
-        // You might want to handle partial failures or specific project errors here
+      .addCase(fetchCommitsAndGenerateWorkLog.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+        state.workLogContent = 'Failed to generate work log.';
       });
   },
 });
 
+// Actions Export
 export const {
-  setRepositories,
-  setALXProjects,
-  toggleProjectSelection,
-  setSelectedProjects,
-  setWizardStep,
-  setWizardData, // Corrected export name (was updateWizardData)
-  resetGitHubState,
-  clearGitHubErrors,
-  clearSelection,
-  resetWizard,
-  // processProjectsWithAI is a thunk, not a reducer action, so it's not exported here
+  openWizard,
+  closeWizard,
+  setCurrentStep,
+  selectRepo,
+  setProjectFormFields,
+  setALXProjectsDetected,
+  selectALXProject,
+  setWorkLogContent,
+  setRawCommits,
+  setStatus,
+  setError,
+  addManualRepo,
+  setSocialPosts,
 } = githubSlice.actions;
 
+// Selectors
+export const selectGithubState = (state) => state.github;
+export const selectRepos = (state) => state.github.repos;
+export const selectGithubStatus = (state) => state.github.status;
+export const selectGithubError = (state) => state.github.error;
+export const selectCurrentStep = (state) => state.github.currentStep;
+export const selectSelectedRepo = (state) => state.github.selectedRepo;
+export const selectProjectFormFields = (state) => state.github.projectFormFields;
+export const selectALXProjectsDetected = (state) => state.github.alxProjectsDetected;
+export const selectSelectedALXProject = (state) => state.github.selectedALXProject;
+export const selectWorkLogContent = (state) => state.github.workLogContent;
+export const selectRawCommits = (state) => state.github.rawCommits;
+export const selectSocialPosts = (state) => state.github.socialPosts; 
+
+
+
+// Export the slice reducer
 export default githubSlice.reducer;

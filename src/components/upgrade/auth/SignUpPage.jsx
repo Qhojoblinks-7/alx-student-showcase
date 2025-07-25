@@ -1,0 +1,202 @@
+// src/components/auth/SignUpPage.jsx
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Label } from '../ui/label';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { signUp, setError } from '../../store/slices/authSlice';
+import { toast } from 'sonner';
+import { Eye, EyeOff, Loader2 } from 'lucide-react'; // For password toggle and loading spinner
+
+const SignUpPage = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { isLoading, error, user } = useSelector((state) => state.auth);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMatchError, setPasswordMatchError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Clear Redux error when component mounts or unmounts
+  useEffect(() => {
+    dispatch(setError(null));
+    return () => {
+      dispatch(setError(null));
+    };
+  }, [dispatch]);
+
+  // Handle redirection on successful sign-up (if email confirmation is off)
+  useEffect(() => {
+    if (user && !isLoading) {
+      // If user is immediately available (email confirmation off)
+      navigate('/dashboard'); // Or an onboarding page
+    }
+  }, [user, isLoading, navigate]);
+
+  // Client-side email validation
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!re.test(email)) {
+      setEmailError("Please enter a valid email address.");
+    } else {
+      setEmailError("");
+    }
+  };
+
+  // Client-side password matching validation
+  useEffect(() => {
+    if (password && confirmPassword && password !== confirmPassword) {
+      setPasswordMatchError("Passwords do not match.");
+    } else {
+      setPasswordMatchError("");
+    }
+  }, [password, confirmPassword]);
+
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Re-validate just before submission
+    validateEmail(email);
+    if (password !== confirmPassword) {
+      setPasswordMatchError("Passwords do not match.");
+    } else {
+      setPasswordMatchError("");
+    }
+
+    if (emailError || passwordMatchError || !email || !password || !confirmPassword) {
+      // toast.error("Please correct the errors in the form."); // Optional
+      return;
+    }
+
+    // Dispatch Redux thunk
+    dispatch(signUp({ email, password }));
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-950 px-4">
+      <Card className="w-full max-w-md bg-neutral-900 border border-neutral-700 text-white shadow-lg animate-fade-in-up">
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+            Create an Account
+          </CardTitle>
+          <CardDescription className="text-gray-400 mt-2">
+            Get started with ALX Showcase today.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="text-red-400 text-sm text-center mb-4" role="alert">
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="email" className="text-gray-300">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  required
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); validateEmail(e.target.value); }}
+                  onBlur={(e) => validateEmail(e.target.value)} // Validate on blur
+                  className={`bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 focus-visible:ring-blue-500 ${emailError ? 'border-red-500' : ''}`}
+                  disabled={isLoading}
+                  aria-invalid={emailError ? "true" : "false"}
+                  aria-describedby={emailError ? "email-error" : undefined}
+                />
+                {emailError && <p id="email-error" className="text-red-400 text-sm mt-1">{emailError}</p>}
+              </div>
+              <div>
+                <Label htmlFor="password" className="text-gray-300">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10 bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 focus-visible:ring-blue-500"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-300"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="confirmPassword" className="text-gray-300">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`pr-10 bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500 focus-visible:ring-blue-500 ${passwordMatchError ? 'border-red-500' : ''}`}
+                    disabled={isLoading}
+                    aria-invalid={passwordMatchError ? "true" : "false"}
+                    aria-describedby={passwordMatchError ? "confirm-password-error" : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-300"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    disabled={isLoading}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {passwordMatchError && <p id="confirm-password-error" className="text-red-400 text-sm mt-1">{passwordMatchError}</p>}
+              </div>
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-500 text-white py-2 rounded-lg shadow-md hover:shadow-lg hover:from-purple-700 hover:to-blue-600 transition-all duration-300 font-semibold text-lg"
+              disabled={isLoading || !!emailError || !!passwordMatchError || !email || !password || !confirmPassword}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                'Create Account'
+              )}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-gray-400 mt-6">
+            Already have an account?{' '}
+            <Link to="/signin" className="text-blue-400 hover:underline">
+              Sign In
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default SignUpPage;

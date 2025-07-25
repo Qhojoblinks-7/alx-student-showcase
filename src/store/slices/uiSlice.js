@@ -1,147 +1,158 @@
+// src/store/slices/uiSlice.js
 import { createSlice } from '@reduxjs/toolkit';
+import { createSelector } from 'reselect'; // For memoized selectors
 
-export const initialState = { // Added export here
-  // Modal states
-  modals: {
-    projectForm: false,
-    gitHubImport: false,
-    shareProject: false,
-    autoWorkLogShare: false,
-    workLogGenerator: false,
-    userProfile: false,
-  },
-  modalData: {}, // Added to store data passed to modals
-  
-  // Active tab states
-  activeTab: 'projects',
-  
-  // Notifications
-  notifications: [],
-  
-  // Loading states for various operations
-  loading: {
-    global: false,
-    projects: false,
-    auth: false,
-    github: false,
-    sharing: false,
-  },
-  
-  // Theme and preferences
-  theme: 'light',
-  sidebarOpen: true,
+// --- Initial State ---
+const initialState = {
+  activeDashboardTab: 'projects', // 'projects', 'stats', 'profile'
+  isAddProjectModalOpen: false,
+  isGitHubImportModalOpen: false,
+  isShareProjectModalOpen: false,
+  isWorkLogGeneratorModalOpen: false,
+  isSidebarOpen: false, // <-- ADDED: Initialize isSidebarOpen to false
+  globalLoading: false, // For general app-wide loading states
+  notifications: [], // For sonner toasts, if managed centrally (optional, Sonner usually handles this directly)
+  theme: 'light', // 'light' or 'dark'
 };
 
+// --- Slice Definition ---
 const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
-    // Modal actions
-    openModal: (state, action) => {
-      const { modalName, data } = action.payload;
-      state.modals[modalName] = true;
-      if (data) {
-        state.modalData = { ...state.modalData, [modalName]: data };
-      }
+    // Dashboard Tab Management
+    setActiveDashboardTab: (state, action) => {
+      state.activeDashboardTab = action.payload;
     },
-    closeModal: (state, action) => {
-      const modalName = action.payload;
-      state.modals[modalName] = false;
-      if (state.modalData) {
-        delete state.modalData[modalName];
-      }
+
+    // Add Project Modal
+    openAddProjectModal: (state) => {
+      state.isAddProjectModalOpen = true;
     },
-    closeAllModals: (state) => {
-      Object.keys(state.modals).forEach(key => {
-        state.modals[key] = false;
-      });
-      state.modalData = {};
+    closeAddProjectModal: (state) => {
+      state.isAddProjectModalOpen = false;
     },
-    
-    // Tab actions
-    setActiveTab: (state, action) => {
-      state.activeTab = action.payload;
+
+    // GitHub Import Modal
+    openGitHubImportModal: (state) => {
+      state.isGitHubImportModalOpen = true;
     },
-    
-    // Notification actions
+    closeGitHubImportModal: (state) => {
+      state.isGitHubImportModalOpen = false;
+    },
+
+    // Share Project Modal
+    openShareProjectModal: (state) => {
+      state.isShareProjectModalOpen = true;
+    },
+    closeShareProjectModal: (state) => {
+      state.isShareProjectModalOpen = false;
+    },
+
+    // Work Log Generator Modal
+    openWorkLogGeneratorModal: (state) => {
+      state.isWorkLogGeneratorModalOpen = true;
+    },
+    closeWorkLogGeneratorModal: (state) => {
+      state.isWorkLogGeneratorModalOpen = false;
+    },
+
+    // Global Loading Indicator
+    setGlobalLoading: (state, action) => {
+      state.globalLoading = action.payload;
+    },
+
+    // Notifications (Optional: Sonner often handles directly, but useful for central state)
     addNotification: (state, action) => {
-      const notification = {
-        id: Date.now() + Math.random(),
-        timestamp: new Date().toISOString(),
-        ...action.payload,
-      };
-      state.notifications.push(notification);
+      // action.payload should be an object like { id: 'unique-id', message: '...', type: 'success' }
+      state.notifications.push(action.payload);
     },
     removeNotification: (state, action) => {
+      // action.payload should be the ID of the notification to remove
       state.notifications = state.notifications.filter(
-        notification => notification.id !== action.payload
+        (notification) => notification.id !== action.payload
       );
     },
-    clearNotifications: (state) => {
-      state.notifications = [];
-    },
-    
-    // Loading actions
-    setLoading: (state, action) => {
-      const { key, isLoading } = action.payload;
-      state.loading[key] = isLoading;
-    },
-    setGlobalLoading: (state, action) => {
-      state.loading.global = action.payload;
-    },
-    
-    // Theme actions
-    setTheme: (state, action) => {
-      state.theme = action.payload;
-    },
+
+    // Theme Toggler
     toggleTheme: (state) => {
       state.theme = state.theme === 'light' ? 'dark' : 'light';
+      // Optional: Update data-theme attribute or toggle dark class on <html> for Tailwind CSS
+      document.documentElement.classList.toggle('dark', state.theme === 'dark');
     },
-    
-    // Sidebar actions
+
     setSidebarOpen: (state, action) => {
-      state.sidebarOpen = action.payload;
-    },
-    toggleSidebar: (state) => {
-      state.sidebarOpen = !state.sidebarOpen;
-    },
+      state.isSidebarOpen = action.payload;
+    }
   },
 });
 
+// --- Actions Export ---
 export const {
-  // Modal actions
-  openModal,
-  closeModal,
-  closeAllModals,
-  
-  // Tab actions
-  setActiveTab,
-  
-  // Notification actions
+  setActiveDashboardTab,
+  openAddProjectModal,
+  closeAddProjectModal,
+  openGitHubImportModal,
+  closeGitHubImportModal,
+  openShareProjectModal,
+  closeShareProjectModal,
+  openWorkLogGeneratorModal,
+  closeWorkLogGeneratorModal,
+  setGlobalLoading,
   addNotification,
   removeNotification,
-  clearNotifications,
-  
-  // Loading actions
-  setLoading,
-  setGlobalLoading,
-  
-  // Theme actions
-  setTheme,
   toggleTheme,
-  
-  // Sidebar actions
   setSidebarOpen,
-  toggleSidebar,
 } = uiSlice.actions;
 
-// Selectors
-export const selectModals = (state) => state.ui.modals;
-export const selectModalData = (state) => state.ui.modalData; // New selector for modal data
-export const selectActiveTab = (state) => state.ui.activeTab;
-export const selectNotifications = (state) => state.ui.notifications;
-export const selectLoading = (state) => state.ui.loading;
-export const selectTheme = (state) => state.ui.theme;
-export const selectSidebarOpen = (state) => state.ui.sidebarOpen;
+// --- Selectors ---
+// Base selector for the UI state
+const selectUIState = (state) => state.ui;
+
+export const selectActiveDashboardTab = createSelector(
+  [selectUIState],
+  (uiState) => uiState.activeDashboardTab
+);
+
+export const selectIsAddProjectModalOpen = createSelector(
+  [selectUIState],
+  (uiState) => uiState.isAddProjectModalOpen
+);
+
+export const selectIsGitHubImportModalOpen = createSelector(
+  [selectUIState],
+  (uiState) => uiState.isGitHubImportModalOpen
+);
+
+export const selectIsShareProjectModalOpen = createSelector(
+  [selectUIState],
+  (uiState) => uiState.isShareProjectModalOpen
+);
+
+export const selectIsWorkLogGeneratorModalOpen = createSelector(
+  [selectUIState],
+  (uiState) => uiState.isWorkLogGeneratorModalOpen
+);
+
+// ADDED: Selector for isSidebarOpen
+export const selectIsSidebarOpen = createSelector(
+  [selectUIState],
+  (uiState) => uiState.isSidebarOpen
+);
+
+export const selectGlobalLoading = createSelector(
+  [selectUIState],
+  (uiState) => uiState.globalLoading
+);
+
+export const selectNotifications = createSelector(
+  [selectUIState],
+  (uiState) => uiState.notifications
+);
+
+export const selectTheme = createSelector(
+  [selectUIState],
+  (uiState) => uiState.theme
+);
 
 export default uiSlice.reducer;

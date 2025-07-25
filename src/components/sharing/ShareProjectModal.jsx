@@ -34,7 +34,7 @@ import {
 // Corrected import path for GitHubCommitsService
 import { GitHubCommitsService } from '@/lib/github-commits-service.js';
 import { SocialContentOptimizer } from '@/lib/social-optimizer.js'; // Import SocialContentOptimizer
-import { Tabs } from '../ui/tabs';
+
 export function ShareProjectModal({ project, onClose }) {
   const projectUrl = project.live_url || project.github_url || '';
   const [copied, setCopied] = useState(false);
@@ -89,10 +89,11 @@ export function ShareProjectModal({ project, onClose }) {
 
       // Fetch repository info and commits in parallel
       const [repoResponse, workLogData] = await Promise.all([
-        fetch(`https://api.github.com/repos/${githubInfo.username}/${githubInfo.repoName}`),
+        // Corrected: Use githubInfo.owner and githubInfo.repo
+        fetch(`https://api.github.com/repos/${githubInfo.owner}/${githubInfo.repo}`),
         GitHubCommitsService.generateWorkLog(
-          githubInfo.username,
-          githubInfo.repoName,
+          githubInfo.owner, // Corrected
+          githubInfo.repo, // Corrected
           parseInt(timeframe)
         )
       ]);
@@ -146,8 +147,8 @@ export function ShareProjectModal({ project, onClose }) {
       toast.success('Copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
-      toast.error('Failed to copy to clipboard.');
+      console.error('Failed to copy:', err.message ? String(err.message) : String(err));
+      toast.error('Failed to copy to clipboard');
     }
   };
 
@@ -227,7 +228,7 @@ export function ShareProjectModal({ project, onClose }) {
               <Icon className="h-5 w-5" />
               <h3 className="font-semibold">{title}</h3>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2"> {/* Added flex container for badge and length */}
               {isOptimized && (
                 <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
                   <Zap className="h-3 w-3 mr-1" />
@@ -281,7 +282,7 @@ export function ShareProjectModal({ project, onClose }) {
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <BarChart3 className="h-5 w-5 text-blue-600" />
-            <h3 className="font-semibold text-blue-900 break-words">{repoInfo.name} - Work Log</h3>
+            <h3 className="font-semibold text-blue-900 break-words">{repoInfo.name} - Work Log</h3> {/* Added break-words */}
             <Badge variant="outline" className="bg-blue-100 text-blue-800">
               Last {timeframe} days
             </Badge>
@@ -435,7 +436,7 @@ export function ShareProjectModal({ project, onClose }) {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <Zap className="h-5 w-5 text-green-600" />
-                        <Label htmlFor="auto-mode" className="font-semibold dark:text-gray-800">Auto Work Log</Label>
+                        <Label htmlFor="auto-mode" className="font-semibold">Auto Work Log</Label>
                       </div>
                       <Switch
                         id="auto-mode"
@@ -445,15 +446,15 @@ export function ShareProjectModal({ project, onClose }) {
                     </div>
 
                     {autoMode && (
-                      <div className="flex items-center gap-4 dark:text-gray-50">
+                      <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
-                          <Label htmlFor="timeframe" className="dark:text-gray-800">Timeframe:</Label>
+                          <Label htmlFor="timeframe">Timeframe:</Label>
                           <Select value={timeframe} onValueChange={setTimeframe}>
-                            <SelectTrigger className="w-32 dark:text-gray-800">
+                            <SelectTrigger className="w-32">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className={"dark:bg-gray-800 dark:text-gray-50"}>
-                              <SelectItem value="1" >1 day</SelectItem>
+                            <SelectContent>
+                              <SelectItem value="1">1 day</SelectItem>
                               <SelectItem value="3">3 days</SelectItem>
                               <SelectItem value="7">7 days</SelectItem>
                               <SelectItem value="14">14 days</SelectItem>
@@ -467,12 +468,11 @@ export function ShareProjectModal({ project, onClose }) {
                           size="sm"
                           onClick={fetchWorkLog}
                           disabled={loadingWorkLog}
-                          className="dark:text-gray-50"
                         >
                           {loadingWorkLog ? (
                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                           ) : (
-                            <RefreshCw className="h-4 w-4 mr-1 dark:text-gray-50" />
+                            <RefreshCw className="h-4 w-4 mr-1" />
                           )}
                           Refresh
                         </Button>

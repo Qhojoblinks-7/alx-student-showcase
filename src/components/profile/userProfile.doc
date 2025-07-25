@@ -1,0 +1,804 @@
+ALX Showcase: Profile & Public Showcase Page UI/UX Design
+This document outlines the high-level responsive layout, detailed 'Profile Settings' design, the professional public 'Showcase' view, and AI-specific UI/UX considerations for the ALX Showcase project. The design adheres to a mobile-first approach, leveraging React, Tailwind CSS, and Shadcn UI, with a strong emphasis on visual appeal and user experience.
+
+1. High-Level Responsive Layout: Private vs. Public Views
+The core design principle is a seamless transition from a functional, editable private profile to a polished, view-only public portfolio, optimizing for different screen sizes.
+
+Global Layout Structure
+Mobile (Viewport < 640px): Single-column, stacked sections. Generous vertical spacing. Large, tappable elements.
+
+Tablet (Viewport 640px - 1023px): Primarily single-column, but with wider content areas. Some elements might start to arrange horizontally if space allows (e.g., buttons in a row).
+
+Desktop (Viewport >= 1024px): Multi-column layouts for efficient use of space. More elaborate visual elements and subtle micro-interactions.
+
+1.1. Private/Editable Profile View (/profile)
+Accessible only to the authenticated user. Focuses on clear form inputs and actionable controls.
+
+Conditional UI Elements:
+
+Always Present: Form fields, "Save Profile" button, "Back Up Data" button.
+
+Absent: Public share links, "Connect" CTAs for others.
+
+Layout Description (Wireframe Elements):
+
+Mobile/Tablet:
+
+Header: Standard app header (ALX Showcase logo, mobile menu, user avatar dropdown).
+
+Main Content Area (Vertical Stack):
+
+Profile Settings Card: Contains all editable sections (Basic Info, Social Links, About Me, Avatar, Additional Info, Badges, AI Recommendations, AI Summary). Each section within this card will be a vertical stack of form elements.
+
+Action Buttons: "Save Profile" and "Back Up Project Data" buttons at the bottom of the Profile Settings Card.
+
+Project List Card: A separate card below the profile settings, displaying the user's projects. Includes an "Add New Project" button at the top.
+
+Modals: ProjectForm, GitHubImportWizard, ShareProjectModal, WorkLogGenerator open as full-screen or large sheets/dialogs, ensuring focus on the task.
+
+Desktop:
+
+Header: Standard app header (ALX Showcase logo, desktop navigation tabs, action buttons, user avatar dropdown).
+
+Main Content Area (Two Columns):
+
+Left Column (Profile Settings): Card containing Basic Info, Social Links, About Me, Avatar, Additional Info, Badges, AI Recommendations, AI Summary. This column will be scrollable if content exceeds viewport height.
+
+Right Column (Portfolio Projects): Card prominently displaying the ProjectList component. This column will also be scrollable independently if its content is long.
+
+Action Buttons: "Save Profile" and "Back Up Project Data" buttons are integrated at the bottom of the left column (Profile Settings Card).
+
+Modals: ProjectForm, GitHubImportWizard, ShareProjectModal, WorkLogGenerator open as centered dialogs or side sheets, allowing some background context to remain visible.
+
+1.2. Public/View-Only Showcase View (/showcase/:username)
+Accessible to anyone. Designed as a standalone, professional portfolio website. No editing controls.
+
+Conditional UI Elements:
+
+Always Present: User's public profile data, projects, AI-generated content.
+
+Absent: All form inputs, "Save/Cancel" buttons, "Add/Edit/Delete" project buttons, "Back Up Data" button, Redux DevTools, etc.
+
+New Elements: "Connect on LinkedIn" button, "View Source" links on projects, subtle ALX Showcase branding.
+
+Layout Description (Wireframe Elements):
+
+Mobile:
+
+Header: Simple, clean header with "ALX Showcase" branding and potentially a subtle "Connect" button or icon for the user. No extensive navigation.
+
+Hero Section: Full-width, prominent avatar, large name, concise tagline.
+
+Main Content Area (Vertical Stack):
+
+About Me: Dedicated section for the bio.
+
+Social Links: Row of clickable icons.
+
+Skills, Certifications, Achievements: Stacked lists/tags.
+
+AI-Generated Summary: A distinct, readable block.
+
+Portfolio Projects: ProjectList with enhanced project cards, stacked vertically. Each card is a mini case study.
+
+AI-Powered Recommendations: A dedicated section, stacked below projects.
+
+Footer: Minimal footer with copyright and ALX Showcase branding.
+
+Tablet:
+
+Header: Similar to mobile, but potentially slightly larger.
+
+Hero Section: Wider, potentially with text beside the avatar.
+
+Main Content Area (Adapting Columns):
+
+Sections like "Skills," "Certifications," "Achievements" might start to arrange into two columns.
+
+"About Me," "AI Summary," "AI Recommendations" remain single column for readability.
+
+ProjectList might adjust to 1 or 2 columns based on card design.
+
+Desktop:
+
+Header: Clean, minimalist header with branding and a prominent "Connect" button.
+
+Hero Section: Full-width, visually striking. Large avatar, bold name, impactful tagline. Clear "Connect" CTA.
+
+Main Content Area (Multi-Column Layouts):
+
+Left Sidebar/Main Content Split (Conceptual):
+
+Left (Sticky/Fixed, if content is short): Avatar, Name, Tagline, Social Links, potentially a quick summary of skills.
+
+Right (Scrollable Main Content):
+
+About Me: Wider text block.
+
+Skills, Certifications, Achievements: Presented in a clean, multi-column grid or flex layout.
+
+AI-Generated Summary: A distinct card or section for an executive overview.
+
+Portfolio Projects: Prominent ProjectList in a 2-3 column grid, with each project card designed as a compelling visual case study.
+
+AI-Powered Recommendations: Dedicated section, possibly a smaller grid or list.
+
+Footer: Standard footer.
+
+2. 'Profile Settings' Section (Private, Editable View)
+This section will be housed within a Card component, providing a clean, grouped interface for editing profile details.
+
+Overall Design Principles:
+
+Clarity: Clear labels, intuitive input fields.
+
+Consistency: Uniform styling for all form elements (inputs, textareas, buttons).
+
+Accessibility: WCAG 2.1 AA compliance (labels, keyboard navigation, focus states, color contrast).
+
+Feedback: Immediate visual feedback for validation and saving states.
+
+<Card className="shadow-md rounded-lg border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 h-fit">
+  <CardHeader className="p-6 pb-4">
+    <CardTitle className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-gray-50">
+      <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+      Profile Settings
+    </CardTitle>
+    <CardDescription className="text-base text-gray-600 dark:text-gray-400">
+      Update your profile information to showcase your ALX journey
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="p-6 pt-0 space-y-8">
+
+    {/* Section: Basic Information */}
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-2 text-gray-800 dark:text-gray-200">
+        <Info className="h-5 w-5 text-purple-500" /> Basic Information
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="full_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</Label>
+          <Input
+            id="full_name"
+            type="text"
+            placeholder="John Doe"
+            value={profile.full_name}
+            onChange={(e) => updateProfile('full_name', e.target.value)}
+            className="mt-1 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+            aria-describedby="full-name-error"
+          />
+          {/* Error State Example */}
+          {errors.full_name && <p id="full-name-error" className="text-red-500 text-xs mt-1">{errors.full_name}</p>}
+        </div>
+        <div>
+          <Label htmlFor="alx_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">ALX ID</Label>
+          <Input
+            id="alx_id"
+            type="text"
+            placeholder="ALX_001234"
+            value={profile.alx_id}
+            readOnly
+            className="mt-1 rounded-md border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed"
+          />
+        </div>
+        <div>
+          <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="john.doe@alx.com"
+            value={user?.email || ''}
+            readOnly
+            className="mt-1 rounded-md border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed"
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Section: Social Links */}
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-2 text-gray-800 dark:text-gray-200">
+        <LinkIcon className="h-5 w-5 text-green-500" /> Social Links
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="github_username" className="text-sm font-medium text-gray-700 dark:text-gray-300">GitHub Username</Label>
+          <div className="relative mt-1">
+            <Github className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              id="github_username"
+              type="text"
+              placeholder="johndoe"
+              value={profile.github_username}
+              onChange={(e) => updateProfile('github_username', e.target.value)}
+              className="pl-10 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+              aria-describedby="github-error"
+            />
+          </div>
+          {/* Validation: Check if username exists on GitHub, or simply valid format */}
+          {errors.github_username && <p id="github-error" className="text-red-500 text-xs mt-1">{errors.github_username}</p>}
+        </div>
+        <div>
+          <Label htmlFor="linkedin_url" className="text-sm font-medium text-gray-700 dark:text-gray-300">LinkedIn URL</Label>
+          <div className="relative mt-1">
+            <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              id="linkedin_url"
+              type="url"
+              placeholder="https://linkedin.com/in/johndoe"
+              value={profile.linkedin_url}
+              onChange={(e) => updateProfile('linkedin_url', e.target.value)}
+              className="pl-10 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+              aria-describedby="linkedin-error"
+            />
+          </div>
+          {/* Validation: Must be a valid URL */}
+          {errors.linkedin_url && <p id="linkedin-error" className="text-red-500 text-xs mt-1">{errors.linkedin_url}</p>}
+        </div>
+      </div>
+    </div>
+
+    {/* Section: About Me */}
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-2 text-gray-800 dark:text-gray-200">
+        <BookOpen className="h-5 w-5 text-yellow-500" /> About Me
+      </h3>
+      <div>
+        <Label htmlFor="bio" className="text-sm font-medium text-gray-700 dark:text-gray-300">Bio</Label>
+        <Textarea
+          id="bio"
+          placeholder="Tell us about yourself and your coding journey, your passions, and what drives you..."
+          rows={4}
+          value={profile.bio}
+          onChange={(e) => updateProfile('bio', e.target.value)}
+          className="mt-1 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+          maxLength={500} // Example max length
+          aria-describedby="bio-character-count bio-error"
+        />
+        <p id="bio-character-count" className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">
+          {profile.bio.length} / 500 characters
+        </p>
+        {errors.bio && <p id="bio-error" className="text-red-500 text-xs mt-1">{errors.bio}</p>}
+      </div>
+    </div>
+
+    {/* Section: Avatar */}
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-2 text-gray-800 dark:text-gray-200">
+        <Image className="h-5 w-5 text-orange-500" /> Avatar
+      </h3>
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+        <Avatar className="h-24 w-24 flex-shrink-0 border-2 border-blue-300 dark:border-blue-600 shadow-sm">
+          <AvatarImage src={profile.avatar_url} alt="User Avatar" />
+          <AvatarFallback className="text-3xl font-bold bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-200">
+            {profile.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || (user?.email ? user.email.substring(0, 2).toUpperCase() : 'U')}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 w-full">
+          <Label htmlFor="avatar_url" className="text-sm font-medium text-gray-700 dark:text-gray-300">Avatar URL</Label>
+          <Input
+            id="avatar_url"
+            type="url"
+            placeholder="https://example.com/avatar.jpg"
+            value={profile.avatar_url}
+            onChange={(e) => updateProfile('avatar_url', e.target.value)}
+            className="mt-1 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+            aria-describedby="avatar-url-error"
+          />
+          {errors.avatar_url && <p id="avatar-url-error" className="text-red-500 text-xs mt-1">{errors.avatar_url}</p>}
+        </div>
+      </div>
+    </div>
+
+    {/* Section: Additional Information (Certifications, Skills, Achievements) */}
+    <div className="space-y-6"> {/* Increased space-y for better separation of lists */}
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-2 text-gray-800 dark:text-gray-200">
+        <Info className="h-5 w-5 text-purple-500" /> Additional Information
+      </h3>
+
+      {/* Certifications */}
+      <div>
+        <Label htmlFor="certifications" className="text-sm font-medium text-gray-700 dark:text-gray-300">Certifications</Label>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {profile.certifications.map((cert, index) => (
+            <Badge key={index} variant="outline" className="flex items-center gap-2 px-3 py-1 rounded-full text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
+              {cert}
+              <Button variant="ghost" size="icon" className="h-5 w-5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full" onClick={() => removeListItem('certifications', index)} aria-label={`Remove certification: ${cert}`}>
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
+          <Input
+            id="new_certification"
+            type="text"
+            placeholder="e.g., AWS Certified Developer"
+            className="flex-1 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+            value={newCertification}
+            onChange={(e) => setNewCertification(e.target.value)}
+            onKeyPress={(e) => { if (e.key === 'Enter') { addListItem('certifications', newCertification); setNewCertification(''); } }}
+            aria-label="Add new certification"
+          />
+          <Button onClick={() => { addListItem('certifications', newCertification); setNewCertification(''); }} className="bg-blue-500 hover:bg-blue-600 text-white rounded-md" aria-label="Add certification">
+            Add
+          </Button>
+        </div>
+      </div>
+
+      {/* Skills */}
+      <div>
+        <Label htmlFor="skills" className="text-sm font-medium text-gray-700 dark:text-gray-300">Skills</Label>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {profile.skills.map((skill, index) => (
+            <Badge key={index} className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500 text-white dark:bg-blue-700 dark:text-blue-100">
+              {skill}
+              <Button variant="ghost" size="icon" className="h-5 w-5 text-white opacity-70 hover:opacity-100 hover:bg-blue-600 dark:hover:bg-blue-600 rounded-full" onClick={() => removeListItem('skills', index)} aria-label={`Remove skill: ${skill}`}>
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
+          <Input
+            id="new_skill"
+            type="text"
+            placeholder="e.g., React, Python, SQL"
+            className="flex-1 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+            value={newSkill}
+            onChange={(e) => setNewSkill(e.target.value)}
+            onKeyPress={(e) => { if (e.key === 'Enter') { addListItem('skills', newSkill); setNewSkill(''); } }}
+            aria-label="Add new skill"
+          />
+          <Button onClick={() => { addListItem('skills', newSkill); setNewSkill(''); }} className="bg-blue-500 hover:bg-blue-600 text-white rounded-md" aria-label="Add skill">
+            Add
+          </Button>
+        </div>
+      </div>
+
+      {/* Achievements */}
+      <div>
+        <Label htmlFor="achievements" className="text-sm font-medium text-gray-700 dark:text-gray-300">Achievements</Label>
+        <div className="space-y-2 mt-2">
+          {profile.achievements.map((achievement, index) => (
+            <div key={index} className="flex items-center gap-2 p-2 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800">
+              <span className="flex-1 text-gray-800 dark:text-gray-200">{achievement}</span>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md" onClick={() => removeListItem('achievements', index)} aria-label={`Remove achievement: ${achievement}`}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
+          <Input
+            id="new_achievement"
+            type="text"
+            placeholder="e.g., Won ALX Hackathon 2023"
+            className="flex-1 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+            value={newAchievement}
+            onChange={(e) => setNewAchievement(e.target.value)}
+            onKeyPress={(e) => { if (e.key === 'Enter') { addListItem('achievements', newAchievement); setNewAchievement(''); } }}
+            aria-label="Add new achievement"
+          />
+          <Button onClick={() => { addListItem('achievements', newAchievement); setNewAchievement(''); }} className="bg-blue-500 hover:bg-blue-600 text-white rounded-md" aria-label="Add achievement">
+            Add
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    {/* Section: Badges (Read-only in Profile Settings, managed elsewhere) */}
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2 mb-2 text-gray-800 dark:text-gray-200">
+        <Trophy className="h-5 w-5 text-yellow-500" /> Badges
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {badges.length > 0 ? (
+          badges.map((badge) => (
+            <div key={badge.id} className="flex items-center space-x-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm bg-white dark:bg-gray-800">
+              {badge.icon}
+              <div>
+                <h4 className="font-bold text-lg text-gray-800 dark:text-gray-100">{badge.name}</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{badge.description}</p>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="col-span-full text-center text-gray-500 dark:text-gray-400">No badges awarded yet.</p>
+        )}
+      </div>
+    </div>
+
+    {/* Section: AI-Powered Recommendations (UI/UX detailed in section 4) */}
+    {/* Section: AI Summary (UI/UX detailed in section 4) */}
+
+    <div className="flex flex-col sm:flex-row gap-4 mt-8"> {/* Responsive button layout */}
+      <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors duration-200">
+        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Save Profile
+      </Button>
+      <Button onClick={handleBackup} className="w-full sm:w-auto bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg shadow-sm transition-colors duration-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100">
+        Back Up Project Data
+      </Button>
+    </div>
+  </CardContent>
+</Card>
+
+Notes on Implementation (for the UserProfile component):
+
+errors object would be managed by a form validation library (e.g., React Hook Form + Zod) or simple state.
+
+newCertification, newSkill, newAchievement states would be local to the UserProfile component for adding new items.
+
+addListItem and removeListItem functions would update the profile state arrays.
+
+Accessibility:
+
+Label elements are correctly associated with Input and Textarea using htmlFor.
+
+aria-describedby is used to link error messages to their respective inputs.
+
+Button elements have aria-label for clarity, especially for icon-only buttons.
+
+Color contrast for text and interactive elements should meet WCAG 2.1 AA (e.g., text on background, button text on button background).
+
+Keyboard navigation (Tab key) should flow logically through all form elements.
+
+3. Public, Read-Only Showcase View (/showcase/:username)
+This view is designed to be a professional, visually stunning portfolio website.
+
+Overall Aesthetic Principles:
+
+Visually Rich but Uncluttered: Use high-quality imagery (for project cards), subtle gradients, and clean iconography. Avoid excessive animations or distracting elements.
+
+Strong Typography: Use a modern, legible sans-serif font (e.g., Inter, as per project instructions). Employ varying font weights and sizes to create clear hierarchy. Headlines should be expressive, body text highly readable.
+
+Harmonious Spacing: Generous whitespace around sections and within elements to create a sense of calm and professionalism. Use consistent padding and margins.
+
+Cohesive Color Palette: Primarily neutral grays, whites, and blacks (for dark mode), with ALX branding blues/purples as accent colors for headlines, buttons, and key elements.
+
+Micro-interactions: Subtle hover effects on project cards, social icons, and buttons (e.g., slight lift, background color change, icon shift).
+
+Implicit Call to Action: Encourage connection or recruitment through clear social links and a "Connect on LinkedIn" button in the hero.
+
+Layout Description (Markdown with conceptual elements):
+
+<div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 font-inter antialiased">
+  {/* Header - Simple and Clean */}
+  <header className="sticky top-0 z-20 w-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800 py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center shadow-sm">
+    <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+      ALX Showcase
+    </h1>
+    <a href={`https://linkedin.com/in/${profile.linkedin_url}`} target="_blank" rel="noopener noreferrer">
+      <Button variant="outline" className="rounded-full px-4 py-2 text-sm sm:text-base border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-gray-800">
+        Connect <ArrowRight className="ml-2 h-4 w-4" />
+      </Button>
+    </a>
+  </header>
+
+  {/* Hero Section */}
+  <section className="relative w-full py-16 md:py-24 lg:py-32 text-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-950 dark:to-black overflow-hidden">
+    {/* Subtle background gradients/blobs can be reused here from LandingPage */}
+    <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6">
+      <Avatar className="h-32 w-32 mx-auto mb-6 border-4 border-blue-400 dark:border-blue-600 shadow-xl transition-all duration-300 hover:scale-105">
+        <AvatarImage src={profile.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${profile.full_name || 'ALX'}`} alt={`${profile.full_name}'s Avatar`} />
+        <AvatarFallback className="text-5xl font-bold bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-200">
+          {profile.full_name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'AL'}
+        </AvatarFallback>
+      </Avatar>
+      <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight mb-4 bg-gradient-to-r from-blue-700 to-purple-700 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+        {profile.full_name || "ALX Learner's Name"}
+      </h1>
+      <p className="text-xl sm:text-2xl text-gray-700 dark:text-gray-300 mb-8 max-w-2xl mx-auto font-medium">
+        {/* AI-generated summary or impactful tagline */}
+        {profile.tagline || summary || "Innovating solutions at ALX, passionate about [Key Skill] and [Key Interest]."}
+      </p>
+      <div className="flex justify-center gap-4 mb-8">
+        {profile.github_username && (
+          <a href={`https://github.com/${profile.github_username}`} target="_blank" rel="noopener noreferrer" aria-label="GitHub Profile">
+            <Button variant="outline" size="icon" className="h-12 w-12 rounded-full border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
+              <Github className="h-6 w-6" />
+            </Button>
+          </a>
+        )}
+        {profile.linkedin_url && (
+          <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn Profile">
+            <Button variant="outline" size="icon" className="h-12 w-12 rounded-full border-gray-300 dark:border-gray-600 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors duration-200">
+              <Linkedin className="h-6 w-6" />
+            </Button>
+          </a>
+        )}
+      </div>
+      {/* Badges can be subtly displayed here or in a dedicated section below */}
+      {badges.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-3 mt-4">
+          {badges.map((badge) => (
+            <Badge key={badge.id} className="px-3 py-1 text-sm rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700">
+              {badge.icon && React.cloneElement(badge.icon, { className: 'h-4 w-4 mr-1' })}
+              {badge.name}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+
+  {/* Main Content Sections */}
+  <main className="w-full max-w-7xl mx-auto py-12 sm:py-16 px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
+    {/* Left Column (Desktop - About, Skills, Certs, Achievements, AI Summary) */}
+    <div className="lg:col-span-1 space-y-10"> {/* Increased space-y for better section separation */}
+      {/* About Me Section */}
+      <Card className="p-6 shadow-md rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <User className="h-6 w-6 text-blue-600 dark:text-blue-400" /> About Me
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 text-gray-700 dark:text-gray-300 leading-relaxed">
+          {profile.bio || "A passionate ALX learner dedicated to building impactful software solutions. My journey through the ALX program has equipped me with a strong foundation in [mention key areas like problem-solving, data structures, algorithms] and hands-on experience in [mention key technologies]. I thrive on tackling complex challenges and continuously expanding my skill set to create innovative and efficient applications."}
+        </CardContent>
+      </Card>
+
+      {/* Skills Section */}
+      <Card className="p-6 shadow-md rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <Lightbulb className="h-6 w-6 text-yellow-500" /> Skills
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 flex flex-wrap gap-2">
+          {profile.skills.length > 0 ? (
+            profile.skills.map((skill, index) => (
+              <Badge key={index} className="px-4 py-1.5 rounded-full bg-blue-500 text-white dark:bg-blue-700 dark:text-blue-100 text-sm font-medium">
+                {skill}
+              </Badge>
+            ))
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No skills listed yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Certifications Section */}
+      <Card className="p-6 shadow-md rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-green-500" /> Certifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 space-y-2">
+          {profile.certifications.length > 0 ? (
+            profile.certifications.map((cert, index) => (
+              <p key={index} className="text-gray-700 dark:text-gray-300 text-base flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-500 flex-shrink-0" /> {cert}
+              </p>
+            ))
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No certifications listed yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Achievements Section */}
+      <Card className="p-6 shadow-md rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <Trophy className="h-6 w-6 text-purple-500" /> Achievements
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 space-y-2">
+          {profile.achievements.length > 0 ? (
+            profile.achievements.map((achievement, index) => (
+              <p key={index} className="text-gray-700 dark:text-gray-300 text-base flex items-start gap-2">
+                <Star className="h-4 w-4 text-yellow-500 flex-shrink-0 mt-1" /> {achievement}
+              </p>
+            ))
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No achievements listed yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI-Generated Portfolio Summary (UI/UX detailed in section 4) */}
+      <Card className="p-6 shadow-md rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <CardHeader className="p-0 pb-2">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <Sparkle className="h-6 w-6 text-pink-500" /> AI-Generated Summary
+            <Info className="h-4 w-4 text-gray-400 ml-2 cursor-pointer" data-tooltip-id="ai-summary-tooltip" data-tooltip-content="This summary is generated by AI based on your profile bio, skills, and project descriptions." />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 text-gray-700 dark:text-gray-300 leading-relaxed">
+          {summary ? (
+            <p>{summary}</p>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No summary available. Fill in your portfolio, skills, and bio to generate an AI-powered project summary!</p>
+          )}
+          <div className="flex justify-end mt-4 gap-2">
+            <Button variant="ghost" size="sm" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-500" onClick={() => {/* Regenerate logic */}}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Regenerate
+            </Button>
+            <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-500" onClick={() => {/* Feedback modal */}}>
+              <MessageSquare className="h-4 w-4 mr-1" /> Feedback
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
+            <AlertCircle className="inline h-3 w-3 mr-1" /> Powered by AI. Content may vary.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+
+    {/* Right Column (Desktop - Portfolio Projects, AI Recommendations) */}
+    <div className="lg:col-span-2 space-y-10"> {/* Increased space-y for better section separation */}
+      {/* Portfolio Projects Section */}
+      <Card className="p-6 shadow-md rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <FolderDot className="h-6 w-6 text-blue-600 dark:text-blue-400" /> Portfolio Projects
+          </CardTitle>
+          <CardDescription className="text-base text-gray-600 dark:text-gray-400">
+            A selection of my key projects, highlighting my skills and contributions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {/* Enhanced ProjectList integration */}
+          <ProjectList
+            projects={profile.portfolio}
+            loading={loading}
+            error={null}
+            onEdit={null} // No edit in public view
+            onShare={null} // No share button in public view (sharing is via URL)
+            filters={{}}
+            isPublicView={true} // New prop for visual differentiation
+          />
+          {profile.portfolio.length === 0 && (
+            <p className="text-center text-gray-500 dark:text-gray-400 mt-4">
+              This user has not added any public projects yet.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI-Powered Project Recommendations (UI/UX detailed in section 4) */}
+      <Card className="p-6 shadow-md rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <CardHeader className="p-0 pb-2">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+            <Sparkle className="h-6 w-6 text-blue-500" /> AI-Powered Project Recommendations
+            <Info className="h-4 w-4 text-gray-400 ml-2 cursor-pointer" data-tooltip-id="ai-recommendations-tooltip" data-tooltip-content="These recommendations are generated by AI based on your skills and interests to suggest potential future projects." />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 text-gray-700 dark:text-gray-300 leading-relaxed">
+          {recommendations.length > 0 ? (
+            <ul className="list-disc pl-5 space-y-2">
+              {recommendations.map((rec, index) => (
+                <li key={index}>{rec}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm">No recommendations available. Fill in your skills and bio to get AI-powered project recommendations!</p>
+          )}
+          <div className="flex justify-end mt-4 gap-2">
+            <Button variant="ghost" size="sm" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-500" onClick={() => {/* Regenerate logic */}}>
+              <RefreshCw className="h-4 w-4 mr-1" /> Regenerate
+            </Button>
+            <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-500" onClick={() => {/* Feedback modal */}}>
+              <MessageSquare className="h-4 w-4 mr-1" /> Feedback
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
+            <AlertCircle className="inline h-3 w-3 mr-1" /> Powered by AI. Content may vary.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  </main>
+
+  {/* Footer */}
+  <footer className="w-full bg-gray-800 dark:bg-gray-900 py-6 sm:py-8 text-gray-300 text-center text-xs sm:text-sm">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <p>&copy; {new Date().getFullYear()} ALX Showcase. All rights reserved.</p>
+      <p className="mt-1 sm:mt-2">Built with passion for the ALX Community.</p>
+    </div>
+  </footer>
+</div>
+
+{/* Tooltip for AI sections (requires a tooltip library like react-tooltip) */}
+{/* <Tooltip id="ai-summary-tooltip" /> */}
+{/* <Tooltip id="ai-recommendations-tooltip" /> */}
+
+Enhancements for ProjectList in Public View (isPublicView={true} prop):
+
+Project Card Design: Each project card should be a mini "case study" summary.
+
+Image/Visual: Prominent project image or a visually appealing placeholder/icon.
+
+Headline: Clear, concise project title.
+
+Core Purpose/Impact: A 1-2 sentence summary of what the project does and why it matters.
+
+Key Technologies: Displayed as Badges.
+
+AI-Generated Snippet: A small, perhaps truncated, AI-generated work log or impact statement (e.g., "AI insights: Optimized data processing by 30%"). This could be expanded on hover or click.
+
+Call to Action Buttons: "View Project" (linking to a dedicated project detail page, if implemented) and "View Source" (linking to GitHub repo).
+
+No Editing Controls: The ProjectList component should conditionally hide "Edit" and "Delete" buttons when isPublicView is true.
+
+4. AI-Powered Sections UI/UX
+These sections (AI-Powered Project Recommendations, AI-Generated Portfolio Summary) are designed to be transparent, trustworthy, and controllable.
+
+Design Principles:
+
+Subtle Integration: AI elements are clearly marked but don't dominate the UI.
+
+Transparency: Users understand the source and basis of the AI output.
+
+Empowerment: Users have options to provide feedback or regenerate content.
+
+UI/UX Elements:
+
+4.1. Visibility
+Dedicated Cards: Both "AI-Generated Summary" and "AI-Powered Project Recommendations" are presented within their own Card components. This gives them clear boundaries and visual importance without cluttering other profile sections.
+
+Clear Headings: Each section has a distinct, bold heading with a relevant icon (Sparkle is used here to denote AI).
+
+Consistent Placement: They are placed logically within the profile flow, either within the main profile settings card (private view) or in dedicated content areas (public view).
+
+4.2. Explanation/Transparency
+"Powered by AI" Label: A small, subtle text label (text-xs text-gray-400 dark:text-gray-600) placed at the bottom of the AI-generated content block. It includes a small AlertCircle icon for visual emphasis.
+
+Info Icon with Tooltip:
+
+An Info icon (h-4 w-4 text-gray-400) is placed next to the section title.
+
+On hover (or focus for keyboard users), a tooltip appears (requires a tooltip library like react-tooltip) explaining the basis of the AI output:
+
+For Summary: "This summary is generated by AI based on your profile bio, skills, and project descriptions."
+
+For Recommendations: "These recommendations are generated by AI based on your skills and interests to suggest potential future projects."
+
+Accessibility: Tooltips should be keyboard-accessible and provide sufficient contrast.
+
+4.3. Trust & Control
+"Regenerate" Button:
+
+Purpose: Allows users to re-run the AI generation process if they are not satisfied with the output or if their underlying data has changed.
+
+Placement: Small, secondary Button (variant="ghost") at the bottom-right of the AI content block.
+
+Icon: RefreshCw icon.
+
+Text: "Regenerate"
+
+"Feedback" Button:
+
+Purpose: Provides a direct channel for users to give feedback on the AI's performance, report inaccuracies, or suggest improvements.
+
+Placement: Small, secondary Button (variant="ghost") next to the "Regenerate" button.
+
+Icon: MessageSquare icon.
+
+Text: "Feedback"
+
+Interaction: Clicking this button would open a simple modal/dialog with a text area for feedback submission.
+
+4.4. Bias Mitigation
+General Disclaimer: The "Powered by AI. Content may vary." disclaimer serves as a subtle reminder that AI output is not infallible.
+
+Focus on Quantifiable Metrics (where applicable): For recommendations, the AI should ideally focus on suggesting projects based on detected skills and interests from the user's input, rather than making subjective judgments about their capabilities. The UI should reflect this by stating the basis of the recommendation clearly.
+
+User Control: Providing "Regenerate" and "Feedback" buttons empowers users to correct or influence the AI's output, which is a crucial step in mitigating perceived biases.
+
+No Sensitive Data Input: Ensure that the input fields for AI generation (e.g., bio, skills, project descriptions) are focused on professional and technical data, avoiding prompts for sensitive personal information that could introduce bias.
+
+Accessibility Considerations for AI Sections:
+
+Labels: All buttons and interactive elements have clear, programmatically associated labels (e.g., aria-label).
+
+Keyboard Navigation: Users can tab through "Regenerate" and "Feedback" buttons.
+
+Color Contrast: Text and icons meet WCAG 2.1 AA contrast ratios against their backgrounds.
+
+Tooltips: Ensure tooltips are accessible via keyboard focus and provide sufficient time for users to read them.
+
+This detailed design aims to create a highly professional and user-friendly experience for the ALX Showcase, both for private profile management and public portfolio display, with thoughtful integration of AI features.

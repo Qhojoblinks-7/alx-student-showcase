@@ -1,445 +1,334 @@
-import { forwardRef, createContext, useContext } from 'react';
-import { useDispatch } from 'react-redux'; // Import useDispatch
-import PropTypes from 'prop-types';
-import { useAuth } from '../../hooks/use-auth.js';
-import { toast } from 'sonner';
-import { cn } from '../../lib/utils';
-
-// Import Redux thunks
+// src/components/projects/ProjectList.jsx
+import React, { memo } from 'react'; // Import memo
+import { useSelector, useDispatch } from 'react-redux';
+import { useOutletContext } from 'react-router-dom';
 import {
-  deleteProject,
-  updateProject, // For toggleVisibility
-  fetchProjects // Re-import fetchProjects for the retry button if needed
-} from '../../store/slices/projectsSlice.js';
-
-import { Button } from '../ui/button.jsx';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card.jsx';
-import { Badge } from '../ui/badge.jsx';
-import { Skeleton } from '../ui/skeleton.jsx';
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
-  Github,
-  ExternalLink,
-  Calendar,
-  Clock,
-  Eye,
-  EyeOff,
-  Share2,
-  Edit,
-  Trash2,
-  AlertTriangle
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+    MoreHorizontal,
+    Pencil,
+    Share2,
+    Eye,
+    EyeOff,
+    Trash2,
+    PlusCircle,
+    Github,
+    Loader2,
+    Info,
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
-// --- Tabs Component Refactor (from tabs.jsx) ---
-const TabsContext = createContext(null);
+import DashboardSummary from '@/components/DashboardSummary';
+import { deleteProject, updateProject } from '@/store/slices/projectsSlice';
+import { selectAllProjects, selectAuthStatus } from '@/store/selectors'; // Import memoized selectors
+import { Skeleton } from '@/components/ui/skeleton';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
-const Tabs = forwardRef(({ className, value, onValueChange, children, ...props }, ref) => (
-  <TabsContext.Provider value={{ value, onValueChange }}>
-    <div ref={ref} className={cn('w-full', className)} {...props}>
-      {children}
-    </div>
-  </TabsContext.Provider>
-));
-Tabs.displayName = 'Tabs';
-
-const TabsList = forwardRef(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
-      className
-    )}
-    role="tablist"
-    {...props}
-  />
-));
-TabsList.displayName = 'TabsList';
-
-const TabsTrigger = forwardRef(({ className, value, ...props }, ref) => {
-  const context = useContext(TabsContext);
-  const isActive = context.value === value;
-
-  return (
-    <button
-      ref={ref}
-      className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-        isActive ? 'bg-background text-foreground shadow-sm' : 'data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground',
-        className
-      )}
-      data-state={isActive ? 'active' : 'inactive'}
-      onClick={() => context.onValueChange?.(value)}
-      role="tab"
-      aria-selected={isActive}
-      {...props}
-    />
-  );
-});
-TabsTrigger.displayName = 'TabsTrigger';
-
-const TabsContent = forwardRef(({ className, value, ...props }, ref) => {
-  const context = useContext(TabsContext);
-  const isActive = context.value === value;
-
-  if (!isActive) return null;
-
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        className
-      )}
-      role="tabpanel"
-      {...props}
-    />
-  );
-});
-TabsContent.displayName = 'TabsContent';
-
-// PropTypes for the refactored Tabs components
-Tabs.propTypes = {
-  className: PropTypes.string,
-  value: PropTypes.string.isRequired,
-  onValueChange: PropTypes.func.isRequired,
-  children: PropTypes.node.isRequired,
-};
-
-TabsList.propTypes = {
-  className: PropTypes.string,
-  children: PropTypes.node.isRequired,
-};
-
-TabsTrigger.propTypes = {
-  className: PropTypes.string,
-  value: PropTypes.string.isRequired,
-  children: PropTypes.node.isRequired,
-};
-
-TabsContent.propTypes = {
-  className: PropTypes.string,
-  value: PropTypes.string.isRequired,
-  children: PropTypes.node.isRequired,
-};
-// --- End Tabs Component Refactor ---
+// IMPORT THE REDUX ACTION FOR OPENING THE WIZARD
+import { openWizard } from '@/store/slices/githubSlice';
 
 
-export function ProjectList({ onEdit, onShare, filters = {}, projects, loading, error, onRetry }) { // Added projects, loading, error, onRetry props
-  const dispatch = useDispatch();
-  const { user } = useAuth(); // Get user from your auth hook
+const ProjectCard = memo(({ project, onEdit, onDelete, isOwner }) => { // Memoize ProjectCard too
+    const dispatch = useDispatch();
+    const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+    const [isTogglingPublic, setIsTogglingPublic] = React.useState(false);
 
-  const [filteredProjects, setFilteredProjects] = useState([]);
+    const handleTogglePublic = async () => {
+        setIsTogglingPublic(true);
+        try {
+            await dispatch(updateProject({ id: project.id, is_public: !project.is_public })).unwrap();
+            toast.success(`Project is now ${project.is_public ? 'Private' : 'Public'}.`);
+        } catch (err) {
+            toast.error(`Failed to change visibility: ${err.message || 'Unknown error'}`);
+        } finally {
+            setIsTogglingPublic(false);
+        }
+    };
 
-  useEffect(() => {
-    let result = projects ? projects.slice() : []; // Use props.projects
+    const handleCopyShareLink = () => {
+        const publicBaseUrl = window.location.origin.replace('/dashboard', '/showcase');
+        const identifier = project.user_github_username || project.user_id;
+        if (!identifier) {
+            toast.error('Could not generate share link: User identifier missing.');
+            return;
+        }
+        const shareLink = `${publicBaseUrl}/${identifier}/${project.id}`;
 
-    if (filters.query) {
-      result = result.filter((project) =>
-        project.title.toLowerCase().includes(filters.query.toLowerCase())
-      );
-    }
+        navigator.clipboard.writeText(shareLink)
+            .then(() => {
+                toast.success('Share link copied to clipboard!');
+            })
+            .catch((err) => {
+                console.error('Failed to copy text: ', err);
+                toast.error('Failed to copy link. Please try again.');
+            });
+    };
 
-    if (filters.tags) {
-      result = result.filter((project) =>
-        project.tags.some((tag) => tag.toLowerCase().includes(filters.tags.toLowerCase()))
-      );
-    }
+    const hasTruncatedDescription = project.description && project.description.length > 100;
 
-    if (filters.technologies) {
-      result = result.filter((project) =>
-        project.technologies.some((tech) =>
-          tech.toLowerCase().includes(filters.technologies.toLowerCase())
-        )
-      );
-    }
-
-    if (filters.sortBy === 'popularity') {
-      // Assuming 'popularity' field exists or can be derived
-      result = result.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-    } else if (filters.sortBy === 'recency') {
-      result = result.sort((a, b) => new Date(b.created_at || b.last_updated) - new Date(a.created_at || a.last_updated)); // Use created_at or last_updated
-    }
-
-    setFilteredProjects(result);
-  }, [filters, projects]); // Depend on filters and projects props
-
-  const handleDeleteProject = async (projectId) => {
-    toast('Are you sure you want to delete this project?', {
-      action: {
-        label: 'Confirm',
-        onClick: async () => {
-          try {
-            await dispatch(deleteProject(projectId)).unwrap();
-            toast.success('Project deleted successfully!');
-          } catch (err) {
-            toast.error('Failed to delete project: ' + (err.message || 'Unknown error'));
-            console.error('Error deleting project:', String(err)); // Explicitly stringify error for console
-          }
-        },
-      },
-      duration: 5000,
-    });
-  };
-
-  const handleToggleVisibility = async (projectId, isPublic) => {
-    try {
-      // Use the updateProject thunk to change the is_public status
-      await dispatch(updateProject({ id: projectId, projectData: { is_public: !isPublic } })).unwrap();
-      toast.success(`Project visibility set to ${!isPublic ? 'public' : 'private'}`);
-    } catch (err) {
-      toast.error('Failed to update visibility: ' + (err.message || 'Unknown error'));
-      console.error('Error updating project visibility:', String(err)); // Explicitly stringify error for console
-    }
-  };
-
-  const getDifficultyColor = (level) => {
-    switch (level) {
-      case 'beginner': return 'bg-green-100 text-green-800';
-      case 'intermediate': return 'bg-yellow-100 text-yellow-800';
-      case 'advanced': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getProjectTypeColor = (type) => {
-    switch (type) {
-      case 'web': return 'bg-blue-100 text-blue-800';
-      case 'mobile': return 'bg-purple-100 text-purple-80';
-      case 'backend': return 'bg-orange-100 text-orange-800';
-      case 'data-science': return 'bg-pink-100 text-pink-800';
-      case 'ai': return 'bg-teal-100 text-teal-800';
-      case 'devops': return 'bg-indigo-100 text-indigo-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  if (loading) {
     return (
-      <div className="space-y-6">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-full" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-6 w-16" />
-                  <Skeleton className="h-6 w-20" />
-                  <Skeleton className="h-6 w-14" />
+        <Card className="flex flex-col h-full overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            {project.image_url && (
+                <div className="relative w-full h-48 bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                    <img
+                        src={project.image_url}
+                        alt={project.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "https://placehold.co/600x400/e0e0e0/000000?text=No+Image"; }}
+                    />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="text-center py-12 bg-red-50 border border-red-200 text-red-800">
-        <CardContent>
-          <AlertTriangle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Error Loading Projects</h3>
-          <p className="text-sm">{error}</p>
-          {onRetry && (
-            <Button onClick={onRetry} className="mt-4">
-              Retry
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (projects.length === 0) {
-    return (
-      <Card className="text-center py-12">
-        <CardContent>
-          <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
-            <Share2 className="h-12 w-12 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
-          <p className="text-muted-foreground mb-4">
-            Start documenting your coding journey by adding your first project!
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const displayedProjects = filteredProjects.length > 0 ? filteredProjects : projects;
-
-  return (
-    <div className="space-y-6">
-      {displayedProjects.map((project) => {
-        return (
-          <Card key={project.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              {/* Flex container for title/description and action buttons */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold break-words">
+            )}
+            <CardHeader className="pb-2 flex-grow">
+                <CardTitle className="text-xl font-semibold leading-tight text-gray-900 dark:text-gray-50">
                     {project.title}
-                    {project.is_public ? (
-                      <Eye className="h-4 w-4 text-green-600 flex-shrink-0" />
-                    ) : (
-                      <EyeOff className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    )}
-                  </CardTitle>
-                  <CardDescription className="mt-2 text-sm text-muted-foreground break-words">
+                </CardTitle>
+                <CardDescription className={`text-sm text-muted-foreground ${hasTruncatedDescription ? 'line-clamp-3' : ''}`}>
                     {project.description}
-                  </CardDescription>
-                </div>
-                {/* Button group: flex-shrink-0 to prevent shrinking, flex-wrap for mobile */}
-                <div className="flex flex-wrap gap-2 flex-shrink-0 mt-2 sm:mt-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleToggleVisibility(project.id, project.is_public)}
-                  >
-                    {project.is_public ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onShare?.(project)}
-
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onEdit?.(project)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDeleteProject(project.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+                    {hasTruncatedDescription && (
+                        <HoverCard>
+                            <HoverCardTrigger asChild>
+                                <span className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"> ...read more</span>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-80 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-50">
+                                {project.description}
+                            </HoverCardContent>
+                        </HoverCard>
+                    )}
+                </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {project.image_url && (
-                <div className="w-full h-48 rounded-lg overflow-hidden bg-muted">
-                  <img
-                    src={project.image_url}
-                    alt={project.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+            <CardContent className="pt-2 flex flex-col justify-end">
+                <div className="flex flex-wrap gap-2 mb-4">
+                    {project.technologies?.map((tech, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs px-2 py-1">
+                            {tech}
+                        </Badge>
+                    ))}
                 </div>
-              )}
 
-              <div className="flex flex-wrap gap-2">
-                <Badge className={getDifficultyColor(project.difficulty_level)}>
-                  {project.difficulty_level}
-                </Badge>
-                <Badge className={getProjectTypeColor(project.category)}>
-                  {project.category}
-                </Badge>
-                {project.technologies?.map((tech, index) => (
-                  <Badge key={index} variant="secondary">
-                    {tech}
-                  </Badge>
-                ))}
-              </div>
-
-              {project.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {project.tags.map((tag, index) => (
-                    <Badge key={index} variant="outline">
-                      #{tag}
-                    </Badge>
-                  ))}
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
+                    {project.category && (
+                        <span className="flex items-center">
+                            <Info className="h-3 w-3 mr-1" />
+                            {project.category}
+                        </span>
+                    )}
+                    {project.difficulty && (
+                        <span className="ml-auto">Difficulty: {project.difficulty}</span>
+                    )}
                 </div>
-              )}
 
-              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                {project.completion_date && (
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {format(new Date(project.completion_date), 'MMM dd, yyyy')}
-                  </div>
-                )}
-                {project.time_spent_hours && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    {project.time_spent_hours}h
-                  </div>
-                )}
-              </div>
+                <div className="flex justify-between items-center mt-auto">
+                    {project.github_url && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={() => window.open(project.github_url, '_blank')}
+                        >
+                            <Github className="h-4 w-4 mr-1" /> GitHub
+                        </Button>
+                    )}
 
-              <div className="flex flex-wrap gap-2">
-                {project.github_url && (
-                  <Button size="sm" variant="outline" asChild>
-                    <a href={project.github_url} target="_blank" rel="noopener noreferrer">
-                      <Github className="h-4 w-4 mr-2" />
-                      Code
-                    </a>
-                  </Button>
-                )}
-                {project.live_url && (
-                  <Button size="sm" variant="outline" asChild>
-                    <a href={project.live_url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Live Demo
-                    </a>
-                  </Button>
-                )}
-              </div>
-
-              {(project.key_learnings || project.challenges_faced) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                  {project.key_learnings && (
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">Key Learnings</h4>
-                      <p className="text-sm text-muted-foreground break-words">{project.key_learnings}</p>
-                    </div>
-                  )}
-                  {project.challenges_faced && (
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">Challenges Faced</h4>
-                      <p className="text-sm text-muted-foreground break-words">{project.challenges_faced}</p>
-                    </div>
-                  )}
+                    {isOwner && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0 ml-auto">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => onEdit(project)}>
+                                    <Pencil className="mr-2 h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleTogglePublic} disabled={isTogglingPublic}>
+                                    {isTogglingPublic ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : project.is_public ? (
+                                        <EyeOff className="mr-2 h-4 w-4" />
+                                    ) : (
+                                        <Eye className="mr-2 h-4 w-4" />
+                                    )}
+                                    {project.is_public ? 'Make Private' : 'Make Public'}
+                                </DropdownMenuItem>
+                                {project.is_public && (
+                                    <DropdownMenuItem onClick={handleCopyShareLink}>
+                                        <Share2 className="mr-2 h-4 w-4" /> Copy Share Link
+                                    </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                                    <DropdownMenuItem
+                                        onClick={(e) => {
+                                            e.preventDefault(); // Prevent dropdown from closing immediately
+                                            setShowDeleteDialog(true);
+                                        }}
+                                        className="text-red-600 focus:text-red-600"
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This action cannot be undone. This will permanently delete your project
+                                                and remove its data from our servers.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => onDelete(project.id)} className="bg-red-600 hover:bg-red-700 text-white">
+                                                Delete
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
-              )}
             </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
+        </Card>
+    );
+}); // End memo for ProjectCard
 
-ProjectList.propTypes = {
-  onEdit: PropTypes.func,
-  onShare: PropTypes.func,
-  filters: PropTypes.object,
-  projects: PropTypes.array.isRequired, // projects is now a required prop
-  loading: PropTypes.bool.isRequired,   // loading is now a required prop
-  error: PropTypes.string,              // error is now a prop
-  onRetry: PropTypes.func,              // onRetry is a new prop for the retry button
-};
-ProjectList.defaultProps = {
-  onEdit: () => {},
-  onShare: () => {},
-  filters: {},
-  loading: false,
-  error: null,
-  onRetry: null, // Default to null if not provided
-};
+
+const ProjectList = memo(() => { // Memoize ProjectList
+    const dispatch = useDispatch();
+    // Use memoized selectors where appropriate
+    const projects = useSelector(selectAllProjects); // Get projects from memoized selector
+    const projectsStatus = useSelector((state) => state.projects.status); // Get status directly
+    const { user, isLoading: authLoading } = useSelector(selectAuthStatus); // Use memoized auth status
+
+    const { handleOpenProjectForm } = useOutletContext() || {};
+
+    // Log to observe renders of ProjectList
+    console.log('ProjectList render: Status =', projectsStatus, 'Projects count =', projects.length);
+
+    const isLoading = projectsStatus === 'loading' || authLoading;
+
+    const handleEditProject = (project) => {
+        if (handleOpenProjectForm) {
+            handleOpenProjectForm(project);
+        }
+    };
+
+    const handleDeleteProject = (projectId) => {
+        dispatch(deleteProject(projectId));
+        toast.success('Project deleted successfully!');
+    };
+
+    const handleOpenGitHubWizard = () => {
+        // Log to confirm this function is called when the button is clicked
+        console.log('ProjectList: "Import from GitHub" button clicked. Dispatching openWizard() action.');
+        dispatch(openWizard());
+    };
+
+    if (isLoading) {
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
+                {[...Array(3)].map((_, i) => (
+                    <Card key={i} className="flex flex-col h-full animate-pulse">
+                        <div className="relative w-full h-48 bg-gray-200 dark:bg-gray-700 rounded-t-lg" />
+                        <CardHeader className="pb-2 flex-grow">
+                            <Skeleton className="h-6 w-3/4 mb-2" />
+                            <Skeleton className="h-4 w-full mb-1" />
+                            <Skeleton className="h-4 w-5/6" />
+                        </CardHeader>
+                        <CardContent className="pt-2">
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-5 w-20" />
+                                <Skeleton className="h-5 w-12" />
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <Skeleton className="h-8 w-20" />
+                                <Skeleton className="h-8 w-8 rounded-full" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+        );
+    }
+
+    if (projects.length === 0 && projectsStatus !== 'loading') { // Use projectsStatus here
+        return (
+            <div className="p-6 text-center text-muted-foreground">
+                <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-50">No Projects Found</h3>
+                <p className="mb-6">It looks like you haven't added any projects yet. Let's get started!</p>
+                <div className="flex flex-col sm:flex-row justify-center gap-4">
+                    <Button onClick={handleOpenGitHubWizard} className="px-6 py-3 text-lg">
+                        <Github className="mr-2 h-5 w-5" /> Import from GitHub
+                    </Button>
+                    <Button onClick={() => handleOpenProjectForm()} variant="outline" className="px-6 py-3 text-lg">
+                        <PlusCircle className="mr-2 h-5 w-5" /> Add Project Manually
+                    </Button>
+                </div>
+                <DashboardSummary />
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-4 sm:p-6">
+            <DashboardSummary />
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Your Projects</h2>
+                <div className="flex gap-2">
+                    <Button onClick={handleOpenGitHubWizard} variant="outline" className="hidden sm:inline-flex">
+                        <Github className="mr-2 h-4 w-4" /> Import from GitHub
+                    </Button>
+                    <Button onClick={() => handleOpenProjectForm()} className="hidden sm:inline-flex">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Project
+                    </Button>
+                    {/* Mobile buttons */}
+                    <Button onClick={handleOpenGitHubWizard} size="icon" variant="outline" className="sm:hidden">
+                        <Github className="h-4 w-4" />
+                    </Button>
+                    <Button onClick={() => handleOpenProjectForm()} size="icon" className="sm:hidden">
+                        <PlusCircle className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {projects.map((project) => (
+                    <ProjectCard
+                        key={project.id}
+                        project={project}
+                        onEdit={handleEditProject}
+                        onDelete={handleDeleteProject}
+                        isOwner={user?.id === project.user_id}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}); // End memo for ProjectList
+
+export default ProjectList;

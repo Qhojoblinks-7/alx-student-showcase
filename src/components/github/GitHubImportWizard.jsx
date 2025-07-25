@@ -1,452 +1,577 @@
-import { useState, useEffect, useCallback } from 'react';
-import PropTypes from 'prop-types';
-import { useDispatch } from 'react-redux'; // useSelector is no longer directly used here
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog.jsx';
-import { Button } from '@/components/ui/button.jsx';
-import { Input } from '@/components/ui/input.jsx';
-import { Label } from '@/components/ui/label.jsx';
-import { Checkbox } from '@/components/ui/checkbox.jsx';
-import { ScrollArea } from '@/components/ui/scroll-area.jsx';
-import { Separator } from '@/components/ui/separator.jsx';
-import { Badge } from '@/components/ui/badge.jsx';
+// src/components/github/GitHubImportWizard.jsx
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
+import { Loader2, CheckCircle2, CornerDownRight } from 'lucide-react';
 import {
-  Loader2,
-  Github,
-  ArrowRight,
-  CheckCircle,
-  AlertTriangle,
-  User, // For username section
-  GitFork,
-  Star,
-  Code,
-  Zap, // For detect ALX projects
-  ListChecks, // For select repositories
-  ClipboardCheck, // For review & import
-} from 'lucide-react';
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+
+import ProjectConfigurationStep from './GitHubImportWizard/ProjectConfigurationStep';
+import OutputGenerationStep from './GitHubImportWizard/OutputGenerationStep';
+
 import {
-  fetchUserRepositories,
-  detectALXProjects,
-  importSelectedProjects,
-  setWizardStep,
-  setWizardData,
-  toggleProjectSelection,
-  resetWizard,
-  clearGitHubErrors,
-  clearSelection,
-} from '@/store/slices/githubSlice.js';
-import { useAuth } from '@/hooks/use-auth.js'; // This is the local useAuth hook, not Redux one
-import { GitHubService } from '@/lib/github-service.js'; // Import GitHubService
-import { GitLabService, BitbucketService } from '@/lib/platform-services.js'; // Import services for GitLab and Bitbucket
-// Import memoized selectors from your selectors.js file
-import {
-  useGitHubRepositories,
-  useALXProjectCandidates,
-  useSelectedProjects,
-  useGitHubLoading,
-  useGitHubErrors,
-  useGitHubWizard,
-} from '@/hooks/selectors.js'; // Assuming selectors.js is in hooks or a similar common place
+    fetchRepos,
+    selectRepo,
+    analyzeRepository,
+    setCurrentStep,
+    closeWizard,
+    setError,
+    setProjectFormFields,
+    fetchCommitsAndGenerateWorkLog,
+    selectALXProject,
+    selectGithubState,
+    setWorkLogContent,
+    setRawCommits,
+    setStatus,
+    setSocialPosts,
+} from '@/store/slices/githubSlice';
+import { addProject } from '@/store/slices/projectsSlice';
+import { generateUniqueId } from '@/lib/utils';
 
-export function GitHubImportWizard({ onClose, onImportComplete }) {
-  const dispatch = useDispatch();
-  const { user } = useAuth(); // Get user from useAuth hook (this is the local state hook)
+const GITHUB_REPO_REGEX = /^(?:https?:\/\/github\.com\/)?([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_-]+)(?:\.git)?$/;
 
-  // Use memoized selectors to get specific pieces of state
-  const repositories = useGitHubRepositories();
-  /**
-   * @type {Array<Object>} alxProjects - Array of detected ALX projects,
-   * each containing processed data like title, description, technologies, etc.
-   */
-  const alxProjects = useALXProjectCandidates();
-  const selectedProjects = useSelectedProjects();
-  const { isLoadingRepositories, isDetectingALX, isImporting } = useGitHubLoading();
-  const { general: error, repository: repositoryError, import: importError } = useGitHubErrors();
-  const { step: wizardStep, data: wizardData } = useGitHubWizard();
+export const GitHubImportWizard = ({ isOpen, onClose }) => {
+    // Log prop directly when the component re-renders
+    console.log('GitHubImportWizard rendered. isOpen prop:', isOpen);
+    const dispatch = useDispatch();
+    const {
+        currentStep,
+        repos,
+        selectedRepo,
+        projectFormFields,
+        workLogContent,
+        socialPosts,
+        status,
+        error,
+        alxProjectsDetected,
+        selectedALXProject,
+    } = useSelector(selectGithubState);
+    const { user } = useSelector((state) => state.auth);
 
-  const [usernameInput, setUsernameInput] = useState(wizardData.username || '');
-  const [platform, setPlatform] = useState('GitHub'); // Add platform state
+    // Log selected Redux state variables on re-render
+    console.log('GitHubImportWizard Redux state:', { currentStep, status, selectedRepo, projectFormFields, isWizardOpen: useSelector(selectGithubState).isWizardOpen });
 
-  // Effect to reset state when modal opens/closes
-  useEffect(() => {
-    if (wizardStep === 'username' && !usernameInput) {
-      dispatch(resetWizard());
-      dispatch(clearSelection()); // Clear any previous selections when starting over
-    }
-  }, [wizardStep, dispatch, usernameInput]);
+    const [repoUrlInput, setRepoUrlInput] = useState('');
+    const [useAIForSummary, setUseAIForSummary] = useState(true);
+    const [useAIForWorkLog, setUseAIForWorkLog] = useState(true);
+    const [useAIForSocial, setUseAIForSocial] = useState(true);
+    const [selectedAIWorkLogFormat, setSelectedAIWorkLogFormat] = useState('bullets');
+    const [tempManualWorkLog, setTempManualWorkLog] = useState('');
 
-  // Helper function to get a readable error message
-  const getErrorMessage = (err) => {
-    if (err instanceof Error) {
-      return err.message;
-    }
-    // Check if it's a Redux Toolkit unwrap error with a payload
-    if (err && typeof err === 'object' && err.payload) {
-      return String(err.payload);
-    }
-    // Fallback for other non-Error objects
-    return String(err) || 'Unknown error';
-  };
+    const isLoadingRepos = status === 'loading_repos';
+    const isAnalyzing = status === 'analyzing_repo';
+    const isGeneratingWorkLog = status === 'generating_worklog';
+    const isGeneratingSocial = status === 'generating_social_posts';
+    const isImporting = status === 'importing';
 
-  // Handle fetching repositories
-  const handleFetchRepositories = useCallback(async () => {
-    if (!usernameInput.trim()) {
-      toast.error('Please enter a username.');
-      return;
-    }
-
-    dispatch(clearGitHubErrors());
-    dispatch(setWizardData({ username: usernameInput.trim() }));
-
-    try {
-      let fetchedRepositories;
-      if (platform === 'GitHub') {
-        // Removed fetchUserRepositories from dependency array as it's a stable thunk creator
-        fetchedRepositories = await dispatch(fetchUserRepositories(usernameInput.trim())).unwrap();
-      } else if (platform === 'GitLab') {
-        fetchedRepositories = await GitLabService.fetchUserRepositories(usernameInput.trim());
-      } else if (platform === 'Bitbucket') {
-        fetchedRepositories = await BitbucketService.fetchUserRepositories(usernameInput.trim());
-      }
-
-      // The fetchUserRepositories thunk already sets the repositories in state
-      // For other platforms, we would dispatch setRepositories(fetchedRepositories);
-      if (platform !== 'GitHub') {
-        dispatch(setRepositories(fetchedRepositories));
-      }
-      dispatch(setWizardStep('select_repos'));
-    } catch (err) {
-      console.error('Error fetching repositories:', String(err)); // Explicitly stringify error for console
-      toast.error('Failed to fetch repositories: ' + getErrorMessage(err));
-    }
-  }, [platform, usernameInput, dispatch]); // Removed fetchUserRepositories from deps
-
-  // Handle detecting ALX projects (for manual trigger from select_repos step)
-  const handleDetectALXProjects = useCallback(async () => {
-    dispatch(clearGitHubErrors()); // Clear previous errors
-    try {
-      // Removed detectALXProjects from dependency array as it's a stable thunk creator
-      // Pass repositories and username explicitly as required by the thunk
-      await dispatch(detectALXProjects({ repositories: repositories, username: wizardData.username })).unwrap();
-      dispatch(setWizardStep('review_import'));
-    } catch (err) {
-      // Log the full error object for debugging
-      console.error('Error in handleDetectALXProjects:', String(err)); // Explicitly stringify error for console
-      toast.error('Failed to detect ALX projects: ' + getErrorMessage(err));
-    }
-  }, [dispatch, repositories, wizardData.username]); // Removed detectALXProjects from deps
-
-  // Handle final import
-  const handleImportSelectedProjects = useCallback(async () => {
-    if (!user?.id) {
-      toast.error('User not authenticated. Please sign in.');
-      return;
-    }
-    if (selectedProjects.length === 0) {
-      toast.error('Please select at least one project to import.');
-      return;
-    }
-
-    dispatch(clearGitHubErrors()); // Clear previous errors
-
-    // Filter directly from 'alxProjects' which already contain the processed data.
-    const projectsToInsert = alxProjects.filter((alxProject) =>
-      selectedProjects.includes(alxProject.id) // alxProject.id is the GitHub repo ID
-    ).map(alxProject => ({
-      user_id: user.id,
-      // Removed 'id: alxProject.id' to allow Supabase to auto-generate UUID
-      title: alxProject.title,
-      description: alxProject.description,
-      technologies: alxProject.technologies || [], // Ensure it's an array
-      github_url: alxProject.github_url,
-      live_url: alxProject.live_url,
-      category: alxProject.category,
-      original_repo_name: alxProject.original_repo_name,
-      alx_confidence: alxProject.alx_confidence || 0.0,
-      last_updated: alxProject.last_updated,
-      is_public: alxProject.is_public,
-      completion_date: null,
-      time_spent_hours: null,
-      key_learnings: '',
-      challenges_faced: '',
-      image_url: '',
-      tags: [],
-      // AI fields will be populated by the importSelectedProjects thunk
-      ai_summary: null,
-      ai_work_log: null,
-      is_ai_processed: false,
-      ai_error: null,
-    }));
-
-    try {
-      if (projectsToInsert.length === 0) {
-        toast.warning('No valid ALX projects could be prepared for import. This might be due to API access issues or missing READMEs for the selected projects, or an internal state mismatch. Check console for details.');
-        onClose();
-        return;
-      }
-
-      // Removed importSelectedProjects from dependency array as it's a stable thunk creator
-      // Pass projectsToInsert and userId as an object to the thunk
-      const result = await dispatch(importSelectedProjects({ projectsToInsert: projectsToInsert, userId: user.id })).unwrap();
-      toast.success(`Successfully imported ${result.length} projects!`);
-      onImportComplete(result);
-      onClose();
-    } catch (err) {
-      toast.error('Failed to import projects: ' + getErrorMessage(err));
-    }
-  }, [selectedProjects, alxProjects, user, dispatch, onImportComplete, onClose]); // Removed importSelectedProjects from deps
-
-  const handleToggleProject = useCallback(
-    (projectId) => {
-      // Removed toggleProjectSelection from dependency array as it's a stable action creator
-      dispatch(toggleProjectSelection(projectId));
-    },
-    [dispatch] // Removed toggleProjectSelection from deps
-  );
-
-  const handlePlatformChange = (event) => {
-    setPlatform(event.target.value);
-  };
-
-  const renderStepContent = () => {
-    switch (wizardStep) {
-      case 'username':
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-              <User className="h-5 w-5 text-blue-500" /> Enter GitHub Username
-            </h3>
-            <Label htmlFor="github-username">GitHub Username</Label>
-            <Input
-              id="github-username"
-              placeholder="e.g., alx-student"
-              value={usernameInput}
-              onChange={(e) => setUsernameInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleFetchRepositories()}
-              disabled={isLoadingRepositories}
-            />
-            {repositoryError && (
-              <div className="text-red-500 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                {repositoryError}
-              </div>
-            )}
-            <Button
-              onClick={handleFetchRepositories}
-              disabled={isLoadingRepositories || !usernameInput.trim()}
-              className="w-full"
-            >
-              {isLoadingRepositories ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Github className="mr-2 h-4 w-4" />
-              )}
-              Fetch Repositories
-            </Button>
-          </div>
-        );
-
-      case 'select_repos':
-        if (repositories.length === 0) {
-          return (
-            <div className="text-center p-8 text-muted-foreground">
-              <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-              <p>No repositories found for "{wizardData.username}".</p>
-              <Button onClick={() => dispatch(setWizardStep('username'))} className="mt-4">
-                Go Back
-              </Button>
-            </div>
-          );
+    // Effect to reset local state when the wizard opens or currentStep changes to 1
+    useEffect(() => {
+        console.log('GitHubImportWizard useEffect: isOpen changed to', isOpen, 'currentStep:', currentStep);
+        if (isOpen && currentStep === 1) {
+            console.log('GitHubImportWizard: Resetting local state for new wizard session.');
+            setRepoUrlInput('');
+            setUseAIForSummary(true);
+            setUseAIForWorkLog(true);
+            setUseAIForSocial(true);
+            setSelectedAIWorkLogFormat('bullets');
+            setTempManualWorkLog('');
+            dispatch(setRawCommits([])); // Clear raw commits on wizard open/reset
+            dispatch(setWorkLogContent('')); // Clear work log content
+            dispatch(setSocialPosts(null)); // Clear social posts
+            dispatch(setError(null)); // Clear any previous errors
+            dispatch(setStatus('idle')); // Reset status to idle
         }
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-              <ListChecks className="h-5 w-5 text-purple-500" /> Select Repositories
-            </h3>
-            <DialogDescription>
-              Select repositories to detect ALX projects from.
-            </DialogDescription>
-            <ScrollArea className="h-80 w-full rounded-md border p-4 shadow-inner">
-              {repositories.map((repo) => (
-                <div key={repo.id} className="flex items-start space-x-3 py-2 border-b last:border-b-0">
-                  <Checkbox
-                    id={`repo-${repo.id}`}
-                    checked={selectedProjects.includes(repo.id)}
-                    onCheckedChange={() => handleToggleProject(repo.id)}
-                    className="mt-1"
-                  />
-                  <Label htmlFor={`repo-${repo.id}`} className="flex-1 cursor-pointer space-y-0.5">
-                    <span className="font-medium text-base text-gray-800 dark:text-gray-200">{repo.name}</span>
-                    <p className="text-sm text-muted-foreground">{repo.description || 'No description provided.'}</p>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
-                      {repo.language && (
-                        <Badge variant="outline" className="px-2 py-0.5 bg-blue-50 text-blue-700">
-                          <Code className="h-3 w-3 mr-1" />
-                          {repo.language}
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="px-2 py-0.5">
-                        <Star className="h-3 w-3 mr-0.5" />
-                        {repo.stargazers_count}
-                      </Badge>
-                      <Badge variant="outline" className="px-2 py-0.5">
-                        <GitFork className="h-3 w-3 mr-0.5" />
-                        {repo.forks_count}
-                      </Badge>
-                    </div>
-                  </Label>
-                </div>
-              ))}
-            </ScrollArea>
-            {error && (
-              <div className="text-red-500 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                {error}
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row justify-between gap-2">
-              <Button variant="outline" onClick={() => dispatch(setWizardStep('username'))} className="w-full sm:w-auto">
-                Back
-              </Button>
-              <Button
-                onClick={handleDetectALXProjects}
-                disabled={isDetectingALX || selectedProjects.length === 0}
-                className="w-full sm:w-auto"
-              >
-                {isDetectingALX ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Zap className="mr-2 h-4 w-4" />
-                )}
-                Detect ALX Projects ({selectedProjects.length})
-              </Button>
-            </div>
-          </div>
-        );
+    }, [isOpen, currentStep, dispatch]); // Added dispatch to dependency array
 
-      case 'review_import':
-        if (alxProjects.length === 0) {
-          return (
-            <div className="text-center p-8 text-muted-foreground">
-              <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-              <p>No ALX projects detected from selected repositories.</p>
-              <Button onClick={() => dispatch(setWizardStep('select_repos'))} className="mt-4">
-                Back to Selection
-              </Button>
-            </div>
-          );
+    const handleClose = useCallback(() => {
+        console.log('GitHubImportWizard: handleClose called, dispatching closeWizard() and calling parent onClose().');
+        dispatch(closeWizard()); // Dispatch the Redux action to close the wizard
+        onClose(); // Call the prop function to update parent's local state (if any)
+    }, [dispatch, onClose]);
+
+    const handleFetchRepos = useCallback(async () => {
+        console.log('GitHubImportWizard: handleFetchRepos called.');
+        if (!user?.user_metadata?.github_access_token) {
+            toast.error('GitHub token not found. Please connect your GitHub account in your profile settings.');
+            console.warn('GitHubImportWizard: GitHub token missing.');
+            return;
         }
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-              <ClipboardCheck className="h-5 w-5 text-green-500" /> Review & Import
-            </h3>
-            <DialogDescription>
-              Review the detected ALX projects. These will be imported into your showcase.
-            </DialogDescription>
-            <ScrollArea className="h-80 w-full rounded-md border p-4 shadow-inner">
-              {alxProjects.map((project) => (
-                <div key={project.id} className="flex items-start space-x-3 py-2 border-b last:border-b-0">
-                  <Checkbox
-                    id={`alx-project-${project.id}`}
-                    checked={selectedProjects.includes(project.id)}
-                    onCheckedChange={() => handleToggleProject(project.id)}
-                    className="mt-1"
-                  />
-                  <Label htmlFor={`alx-project-${project.id}`} className="flex-1 cursor-pointer space-y-0.5">
-                    <span className="font-medium text-base text-gray-800 dark:text-gray-200">{project.name}</span>
-                    <p className="text-sm text-muted-foreground">{project.description || 'No description provided.'}</p>
-                    <div className="flex flex-wrap items-center gap-2 text-xs mt-1">
-                      <Badge variant="secondary" className="px-2 py-0.5 bg-blue-50 text-blue-700">
-                        ALX Score: {project.alx_score?.toFixed(1)}
-                      </Badge>
-                      <Badge variant="outline" className="px-2 py-0.5">
-                        Confidence: {(project.alx_confidence * 100).toFixed(0)}%
-                      </Badge>
-                      <Badge variant="outline" className="px-2 py-0.5">
-                        Category: {project.alx_category}
-                      </Badge>
-                    </div>
-                  </Label>
+        dispatch(fetchRepos());
+    }, [dispatch, user?.user_metadata?.github_access_token]);
+
+    const handleSelectRepo = useCallback(async (repo) => {
+        console.log('GitHubImportWizard: handleSelectRepo called for:', repo.name);
+        dispatch(selectRepo(repo));
+        dispatch(setCurrentStep(2));
+        try {
+            console.log('GitHubImportWizard: Initiating repository analysis for selected repo.');
+            await dispatch(analyzeRepository({
+                owner: repo.owner.login,
+                repoName: repo.name,
+                useAI: useAIForSummary,
+            })).unwrap();
+            console.log('GitHubImportWizard: Repository analysis completed successfully.');
+        } catch (err) {
+            console.error('GitHubImportWizard: Failed to analyze repository:', err);
+            toast.error(`Failed to analyze repository: ${err.message || 'Unknown error'}`);
+            dispatch(setCurrentStep(1)); // Go back to step 1 on error
+            dispatch(selectRepo(null)); // Clear selected repo
+        }
+    }, [dispatch, useAIForSummary]);
+
+    const handleManualRepoInput = useCallback(async () => {
+        console.log('GitHubImportWizard: handleManualRepoInput called with URL:', repoUrlInput);
+        const match = repoUrlInput.match(GITHUB_REPO_REGEX);
+        if (!match) {
+            console.warn('GitHubImportWizard: Invalid GitHub repository URL format.');
+            dispatch(setError('Invalid GitHub repository URL format. Please use "owner/repo" or a full GitHub URL.'));
+            return;
+        }
+        dispatch(setError(null));
+        const [, owner, repoName] = match;
+
+        const tempRepo = {
+            id: generateUniqueId(), // Use generateUniqueId for a temporary ID
+            name: repoName,
+            full_name: `${owner}/${repoName}`,
+            html_url: `https://github.com/${owner}/${repoName}`,
+            owner: { login: owner, avatar_url: `https://github.com/${owner}.png` }, // Basic avatar URL
+            description: null,
+            default_branch: 'main', // Assume 'main' for manual entry
+        };
+        dispatch(selectRepo(tempRepo));
+        dispatch(setCurrentStep(2));
+        try {
+            console.log('GitHubImportWizard: Initiating repository analysis for manual input.');
+            await dispatch(analyzeRepository({
+                owner: owner,
+                repoName: repoName,
+                useAI: useAIForSummary,
+            })).unwrap();
+            console.log('GitHubImportWizard: Manual repository analysis completed successfully.');
+        } catch (err) {
+            console.error('GitHubImportWizard: Failed to analyze manual repository:', err);
+            toast.error(`Failed to analyze repository: ${err.message || 'Unknown error'}`);
+            dispatch(setCurrentStep(1));
+            dispatch(selectRepo(null));
+        }
+    }, [dispatch, repoUrlInput, useAIForSummary]);
+
+    const handleSetProjectFormFields = useCallback((fields) => {
+        console.log('GitHubImportWizard: setProjectFormFields called with:', fields);
+        dispatch(setProjectFormFields(fields));
+    }, [dispatch]);
+
+    const handleSetUseAIForSummary = useCallback((checked) => {
+        console.log('GitHubImportWizard: setUseAIForSummary called with:', checked);
+        setUseAIForSummary(checked);
+        // If enabling AI summary and a repo is selected and not currently analyzing, re-analyze
+        if (checked && selectedRepo && !isAnalyzing) {
+            console.log('GitHubImportWizard: Re-analyzing repo for AI summary due to toggle.');
+            dispatch(analyzeRepository({
+                owner: selectedRepo.owner.login,
+                repoName: selectedRepo.name,
+                useAI: true,
+            }));
+        }
+    }, [dispatch, selectedRepo, isAnalyzing]);
+
+    const handleSelectALXProjectInChild = useCallback((value) => {
+        console.log('GitHubImportWizard: handleSelectALXProjectInChild called with value:', value);
+        const alxProject = alxProjectsDetected.find(p => p.id === value);
+        dispatch(selectALXProject(alxProject));
+    }, [dispatch, alxProjectsDetected]);
+
+    const handleApplyALXProjectDetailsInChild = useCallback(() => {
+        console.log('GitHubImportWizard: handleApplyALXProjectDetailsInChild called.');
+        if (selectedALXProject) {
+            console.log('GitHubImportWizard: Applying ALX project details:', selectedALXProject);
+            dispatch(setProjectFormFields({
+                title: selectedALXProject.title,
+                description: selectedALXProject.description || projectFormFields.description,
+                technologies: [...new Set([...projectFormFields.technologies, ...selectedALXProject.technologies])], // Merge technologies
+                is_alx_project: true,
+                category: selectedALXProject.suggested_category,
+                difficulty: selectedALXProject.suggested_difficulty,
+                ai_summary: selectedALXProject.ai_summary, // Keep AI summary from analysis if available
+            }));
+            toast.success(`Applied details for ALX project: ${selectedALXProject.title}`);
+        } else {
+            console.warn('GitHubImportWizard: Attempted to apply ALX details without a selected project.');
+            toast.error('Please select an ALX project first.');
+        }
+    }, [dispatch, selectedALXProject, projectFormFields.description, projectFormFields.technologies]);
+
+    const handleGenerateSocialPosts = useCallback(async () => {
+        console.log('GitHubImportWizard: handleGenerateSocialPosts called.');
+        if (useAIForSocial && projectFormFields.title) {
+            dispatch(setStatus('generating_social_posts'));
+            try {
+                console.log('GitHubImportWizard: Simulating AI social media post generation...');
+                // Simulate API call for social posts
+                const generatedPosts = await new Promise(resolve => setTimeout(() => ({
+                    twitter: `Just imported "${projectFormFields.title}"! Built with ${projectFormFields.technologies.join(', ')}. Check it out! #ALXProjects #Coding`,
+                    linkedin: `Excited to share my recent project, "${projectFormFields.title}"! This ${projectFormFields.category || 'software development'} project leverages ${projectFormFields.technologies.join(', ')}. Key learnings include... [workLog summary here] #SoftwareDevelopment #GitHub #ALX`,
+                }), 1500));
+
+                dispatch(setSocialPosts(generatedPosts));
+                dispatch(setStatus('succeeded'));
+                console.log('GitHubImportWizard: Social media posts generated.');
+            } catch (err) {
+                console.error('GitHubImportWizard: Failed to generate social media posts:', err);
+                toast.error(`Failed to generate social media posts: ${err.message || 'Unknown error'}`);
+                dispatch(setError(err.message || 'Failed to generate social media posts.'));
+                dispatch(setStatus('failed'));
+                setUseAIForSocial(false); // Disable AI if generation fails
+            }
+        } else {
+            console.log("GitHubImportWizard: AI Social Media generation is not enabled or project title is missing. Skipping generation.");
+            toast.info("AI Social Media generation is not enabled or project title is missing.");
+        }
+    }, [dispatch, useAIForSocial, projectFormFields.title, projectFormFields.technologies, projectFormFields.category]);
+
+    const handleGenerateWorkLog = useCallback(async () => {
+        console.log('GitHubImportWizard: handleGenerateWorkLog called.');
+        if (useAIForWorkLog && selectedRepo) {
+            try {
+                console.log('GitHubImportWizard: Initiating AI work log generation.');
+                await dispatch(fetchCommitsAndGenerateWorkLog({
+                    owner: selectedRepo.owner.login,
+                    repoName: selectedRepo.name,
+                    branch: selectedRepo.default_branch || 'main',
+                    timeframe: 'all', // Or dynamically selected timeframe
+                    format: selectedAIWorkLogFormat,
+                })).unwrap();
+                console.log('GitHubImportWizard: Work log generated successfully.');
+            } catch (err) {
+                console.error('GitHubImportWizard: Failed to generate work log:', err);
+                toast.error(`Failed to generate work log: ${err.message || 'Unknown error'}`);
+                dispatch(setError(err.message || 'Failed to generate work log.'));
+                setUseAIForWorkLog(false); // Disable AI if generation fails
+            }
+        } else {
+            console.log("GitHubImportWizard: AI Work Log generation is not enabled or no repository selected. Skipping generation.");
+            toast.info("AI Work Log generation is not enabled or no repository selected.");
+        }
+    }, [dispatch, useAIForWorkLog, selectedRepo, selectedAIWorkLogFormat]);
+
+    const handleConfirmProjectDetails = useCallback(async () => {
+        console.log('GitHubImportWizard: handleConfirmProjectDetails called.');
+        if (!projectFormFields.title || !projectFormFields.description || !projectFormFields.technologies?.length) {
+            console.warn('GitHubImportWizard: Project details missing for confirmation.');
+            toast.error('Project Name, Description, and Technologies are required.');
+            dispatch(setError('Project Name, Description, and Technologies are required.'));
+            return;
+        }
+        dispatch(setError(null));
+        dispatch(setCurrentStep(3)); // Move to work log step
+
+        // If AI work log is enabled, trigger its generation immediately
+        if (useAIForWorkLog && selectedRepo) {
+            console.log('GitHubImportWizard: Triggering AI work log generation after project details confirmed.');
+            try {
+                await dispatch(fetchCommitsAndGenerateWorkLog({
+                    owner: selectedRepo.owner.login,
+                    repoName: selectedRepo.name,
+                    branch: selectedRepo.default_branch || 'main',
+                    timeframe: 'all',
+                    format: selectedAIWorkLogFormat, // Use the selected format
+                })).unwrap();
+            } catch (err) {
+                console.error('GitHubImportWizard: Failed to generate work log during project details confirmation:', err);
+                toast.error(`Failed to generate work log: ${err.message || 'Unknown error'}`);
+                setUseAIForWorkLog(false); // Fallback to manual if AI fails
+                dispatch(setError(err.message || 'Failed to generate work log.'));
+            }
+        }
+    }, [dispatch, projectFormFields.title, projectFormFields.description, projectFormFields.technologies, useAIForWorkLog, selectedRepo, selectedAIWorkLogFormat]);
+
+
+    const handleConfirmWorkLog = useCallback(async () => {
+        console.log('GitHubImportWizard: handleConfirmWorkLog called.');
+        dispatch(setCurrentStep(4)); // Move to social posts step
+        // If AI social media generation is enabled and posts haven't been generated yet, trigger it
+        if (useAIForSocial && !socialPosts && projectFormFields.title) {
+            console.log('GitHubImportWizard: Triggering AI social media post generation after work log confirmed.');
+            handleGenerateSocialPosts();
+        }
+    }, [dispatch, useAIForSocial, socialPosts, projectFormFields.title, handleGenerateSocialPosts]);
+
+    const handleConfirmSocialMedia = useCallback(() => {
+        console.log('GitHubImportWizard: handleConfirmSocialMedia called. Moving to final review step.');
+        dispatch(setCurrentStep(5));
+    }, [dispatch]);
+
+    const handleImportProjects = useCallback(async () => {
+        console.log('GitHubImportWizard: handleImportProjects called. Finalizing import.');
+        if (!user?.id) {
+            console.warn('GitHubImportWizard: User not authenticated for project import.');
+            toast.error('User not authenticated. Cannot import project.');
+            return;
+        }
+        dispatch(setStatus('importing'));
+        try {
+            const projectToImport = {
+                ...projectFormFields,
+                user_id: user.id,
+                github_repo_id: selectedRepo?.id?.toString(), // Ensure it's a string if needed for DB
+                github_url: selectedRepo?.html_url,
+                // If AI was used, take the content from Redux state; otherwise, from local manual input
+                ai_work_log: useAIForWorkLog ? workLogContent : tempManualWorkLog,
+                ai_social_posts: useAIForSocial ? socialPosts : null,
+            };
+
+            console.log('GitHubImportWizard: Dispatching addProject with:', projectToImport);
+            await dispatch(addProject(projectToImport)).unwrap();
+            toast.success('Project imported and added successfully!');
+            console.log('GitHubImportWizard: Project imported successfully.');
+
+            if (useAIForSocial && socialPosts && Object.keys(socialPosts).length > 0) {
+                toast.info('Social media posts generated. You can now copy and share them.');
+            }
+            dispatch(setStatus('succeeded'));
+            handleClose(); // Close the wizard after successful import
+        } catch (err) {
+            console.error('GitHubImportWizard: Failed to import project:', err);
+            toast.error('Failed to import project: ' + (err.message || 'Unknown error'));
+            dispatch(setStatus('failed'));
+        }
+    }, [dispatch, user?.id, projectFormFields, selectedRepo, useAIForWorkLog, workLogContent, tempManualWorkLog, useAIForSocial, socialPosts, handleClose]);
+
+    const handleNextStep = useCallback(() => {
+        console.log('GitHubImportWizard: handleNextStep called for currentStep:', currentStep);
+        switch (currentStep) {
+            case 1:
+                console.warn("GitHubImportWizard: Attempted to call handleNextStep for Step 1. This should not happen as Step 1 transitions are handled by explicit repo selection/manual input.");
+                break;
+            case 2: // Project Details -> Work Log
+                handleConfirmProjectDetails();
+                break;
+            case 3: // Work Log -> Social Posts
+                handleConfirmWorkLog();
+                break;
+            case 4: // Social Posts -> Review & Import
+                handleConfirmSocialMedia();
+                break;
+            case 5: // Review & Import -> Finalize (Import)
+                handleImportProjects();
+                break;
+            default:
+                // Fallback for unexpected steps, though ideally, transitions are explicit
+                console.log(`GitHubImportWizard: Moving to next step from ${currentStep} to ${currentStep + 1}`);
+                dispatch(setCurrentStep(currentStep + 1));
+                break;
+        }
+    }, [currentStep, handleConfirmProjectDetails, handleConfirmWorkLog, handleConfirmSocialMedia, handleImportProjects, dispatch]);
+
+    const renderStepContent = () => {
+        console.log('GitHubImportWizard: Rendering content for currentStep:', currentStep);
+        switch (currentStep) {
+            case 1:
+            case 2:
+                return (
+                    <ProjectConfigurationStep
+                        user={user}
+                        repos={repos}
+                        repoUrlInput={repoUrlInput}
+                        setRepoUrlInput={setRepoUrlInput}
+                        handleFetchRepos={handleFetchRepos}
+                        handleSelectRepo={handleSelectRepo}
+                        handleManualRepoInput={handleManualRepoInput}
+                        isLoadingRepos={isLoadingRepos}
+                        isAnalyzing={isAnalyzing}
+                        error={error}
+                        currentSubStep={currentStep} // Pass current step to determine which part of config to show
+                        selectedRepo={selectedRepo}
+                        projectFormFields={projectFormFields}
+                        setProjectFormFields={handleSetProjectFormFields}
+                        useAIForSummary={useAIForSummary}
+                        setUseAIForSummary={handleSetUseAIForSummary}
+                        alxProjectsDetected={alxProjectsDetected}
+                        selectedALXProject={selectedALXProject}
+                        handleSelectALXProject={handleSelectALXProjectInChild}
+                        handleApplyALXProjectDetails={handleApplyALXProjectDetailsInChild}
+                    />
+                );
+            case 3:
+            case 4:
+            case 5:
+                return (
+                    <OutputGenerationStep
+                        currentSubStep={currentStep} // Pass current step to determine which part of output to show
+                        error={error}
+                        workLogContent={workLogContent}
+                        socialPosts={socialPosts}
+                        tempManualWorkLog={tempManualWorkLog}
+                        setTempManualWorkLog={setTempManualWorkLog}
+                        useAIForWorkLog={useAIForWorkLog}
+                        setUseAIForWorkLog={setUseAIForWorkLog}
+                        selectedAIWorkLogFormat={selectedAIWorkLogFormat}
+                        setSelectedAIWorkLogFormat={setSelectedAIWorkLogFormat}
+                        useAIForSocial={useAIForSocial}
+                        setUseAIForSocial={setUseAIForSocial}
+                        isGeneratingWorkLog={isGeneratingWorkLog}
+                        isGeneratingSocial={isGeneratingSocial}
+                        projectFormFields={projectFormFields}
+                        selectedRepo={selectedRepo} // Pass selectedRepo for work log generation details
+                        onGenerateWorkLog={handleGenerateWorkLog}
+                        onGenerateSocialPosts={handleGenerateSocialPosts}
+                        onImportProject={handleImportProjects} // For the final import button in Step 5
+                    />
+                );
+            default:
+                console.warn('GitHubImportWizard: Unknown step requested for rendering:', currentStep);
+                return <div className="text-center text-muted-foreground">Unknown step.</div>;
+        }
+    };
+
+    const getStepButtonText = () => {
+        switch (currentStep) {
+            case 1: return 'Next (Not used for Step 1)'; // Step 1 buttons are handled internally by ProjectConfigurationStep
+            case 2: return isAnalyzing ? 'Analyzing...' : 'Confirm Project Details';
+            case 3: return isGeneratingWorkLog ? 'Generating Work Log...' : 'Confirm Work Log';
+            case 4: return isGeneratingSocial ? 'Generating Social Posts...' : 'Confirm Social Posts';
+            case 5: return isImporting ? 'Importing...' : 'Finalize & Import Project';
+            default: return 'Next';
+        }
+    };
+
+    const isNextButtonDisabled = () => {
+        const isProcessing = isLoadingRepos || isAnalyzing || isGeneratingWorkLog || isGeneratingSocial || isImporting;
+
+        if (isProcessing) return true;
+
+        switch (currentStep) {
+            case 1:
+                return true; // Next button is not directly used for step 1
+            case 2: // Project Details step
+                return !projectFormFields.title || !projectFormFields.description || projectFormFields.technologies?.length === 0;
+            case 3: // Work Log step
+                return (useAIForWorkLog && !workLogContent) || (!useAIForWorkLog && !tempManualWorkLog.trim());
+            case 4: // Social Posts step
+                return false; // Social posts step can always proceed, even if AI is off or posts are empty
+            case 5: // Review & Import step
+                return false; // Final step should allow import unless another operation is ongoing
+            default: return false;
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={(open) => {
+            console.log('GitHubImportWizard Dialog onOpenChange called with:', open);
+            // Prevent closing if an operation is in progress, otherwise call handleClose
+            if (!isAnalyzing && !isLoadingRepos && !isImporting && !isGeneratingWorkLog && !isGeneratingSocial) {
+                if (!open) handleClose();
+            } else {
+                toast.info("Cannot close wizard while an operation is in progress.");
+                console.log('GitHubImportWizard: Dialog close prevented due to ongoing operation.');
+            }
+        }}>
+            <DialogContent className="w-[calc(100%-2rem)] max-w-lg sm:max-w-[800px] flex flex-col max-h-[95vh] h-full">
+                <DialogHeader>
+                    <DialogTitle>GitHub Project Import Wizard</DialogTitle>
+                    <DialogDescription>
+                        Import your GitHub project and enhance its details with AI.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {/* Progress Tracker */}
+                <div className="flex justify-between items-center py-4 text-xs sm:text-sm">
+                    {['Select Repo', 'Project Details', 'Work Log', 'Social Posts', 'Review & Import'].map((label, index) => (
+                        <React.Fragment key={label}>
+                            <div className="flex flex-col items-center">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
+                                    ${currentStep === index + 1 ? 'bg-primary text-primary-foreground' :
+                                    currentStep > index + 1 ? 'bg-green-500 text-white' :
+                                    'bg-muted text-muted-foreground'}`}>
+                                    {currentStep > index + 1 ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                                </div>
+                                <span className="text-xs sm:text-sm text-center mt-1">{label}</span>
+                            </div>
+                            {index < 4 && <div className={`flex-1 h-0.5 ${currentStep > index + 1 ? 'bg-green-500' : 'bg-muted-foreground'}`} />}
+                        </React.Fragment>
+                    ))}
                 </div>
-              ))}
-            </ScrollArea>
-            {importError && (
-              <div className="text-red-500 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                {importError}
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row justify-between gap-2">
-              <Button variant="outline" onClick={() => dispatch(setWizardStep('select_repos'))} className="w-full sm:w-auto">
-                Back
-              </Button>
-              <Button
-                onClick={handleImportSelectedProjects}
-                disabled={isImporting || selectedProjects.length === 0}
-                className="w-full sm:w-auto"
-              >
-                {isImporting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                )}
-                Import ({selectedProjects.length}) Projects
-              </Button>
-            </div>
-          </div>
-        );
+                <Separator className="my-2" />
 
-      default:
-        return <div className="text-center p-8">Unknown wizard step.</div>;
-    }
-  };
+                {/* Main Content Area for Steps */}
+                <div className="flex-1 overflow-auto">
+                    {renderStepContent()}
+                </div>
 
-  return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-md sm:max-w-2xl p-4 sm:p-6">
-        <DialogHeader className="mb-4">
-          <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold">
-            <Github className="h-6 w-6 sm:h-7 sm:w-7 text-gray-800 dark:text-gray-200" />
-            Import Projects from GitHub
-          </DialogTitle>
-          <DialogDescription className="text-base text-muted-foreground">
-            This wizard helps you find and import your ALX projects from GitHub.
-          </DialogDescription>
-        </DialogHeader>
+                {/* Dialog Footer with Navigation Buttons */}
+                <DialogFooter className="flex flex-col sm:flex-row sm:justify-between sm:space-x-2 pt-4 border-t gap-2 sm:gap-0">
+                    {currentStep > 1 && currentStep < 5 && ( // Show "Previous" button for steps 2, 3, 4
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                console.log('GitHubImportWizard: Previous button clicked, setting step to', currentStep - 1);
+                                dispatch(setCurrentStep(currentStep - 1));
+                            }}
+                            disabled={isAnalyzing || isGeneratingWorkLog || isGeneratingSocial || isImporting}
+                            className="w-full sm:w-auto"
+                        >
+                            Previous
+                        </Button>
+                    )}
 
-        <Separator className="my-4" />
+                    {currentStep === 5 && ( // Show "Edit Details" button only on Step 5
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                console.log('GitHubImportWizard: Edit Details button clicked, setting step to 2.');
+                                dispatch(setCurrentStep(2));
+                            }}
+                            className="w-full sm:w-auto"
+                        >
+                            <CornerDownRight className="mr-2 h-4 w-4 rotate-180" /> Edit Details
+                        </Button>
+                    )}
 
-        {/* Progress Indicator */}
-        <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground px-2 sm:px-0 mb-6">
-          <div className="flex items-center gap-1 sm:gap-2">
-            <span className={`font-semibold ${wizardStep === 'username' ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-              1. Username
-            </span>
-            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-            <span className={`font-semibold ${wizardStep === 'select_repos' ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-              2. Select Repos
-            </span>
-            <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-            <span className={`font-semibold ${wizardStep === 'review_import' ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-              3. Review & Import
-            </span>
-          </div>
-        </div>
+                    <div className="flex-grow hidden sm:block" /> {/* Spacer for desktop layout */}
 
-        <div className="py-2">{renderStepContent()}</div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+                    {currentStep !== 1 && currentStep !== 5 && ( // Show "Next" button for steps 2, 3, 4
+                        <Button
+                            onClick={handleNextStep}
+                            disabled={isNextButtonDisabled()}
+                            className="w-full sm:w-auto"
+                        >
+                            {(isAnalyzing || isGeneratingWorkLog || isGeneratingSocial) ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            {getStepButtonText()}
+                        </Button>
+                    )}
 
-GitHubImportWizard.propTypes = {
-  onClose: PropTypes.func.isRequired,
-  onImportComplete: PropTypes.func.isRequired,
+                    {currentStep === 5 && ( // Show "Finalize & Import" button only on Step 5
+                        <Button
+                            onClick={handleNextStep} // This calls handleImportProjects
+                            disabled={isNextButtonDisabled()}
+                            className="w-full sm:w-auto"
+                        >
+                            {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                            {getStepButtonText()}
+                        </Button>
+                    )}
+
+                    {/* Cancel/Close Button */}
+                    {currentStep === 5 ? ( // "Close Wizard" on final step
+                        <Button onClick={handleClose} variant="secondary" className="w-full sm:w-auto">Close Wizard</Button>
+                    ) : ( // "Cancel" on other steps
+                        <Button onClick={handleClose} variant="ghost" disabled={isAnalyzing || isGeneratingWorkLog || isGeneratingSocial || isImporting} className="w-full sm:w-auto">Cancel</Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 };
+
+export default GitHubImportWizard;

@@ -1,0 +1,352 @@
+I will now provide a detailed UI/UX design specification for the ALX Showcase Stats Page, covering the responsive layout, summary cards, data visualizations, and filtering options, adhering to your requirements for clarity, professionalism, and responsiveness using Tailwind CSS and Shadcn UI.
+
+-----
+
+## ALX Showcase: Stats Page UI/UX Design Specification
+
+The Stats Page (`/dashboard/stats`) is designed to offer ALX Software Engineering students clear, actionable insights into their coding portfolios. It prioritizes data clarity, a clean aesthetic, and full responsiveness across devices.
+
+### 1\. High-Level Responsive Layout & Summary Cards
+
+The Stats Page will adopt a flexible grid-based layout for larger screens, transitioning to a stacked, single-column layout for smaller viewports.
+
+#### Overall Structure
+
+  * **Desktop (lg+):** A primary grid with 3 columns for summary cards at the top, followed by a 2-column grid for charts.
+  * **Tablet (sm-lg):** Summary cards will likely reflow to 2 columns, while charts remain largely in a single column or adjust to fill available width.
+  * **Mobile (default):** All sections will stack vertically in a single column, ensuring readability and ease of interaction on smaller screens.
+
+#### Summary Statistics Cards
+
+These cards will be prominently displayed at the top of the page, providing an immediate overview of key metrics.
+
+**Design:** Each card will utilize the Shadcn UI `Card` component for a clean, bordered, and shadowed appearance.
+
+  * **Layout:** `flex flex-row items-center justify-between` within `CardHeader` for title and icon, with `CardContent` holding the value and description.
+  * **Title:** `text-sm font-medium text-gray-600 dark:text-gray-400`
+  * **Value:** `text-2xl font-bold text-gray-900 dark:text-gray-50` (large and prominent)
+  * **Description:** `text-xs text-muted-foreground` (subtle context)
+  * **Icon:** `h-5 w-5` from `lucide-react`, colored to match the card's theme or data type.
+
+**Proposed Summary Cards (4):**
+
+1.  **Total Projects**
+      * **Icon:** `FolderDot` (blue-500)
+      * **Value:** `stats.total` (from Redux `projectsSlice`)
+      * **Description:** "Across all categories"
+2.  **Public Projects**
+      * **Icon:** `Code` (green-500)
+      * **Value:** `stats.public`
+      * **Description:** "Visible to the community"
+3.  **Projects Completed Last 30 Days**
+      * **Icon:** `CalendarCheck` (orange-500 - *assuming a new icon or similar*)
+      * **Value:** *Calculated from `projects` data (e.g., filter by `completion_date` within last 30 days)*
+      * **Description:** "Recent milestones"
+4.  **Unique Technologies**
+      * **Icon:** `Scale` (purple-500)
+      * **Value:** `stats.technologies`
+      * **Description:** "Skills demonstrated"
+
+#### Conceptual Wireframes
+
+**Desktop View (lg+):**
+
+```
++-------------------------------------------------------------------+
+| ALX Showcase Header (Dashboard Tabs: Projects | Profile | Stats) |
++-------------------------------------------------------------------+
+|                                                                   |
+|  Your Portfolio at a Glance                                       |
+|                                                                   |
+|  +-------------------+  +-------------------+  +-------------------+
+|  | Total Projects    |  | Public Projects   |  | Projects Last 30D |
+|  | [Icon]   [Value]  |  | [Icon]   [Value]  |  | [Icon]   [Value]  |
+|  | [Description]     |  | [Description]     |  | [Description]     |
+|  +-------------------+  +-------------------+  +-------------------+
+|                                                                   |
+|  +-------------------+                                            |
+|  | Unique Techs      |                                            |
+|  | [Icon]   [Value]  |                                            |
+|  | [Description]     |                                            |
+|  +-------------------+                                            |
+|                                                                   |
+|  +-----------------------+  +-----------------------+
+|  | Projects by Category  |  | Top Technologies Used |
+|  | [Pie Chart]           |  | [Horizontal Bar Chart]|
+|  | [Legend]              |  | [Tooltip]             |
+|  +-----------------------+  +-----------------------+
+|                                                                   |
+|  +---------------------------------------------------+
+|  | Projects Completed Over Time (Line Chart)         |
+|  | [Timeframe Filter]                                |
+|  | [Legend]                                          |
+|  +---------------------------------------------------+
+|                                                                   |
+|  +---------------------------------------------------+
+|  | Projects by Difficulty Level (Vertical Bar Chart) |
+|  | [Tooltip]                                         |
+|  +---------------------------------------------------+
+|                                                                   |
++-------------------------------------------------------------------+
+```
+
+**Tablet View (sm-lg):**
+
+```
++-------------------------------------------------------------------+
+| ALX Showcase Header (Mobile Menu | User Dropdown)                 |
++-------------------------------------------------------------------+
+|                                                                   |
+|  Your Portfolio at a Glance                                       |
+|                                                                   |
+|  +-------------------+  +-------------------+
+|  | Total Projects    |  | Public Projects   |
+|  | [Icon]   [Value]  |  | [Icon]   [Value]  |
+|  | [Description]     |  | [Description]     |
+|  +-------------------+  +-------------------+
+|                                                                   |
+|  +-------------------+  +-------------------+
+|  | Projects Last 30D |  | Unique Techs      |
+|  | [Icon]   [Value]  |  | [Icon]   [Value]  |
+|  | [Description]     |  | [Description]     |
+|  +-------------------+  +-------------------+
+|                                                                   |
+|  +-----------------------+
+|  | Projects by Category  |
+|  | [Pie Chart]           |
+|  | [Legend]              |
+|  +-----------------------+
+|                                                                   |
+|  +-----------------------+
+|  | Top Technologies Used |
+|  | [Horizontal Bar Chart]|
+|  | [Tooltip]             |
+|  +-----------------------+
+|                                                                   |
+|  +-----------------------+
+|  | Projects Completed    |
+|  | Over Time             |
+|  | [Line Chart]          |
+|  | [Timeframe Filter]    |
+|  | [Legend]              |
+|  +-----------------------+
+|                                                                   |
+|  +-----------------------+
+|  | Projects by Difficulty|
+|  | [Vertical Bar Chart]  |
+|  | [Tooltip]             |
+|  +-----------------------+
+|                                                                   |
++-------------------------------------------------------------------+
+```
+
+**Mobile View (default):**
+
+```
++-----------------------------------+
+| ALX Showcase Header (Mobile Menu) |
++-----------------------------------+
+|                                   |
+|  Your Portfolio at a Glance       |
+|                                   |
+|  +-----------------------------+
+|  | Total Projects              |
+|  | [Icon]         [Value]      |
+|  | [Description]               |
+|  +-----------------------------+
+|                                   |
+|  +-----------------------------+
+|  | Public Projects             |
+|  | [Icon]         [Value]      |
+|  | [Description]               |
+|  +-----------------------------+
+|                                   |
+|  +-----------------------------+
+|  | Projects Last 30D           |
+|  | [Icon]         [Value]      |
+|  | [Description]               |
+|  +-----------------------------+
+|                                   |
+|  +-----------------------------+
+|  | Unique Techs                |
+|  | [Icon]         [Value]      |
+|  | [Description]               |
+|  +-----------------------------+
+|                                   |
+|  +-----------------------------+
+|  | Projects by Category        |
+|  | [Pie Chart]                 |
+|  | [Legend]                    |
+|  +-----------------------------+
+|                                   |
+|  +-----------------------------+
+|  | Top Technologies Used       |
+|  | [Horizontal Bar Chart]      |
+|  | [Tooltip]                   |
+|  +-----------------------------+
+|                                   |
+|  +-----------------------------+
+|  | Projects Completed Over Time|
+|  | [Line Chart]                |
+|  | [Timeframe Filter]          |
+|  | [Legend]                    |
+|  +-----------------------------+
+|                                   |
+|  +-----------------------------+
+|  | Projects by Difficulty      |
+|  | [Vertical Bar Chart]        |
+|  | [Tooltip]                   |
+|  +-----------------------------+
+|                                   |
++-----------------------------------+
+```
+
+### 2\. Data Visualizations (Charts)
+
+All charts will be encapsulated within Shadcn UI `Card` components, ensuring a consistent and professional look. They will use the `recharts` library as demonstrated in the `dashboard-stats` Canvas. The `COLORS` array defined in the Canvas will be used for consistency: `['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28DFF', '#FF6B6B']`.
+
+#### 2.1. Project Distribution by Category
+
+  * **Chart Type:** Pie Chart
+  * **Purpose:** Visually represent the proportion of projects belonging to different categories (e.g., Web App, Mobile App, AI/ML).
+  * **Visual Elements:**
+      * `ResponsiveContainer`: Ensures the chart adapts to its parent container.
+      * `PieChart`: Main chart component.
+      * `Pie`: Data visualization for the slices.
+          * `dataKey="value"`: Maps to the count of projects in each category.
+          * `labelLine={false}`: Hides lines connecting labels to slices.
+          * `label={({ name, percent }) => \`${name} (${(percent \* 100).toFixed(0)}%)\`}\`: Displays category name and percentage directly on or near the slice.
+          * `Cell`: Used to apply distinct colors from the `COLORS` array to each slice.
+      * `Tooltip`: Shows detailed information (category name, value) on hover.
+      * `Legend`: Displays a legend mapping colors to categories.
+      * **Colors:** Utilizes the `COLORS` array for distinct slice colors.
+  * **Interactivity:** Tooltip on hover for detailed data.
+  * **Accessibility:**
+      * Ensure sufficient color contrast between slices and their labels.
+      * `Tooltip` provides information on hover, which should also be accessible via keyboard navigation (e.g., tabbing through slices).
+      * A descriptive `aria-label` for the `PieChart` container would be beneficial.
+
+#### 2.2. Technology Usage Breakdown
+
+  * **Chart Type:** Horizontal Bar Chart
+  * **Purpose:** Highlight the top N (e.g., 5-7, or top 10 as per current Canvas) most frequently used technologies across all projects. Horizontal bars are ideal for displaying categories with potentially long names.
+  * **Visual Elements:**
+      * `ResponsiveContainer`: Ensures responsiveness.
+      * `BarChart`: Main chart component with `layout="vertical"`.
+      * `XAxis`: Type `number` for the count of projects using the technology. `stroke="#6b7280"` for axis line color.
+      * `YAxis`: Type `category` with `dataKey="name"` for technology names. `stroke="#6b7280"` for axis line color.
+      * `CartesianGrid`: `strokeDasharray="3 3"` for subtle grid lines, `vertical={false}` to only show horizontal grid.
+      * `Bar`: Data visualization for the bars.
+          * `dataKey="value"`: Maps to the count of projects using the technology.
+          * `LabelList dataKey="value" position="right"`: Displays the numerical value at the end of each bar.
+          * `Cell`: Applies colors from the `COLORS` array.
+      * `Tooltip`: Shows technology name and count on hover.
+      * **Colors:** Utilizes the `COLORS` array for bar colors.
+  * **Interactivity:** Tooltip on hover for detailed data.
+  * **Accessibility:**
+      * Clear axis labels and legible text.
+      * Sufficient contrast for bars against the background and grid lines.
+      * Tooltip accessibility.
+
+#### 2.3. Projects Completed Over Time
+
+  * **Chart Type:** Line Chart
+  * **Purpose:** Illustrate project completion trends over a specific period (e.g., last 6 or 12 months), helping users visualize their productivity.
+  * **Visual Elements:**
+      * `ResponsiveContainer`: Ensures responsiveness.
+      * `LineChart`: Main chart component.
+      * `XAxis`: `dataKey="month"` (or `date`), formatted for readability (e.g., "Jan 2023"). `stroke="#6b7280"`.
+      * `YAxis`: For the count of projects completed. `stroke="#6b7280"`.
+      * `CartesianGrid`: `strokeDasharray="3 3"`.
+      * `Line`: Data visualization for the trend.
+          * `type="monotone"`: For smooth curves.
+          * `dataKey="count"`: Maps to the number of projects completed.
+          * `stroke="#8884d8"` (or a distinct line color).
+          * `activeDot={{ r: 8 }}`: Larger dot on hover.
+      * `Tooltip`: Shows month and project count on hover.
+      * `Legend`: If multiple lines were to be added (e.g., public vs. private projects).
+      * **Colors:** A single, clear line color.
+  * **Interactivity:**
+      * **Timeframe Filter:** A dropdown (see Filters section below) will allow users to select `Last 6 Months` or `Last 12 Months`, dynamically updating the chart data.
+      * Tooltip on hover.
+  * **Accessibility:**
+      * Clear labels for both axes.
+      * Sufficient contrast for the line against the background and grid.
+      * Tooltip accessibility.
+
+#### 2.4. Difficulty Level Distribution
+
+  * **Chart Type:** Vertical Bar Chart
+  * **Purpose:** Show the distribution of projects across defined difficulty levels (Beginner, Intermediate, Advanced).
+  * **Visual Elements:**
+      * `ResponsiveContainer`: Ensures responsiveness.
+      * `BarChart`: Main chart component.
+      * `XAxis`: `dataKey="name"` for difficulty levels. `stroke="#6b7280"`.
+      * `YAxis`: For the count of projects. `stroke="#6b7280"`.
+      * `CartesianGrid`: `strokeDasharray="3 3"`.
+      * `Bar`: Data visualization for the bars.
+          * `dataKey="value"`: Maps to the count of projects in each difficulty.
+          * `LabelList dataKey="value" position="top"`: Displays the numerical value at the top of each bar.
+          * `Cell`: Applies colors from the `COLORS` array.
+      * `Tooltip`: Shows difficulty level and count on hover.
+      * `Legend`: If needed (e.g., for multiple series, but not typically for this chart).
+      * **Colors:** Utilizes the `COLORS` array for bar colors.
+  * **Interactivity:** Tooltip on hover for detailed data.
+  * **Accessibility:**
+      * Clear axis labels and legible text.
+      * Sufficient contrast for bars against the background and grid lines.
+      * Tooltip accessibility.
+
+### 3\. Filters Section
+
+The filters section will enable users to refine the data displayed in the charts and potentially the summary cards.
+
+#### Placement & Responsiveness
+
+  * **Desktop (lg+):** Filters will be placed at the top of the main content area, possibly within a collapsible `Card` or a dedicated `div` that expands/collapses, similar to the `ProjectSearch` component. This keeps them accessible without consuming excessive vertical space.
+  * **Tablet (sm-lg):** Similar to desktop, but the layout might adjust to stack filter elements if horizontal space is limited.
+  * **Mobile (default):** Filters will be presented in a single column layout. A common pattern is to have a "Filter" button that opens a bottom sheet or a full-screen dialog containing all filter options, to maximize screen real estate for content.
+
+#### Filter Components
+
+All filters will use Shadcn UI components for a consistent look and feel.
+
+1.  **Timeframe Filter**
+
+      * **Component:** Shadcn UI `Select` component.
+      * **Label:** "Timeframe"
+      * **Options:**
+          * "All Time"
+          * "Last 3 Months"
+          * "Last 6 Months"
+          * "Last 12 Months"
+          * "Custom Date Range" (Selecting this could reveal two date picker inputs, requiring a date picker component like `react-day-picker` integrated with Shadcn UI inputs).
+      * **Functionality:** This filter will primarily affect the "Projects Completed Over Time" chart, and potentially other charts if they are adapted to show data for a specific period.
+
+2.  **Category Filter**
+
+      * **Component:** Shadcn UI `Select` component (for single selection) or a custom multi-select dropdown (e.g., using `Checkbox` within a `Popover` for multi-selection). Given the request, a multi-select is preferred for flexibility.
+      * **Label:** "Category"
+      * **Options:** Dynamically populated from available project categories (e.g., "Web Application", "Mobile App", "Backend/API", "Data Science", "AI/Machine Learning", "DevOps", "Other").
+      * **Functionality:** Filters all charts and summary cards to only include projects belonging to the selected categories.
+
+3.  **Technology Filter**
+
+      * **Component:** Similar to the Category Filter, a multi-select dropdown using Shadcn UI components.
+      * **Label:** "Technology"
+      * **Options:** Dynamically populated from all unique technologies used across projects.
+      * **Functionality:** Filters all charts and summary cards to only include projects utilizing the selected technologies.
+
+#### Action Buttons
+
+  * **Apply Filters Button:**
+      * **Component:** Shadcn UI `Button`.
+      * **Label:** "Apply Filters"
+      * **Functionality:** Triggers the data re-calculation and chart re-rendering based on the selected filter criteria.
+  * **Reset Filters Button:**
+      * **Component:** Shadcn UI `Button` with `variant="outline"`.
+      * **Label:** "Reset Filters"
+      * **Icon:** `XCircle` (from `lucide-react`).
+      * **Functionality:** Clears all applied filters and reverts the charts and summary cards to display data for all projects.
+
+The overall design emphasizes a clean, modern aesthetic with clear data presentation, ensuring the Stats Page is a valuable and intuitive tool for ALX students.

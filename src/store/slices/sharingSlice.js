@@ -1,312 +1,233 @@
+// src/store/slices/sharingSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-// Corrected import path for GitHubCommitsService and SocialContentOptimizer
-import { GitHubCommitsService } from '../../lib/github-commits-service.js'; // For fetching raw commits
-import { generateWorkLogSummary as aiGenerateWorkLogSummary } from '../../lib/ai-service.js'; // Corrected import for AI-generated summaries
-import { SocialContentOptimizer } from '../../lib/social-optimizer.js'; // For platform-specific content optimization
+import { createSelector } from 'reselect';
 
-// Async thunks for sharing operations
+// --- Service Imports ---
+import { githubService } from '../../components/service/github-service';             // For fetching general repo info
+import { aiService } from '../../components/service/ai-service';                 // For AI work log summary
+import { socialOptimizer } from '../../lib/social-optimizer';     // For optimizing social media content
+import { githubCommitsService } from '../../components/service/github-commits-service';
+
+// --- Initial State ---
+const initialState = {
+  currentWorkLog: '', // AI-generated humanized work log text
+  socialContent: { // Optimized content for different platforms
+    twitter: '',
+    linkedin: '',
+    facebook: '',
+    discord: '',
+  },
+  repositoryInfo: null, // Basic GitHub repo details for the UI (e.g., repo name, default branch)
+  isLoadingWorkLog: false,
+  isLoadingSocialContent: false,
+  error: null,
+};
+
+// --- Async Thunks (createAsyncThunk) ---
 
 /**
- * Generates a humanized work log summary using AI based on GitHub commit activity.
- * It fetches raw commits and then sends them to the OpenAI service for summarization.
- *
- * @param {object} payload - Contains githubUrl (string) and timeframe (number of days).
+ * Fetches commit data from GitHub and uses AI to generate a humanized work log.
+ * @param {object} params
+ * @param {string} params.githubUrl - The full GitHub repository URL (e.g., https://github.com/user/repo).
+ * @param {string} params.timeframe - Timeframe for commits ('all', 'last_week', 'last_month', 'last_3_months').
+ * @param {string} params.branch - Optional: The branch to fetch commits from (e.g., 'main', 'master').
  */
 export const generateWorkLog = createAsyncThunk(
   'sharing/generateWorkLog',
-  async ({ githubUrl, timeframe }, { rejectWithValue }) => {
+  async ({ githubUrl, timeframe, branch = 'main' }, { dispatch, rejectWithValue }) => {
     try {
-      // The aiGenerateWorkLogSummary now handles fetching commits internally.
-      // It expects the githubUrl and optionally a commit limit.
-      // We'll pass a higher limit (e.g., 50) to ensure enough data for AI.
-      const aiWorkLogSummary = await aiGenerateWorkLogSummary( // Corrected call
-        githubUrl,
-        50 // Fetch up to 50 recent commits for AI analysis
-      );
+      dispatch(sharingSlice.actions.setLoadingWorkLog(true));
+      dispatch(sharingSlice.actions.setError(null));
 
-      if (!aiWorkLogSummary || aiWorkLogSummary.includes('No recent commit activity')) {
-        // Return a specific message if AI couldn't generate a log
-        return rejectWithValue(`No recent commit activity found for ${githubUrl} in the last ${timeframe} days, or AI could not generate a summary.`);
+      // 1. Parse GitHub URL to get owner and repoName
+      const parsedUrl = githubCommitsService.parseGitHubUrl(githubUrl);
+      if (!parsedUrl) {
+        throw new Error("Invalid GitHub URL provided. Please ensure it's a valid repository URL.");
+      }
+      const { owner, repoName } = parsedUrl;
+      // 2. Determine the 'sinceDate' based on the timeframe
+      let sinceDate = null;
+      const now = new Date();
+      if (timeframe === 'last_week') {
+        const oneWeekAgo = new Date(now.setDate(now.getDate() - 7));
+        sinceDate = oneWeekAgo.toISOString();
+      } else if (timeframe === 'last_month') {
+        const oneMonthAgo = new Date(now.setMonth(now.getMonth() - 1));
+        sinceDate = oneMonthAgo.toISOString();
+      } else if (timeframe === 'last_3_months') {
+        const threeMonthsAgo = new Date(now.setMonth(now.getMonth() - 3));
+        sinceDate = threeMonthsAgo.toISOString();
+      }
+      // 'all' timeframe means no 'sinceDate' filter is applied
+
+      // 3. Fetch raw commit data from GitHub using githubCommitsService
+      const rawCommits = await githubCommitsService.fetchRepositoryCommits(owner, repoName, sinceDate, branch);
+
+      if (!rawCommits || rawCommits.length === 0) {
+        throw new Error("No commits found for the given repository, branch, and timeframe.");
       }
 
-      // Optionally, if you still want some structured info from raw commits
-      // for other parts of the UI or for SocialContentOptimizer's internal logic,
-      // you could fetch them here and return them alongside the AI summary.
-      // For now, we'll assume SocialContentOptimizer can re-analyze if needed,
-      // or that the AI summary is sufficient.
+      // 4. Use AI service to generate a humanized work log summary
+      const workLogText = await aiService.generateWorkLogSummary(rawCommits);
 
-      return aiWorkLogSummary; // This will be the AI-generated text
+      dispatch(sharingSlice.actions.setCurrentWorkLog(workLogText));
+      return { workLogText, rawCommits }; // Return rawCommits as they might be needed for social content generation
     } catch (error) {
-      console.error('Error generating AI work log:', error.message);
+      console.error("Generate work log error:", error.message);
+      dispatch(sharingSlice.actions.setError(error.message));
       return rejectWithValue(error.message);
+    } finally {
+      dispatch(sharingSlice.actions.setLoadingWorkLog(false));
     }
   }
 );
 
 /**
- * Generates optimized social media content for various platforms.
- * It now expects the AI-generated work log summary and raw commits (if needed for internal analysis).
- *
- * @param {object} payload - Contains project object, aiWorkLogSummaryText (string), rawCommits (array of objects), and customMessage (string).
+ * Optimizes content for various social media platforms using AI.
+ * @param {object} params
+ * @param {object} params.project - The project object related to the work log.
+ * @param {string} params.aiWorkLogSummaryText - The AI-generated humanized work log.
+ * @param {Array} params.rawCommits - The raw commit data (optional, for deeper analysis by AI).
+ * @param {string} params.customMessage - Any additional custom message from the user.
  */
 export const generateSocialContent = createAsyncThunk(
   'sharing/generateSocialContent',
-  async ({ project, aiWorkLogSummaryText, rawCommits, customMessage }, { rejectWithValue }) => {
+  async ({ project, aiWorkLogSummaryText, rawCommits = [], customMessage = '' }, { dispatch, rejectWithValue }) => {
     try {
-      // SocialContentOptimizer now receives the AI-generated summary directly.
-      // It can also receive rawCommits if its internal logic needs to analyze them
-      // for things like 'mostActiveArea' for smart content generation.
-      const content = SocialContentOptimizer.generatePlatformContent(
-        project,
-        aiWorkLogSummaryText,
-        rawCommits, // Pass raw commits if SocialContentOptimizer needs to analyze them
-        customMessage
-      );
-      return content;
+      dispatch(sharingSlice.actions.setLoadingSocialContent(true));
+      dispatch(sharingSlice.actions.setError(null));
+
+      // Prepare data for social content optimization service
+      const contentData = {
+        projectName: project?.title,
+        projectDescription: project?.description,
+        projectTechnologies: project?.technologies,
+        projectUrl: project?.github_url, // Pass project URL for call to action
+        workLog: aiWorkLogSummaryText,
+        rawCommits: rawCommits.map(c => c.message), // Send only messages for brevity
+        customMessage: customMessage,
+      };
+
+      // Call the socialOptimizer service
+      const optimizedContent = await socialOptimizer.generatePlatformContent(contentData);
+
+      dispatch(sharingSlice.actions.setSocialContent(optimizedContent));
+      return optimizedContent;
     } catch (error) {
-      console.error('Error generating social content:', error.message);
+      console.error("Generate social content error:", error.message);
+      dispatch(sharingSlice.actions.setError(error.message));
       return rejectWithValue(error.message);
+    } finally {
+      dispatch(sharingSlice.actions.setLoadingSocialContent(false));
     }
   }
 );
 
 /**
- * Fetches basic repository information from GitHub API.
- * @param {string} githubUrl - The GitHub repository URL.
+ * Fetches basic repository details for the Work Log Generator UI.
+ * @param {string} githubUrl - The full GitHub repository URL.
  */
 export const fetchRepositoryInfo = createAsyncThunk(
   'sharing/fetchRepositoryInfo',
-  async (githubUrl, { rejectWithValue }) => {
+  async (githubUrl, { dispatch, rejectWithValue }) => {
     try {
-      const githubInfo = GitHubCommitsService.parseGitHubUrl(githubUrl); // Reuse parseGitHubUrl
-      if (!githubInfo) {
-        throw new Error('Invalid GitHub URL format');
+      dispatch(sharingSlice.actions.setError(null)); // Clear previous errors
+
+      // Parse GitHub URL to get owner and repoName
+      const parsedUrl = githubCommitsService.parseGitHubUrl(githubUrl);
+      if (!parsedUrl) {
+        throw new Error("Invalid GitHub URL provided. Please use a full repository URL.");
       }
+      const { owner, repoName } = parsedUrl;
 
-      // Note: This fetch doesn't use authentication by default, which might lead to rate limits.
-      // Consider adding authentication headers if this becomes an issue.
-      const response = await fetch(
-        `https://api.github.com/repos/${githubInfo.owner}/${githubInfo.repo}`
-      );
+      // Use githubService to fetch repository info
+      const repoInfo = await githubService.fetchRepositoryInfo(owner, repoName);
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`Repository not found: ${githubInfo.owner}/${githubInfo.repo}`);
-        }
-        throw new Error(`Failed to fetch repository information: ${response.statusText || response.status}`);
-      }
-
-      const repoData = await response.json();
-      return {
-        name: repoData.name,
-        description: repoData.description,
-        language: repoData.language,
-        homepage: repoData.homepage,
-        stars: repoData.stargazers_count,
-        forks: repoData.forks_count,
-        // Add other relevant fields if needed
-        github_url: repoData.html_url,
-      };
+      dispatch(sharingSlice.actions.setRepositoryInfo(repoInfo));
+      return repoInfo;
     } catch (error) {
-      console.error('Error fetching repository info:', error.message);
+      console.error("Fetch repository info error:", error.message);
+      dispatch(sharingSlice.actions.setError(error.message));
       return rejectWithValue(error.message);
     }
   }
 );
 
-export const initialState = {
-  // Work log data (will now store AI-generated text)
-  currentWorkLog: null, // This will be the AI-generated string
-  repositoryInfo: null, // Basic info about the repo
-
-  // Generated content for different platforms
-  socialContent: {
-    twitter: null,
-    linkedin: null,
-    facebook: null,
-    discord: null,
-  },
-
-  // Sharing settings
-  settings: {
-    timeframe: '7', // Default timeframe for commit fetching
-    selectedPlatforms: ['twitter', 'linkedin'],
-    autoGenerate: true,
-  },
-
-  // Custom messages and templates
-  customMessage: '',
-  templates: [],
-
-  // Loading states
-  isGeneratingWorkLog: false,
-  isGeneratingContent: false,
-  isFetchingRepoInfo: false,
-
-  // Error states
-  error: null, // General error
-  workLogError: null, // Error specific to work log generation
-  contentError: null, // Error specific to social content generation
-};
+// --- Slice Definition ---
 
 const sharingSlice = createSlice({
   name: 'sharing',
   initialState,
   reducers: {
-    // Clear states
-    clearError: (state) => {
-      state.error = null;
-      state.workLogError = null;
-      state.contentError = null;
+    // Synchronous reducers
+    setCurrentWorkLog: (state, action) => {
+      state.currentWorkLog = action.payload;
     },
-    clearWorkLog: (state) => {
-      state.currentWorkLog = null;
-      state.repositoryInfo = null;
+    setSocialContent: (state, action) => {
+      state.socialContent = action.payload;
     },
-    clearSocialContent: (state) => {
-      state.socialContent = {
-        twitter: null,
-        linkedin: null,
-        facebook: null,
-        discord: null,
-      };
+    setRepositoryInfo: (state, action) => {
+      state.repositoryInfo = action.payload;
     },
-
-    // Settings actions
-    updateSettings: (state, action) => {
-      state.settings = { ...state.settings, ...action.payload };
+    setLoadingWorkLog: (state, action) => {
+      state.isLoadingWorkLog = action.payload;
     },
-    setTimeframe: (state, action) => {
-      state.settings.timeframe = action.payload;
+    setLoadingSocialContent: (state, action) => {
+      state.isLoadingSocialContent = action.payload;
     },
-    setSelectedPlatforms: (state, action) => {
-      state.settings.selectedPlatforms = action.payload;
+    setError: (state, action) => {
+      state.error = action.payload;
     },
-    togglePlatform: (state, action) => {
-      const platform = action.payload;
-      const platforms = state.settings.selectedPlatforms;
-      if (platforms.includes(platform)) {
-        state.settings.selectedPlatforms = platforms.filter(p => p !== platform);
-      } else {
-        state.settings.selectedPlatforms = [...platforms, platform];
-      }
+    clearSharingState: (state) => {
+      // Reset all state to initial values
+      Object.assign(state, initialState);
     },
-
-    // Message actions
-    setCustomMessage: (state, action) => {
-      state.customMessage = action.payload;
-    },
-    addTemplate: (state, action) => {
-      state.templates.push({
-        id: Date.now(),
-        text: action.payload,
-        createdAt: new Date().toISOString(),
-      });
-    },
-    removeTemplate: (state, action) => {
-      state.templates = state.templates.filter(t => t.id !== action.payload);
-    },
-
-    // Manual content updates
-    updateSocialContent: (state, action) => {
-      const { platform, content } = action.payload;
-      state.socialContent[platform] = content;
-    },
-  },
-  extraReducers: (builder) => {
-    builder
-      // Generate work log
-      .addCase(generateWorkLog.pending, (state) => {
-        state.isGeneratingWorkLog = true;
-        state.workLogError = null;
-      })
-      .addCase(generateWorkLog.fulfilled, (state, action) => {
-        state.isGeneratingWorkLog = false;
-        state.currentWorkLog = action.payload; // Payload is now the AI-generated string
-        state.workLogError = null;
-      })
-      .addCase(generateWorkLog.rejected, (state, action) => {
-        state.isGeneratingWorkLog = false;
-        state.workLogError = action.payload;
-        state.currentWorkLog = null;
-      })
-
-      // Generate social content
-      .addCase(generateSocialContent.pending, (state) => {
-        state.isGeneratingContent = true;
-        state.contentError = null;
-      })
-      .addCase(generateSocialContent.fulfilled, (state, action) => {
-        state.isGeneratingContent = false;
-        state.socialContent = action.payload; // Payload is the object of platform-specific content
-        state.contentError = null;
-      })
-      .addCase(generateSocialContent.rejected, (state, action) => {
-        state.isGeneratingContent = false;
-        state.contentError = action.payload;
-      })
-
-      // Fetch repository info
-      .addCase(fetchRepositoryInfo.pending, (state) => {
-        state.isFetchingRepoInfo = true;
-        state.error = null;
-      })
-      .addCase(fetchRepositoryInfo.fulfilled, (state, action) => {
-        state.isFetchingRepoInfo = false;
-        state.repositoryInfo = action.payload;
-        state.error = null;
-      })
-      .addCase(fetchRepositoryInfo.rejected, (state, action) => {
-        state.isFetchingRepoInfo = false;
-        state.error = action.payload;
-        state.repositoryInfo = null;
-      });
   },
 });
 
+// --- Actions Export ---
 export const {
-  // Clear actions
-  clearError,
-  clearWorkLog,
-  clearSocialContent,
-
-  // Settings actions
-  updateSettings,
-  setTimeframe,
-  setSelectedPlatforms,
-  togglePlatform,
-
-  // Message actions
-  setCustomMessage,
-  addTemplate,
-  removeTemplate,
-
-  // Manual content updates
-  updateSocialContent,
+  setCurrentWorkLog,
+  setSocialContent,
+  setRepositoryInfo,
+  setLoadingWorkLog,
+  setLoadingSocialContent,
+  setError,
+  clearSharingState,
 } = sharingSlice.actions;
 
-// Selectors
-export const selectCurrentWorkLog = (state) => state.sharing.currentWorkLog;
-export const selectRepositoryInfo = (state) => state.sharing.repositoryInfo;
-export const selectSocialContent = (state) => state.sharing.socialContent;
-export const selectSharingSettings = (state) => state.sharing.settings;
-export const selectCustomMessage = (state) => state.sharing.customMessage;
-export const selectTemplates = (state) => state.sharing.templates;
-export const selectSharingLoading = (state) => ({
-  workLog: state.sharing.isGeneratingWorkLog,
-  content: state.sharing.isGeneratingContent,
-  repoInfo: state.sharing.isFetchingRepoInfo,
-});
-export const selectSharingErrors = (state) => ({
-  general: state.sharing.error,
-  workLog: state.sharing.workLogError,
-  content: state.sharing.contentError,
-});
+// --- Selectors ---
+// Base selector for the sharing state
+const selectSharingState = (state) => state.sharing;
+
+export const selectCurrentWorkLog = createSelector(
+  [selectSharingState],
+  (sharingState) => sharingState.currentWorkLog
+);
+
+export const selectSocialContent = createSelector(
+  [selectSharingState],
+  (sharingState) => sharingState.socialContent
+);
+
+export const selectRepositoryInfo = createSelector(
+  [selectSharingState],
+  (sharingState) => sharingState.repositoryInfo
+);
+
+export const selectIsLoadingWorkLog = createSelector(
+  [selectSharingState],
+  (sharingState) => sharingState.isLoadingWorkLog
+);
+
+export const selectIsLoadingSocialContent = createSelector(
+  [selectSharingState],
+  (sharingState) => sharingState.isLoadingSocialContent
+);
+
+export const selectSharingError = createSelector(
+  [selectSharingState],
+  (sharingState) => sharingState.error
+);
 
 export default sharingSlice.reducer;
-export const sharingActions = {
-  generateWorkLog,
-  generateSocialContent,
-  fetchRepositoryInfo,
-  ...sharingSlice.actions, // Export all actions from the slice
-};

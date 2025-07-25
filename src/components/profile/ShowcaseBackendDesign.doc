@@ -1,0 +1,314 @@
+ALX Showcase: Profile/Showcase Backend Design
+This document details the backend architecture for the Profile/Showcase feature, leveraging Supabase (PostgreSQL) for data persistence and authentication, and outlining the integration points for OpenAI services.
+
+1. Supabase Database Schema: profiles Table
+The profiles table will store all user-specific profile information, including the AI-generated content. It is linked to Supabase's built-in auth.users table via the id column.
+
+Table Name: profiles
+
+Column Name
+
+Data Type
+
+Constraints
+
+Description
+
+id
+
+uuid
+
+PRIMARY KEY, NOT NULL, REFERENCES auth.users(id)
+
+Unique identifier for the profile, linked to the user's authentication ID.
+
+created_at
+
+timestamptz
+
+DEFAULT now(), NOT NULL
+
+Timestamp of profile creation.
+
+updated_at
+
+timestamptz
+
+DEFAULT now(), NOT NULL
+
+Timestamp of last profile update.
+
+full_name
+
+text
+
+NULLABLE
+
+User's full name.
+
+alx_id
+
+text
+
+NULLABLE
+
+ALX student ID (read-only from frontend).
+
+github_username
+
+text
+
+UNIQUE, NULLABLE
+
+GitHub username, used as the public identifier for showcase URLs.
+
+linkedin_url
+
+text
+
+NULLABLE
+
+LinkedIn profile URL.
+
+bio
+
+text
+
+NULLABLE
+
+Short biography or "About Me" section.
+
+avatar_url
+
+text
+
+NULLABLE
+
+URL to the user's profile picture.
+
+certifications
+
+text[]
+
+DEFAULT '{}', NOT NULL
+
+Array of strings for certifications.
+
+skills
+
+text[]
+
+DEFAULT '{}', NOT NULL
+
+Array of strings for technical skills.
+
+achievements
+
+text[]
+
+DEFAULT '{}', NOT NULL
+
+Array of strings for notable achievements.
+
+is_public_profile
+
+boolean
+
+DEFAULT FALSE, NOT NULL
+
+Flag to determine if the profile is publicly viewable.
+
+ai_portfolio_summary
+
+text
+
+NULLABLE
+
+NEW: AI-generated concise summary of the user's portfolio.
+
+ai_recommendations
+
+text[]
+
+DEFAULT '{}', NOT NULL
+
+NEW: AI-generated project recommendations (array of strings).
+
+2. Supabase Row Level Security (RLS) Policies
+RLS is crucial for securing data access in Supabase. Policies will ensure users can only access their own private data and public data as intended.
+
+Enable RLS on the profiles table:
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+RLS Policies:
+
+profiles_select_policy (SELECT):
+
+Purpose: Allows authenticated users to read their own profile, and anyone (authenticated or not) to read profiles marked as public.
+
+Definition:
+
+CREATE POLICY "profiles_select_policy"
+ON profiles FOR SELECT
+USING (
+  (auth.uid() = id) OR (is_public_profile = TRUE)
+);
+
+profiles_insert_policy (INSERT):
+
+Purpose: Allows an authenticated user to create their own profile entry (typically during the sign-up process).
+
+Definition:
+
+CREATE POLICY "profiles_insert_policy"
+ON profiles FOR INSERT
+WITH CHECK (auth.uid() = id);
+
+profiles_update_policy (UPDATE):
+
+Purpose: Allows an authenticated user to update only their own profile.
+
+Definition:
+
+CREATE POLICY "profiles_update_policy"
+ON profiles FOR UPDATE
+USING (auth.uid() = id);
+
+profiles_delete_policy (DELETE):
+
+Purpose: Allows an authenticated user to delete only their own profile. (Consider if a soft-delete mechanism is preferred for data retention).
+
+Definition:
+
+CREATE POLICY "profiles_delete_policy"
+ON profiles FOR DELETE
+USING (auth.uid() = id);
+
+3. GraphQL API Design (Conceptual)
+Assuming a GraphQL layer (e.g., using PostGraphile if deployed on a custom server, or a custom API gateway) sits on top of Supabase, here's how the operations would be exposed. The frontend Redux thunks (fetchUserProfile, updateUserProfile, generateAIPortfolioSummary, generateAIProjectRecommendations) would interact with these API endpoints.
+
+3.1. Queries
+profile(username: String, userId: UUID): Profile
+
+Description: Fetches a single user profile. It can be queried either by username (for public showcase view) or userId (for authenticated private view).
+
+Arguments:
+
+username: String (Optional) - The GitHub username of the profile owner.
+
+userId: UUID (Optional) - The UUID of the user's profile.
+
+Return Type: Profile (or null if not found/authorized).
+
+Backend Logic: This query would internally use the Supabase client to fetch from the profiles table, applying the RLS policies. It would prioritize userId if provided, otherwise use username to find a public profile.
+
+3.2. Mutations
+updateProfile(input: UpdateProfileInput!): Profile
+
+Description: Updates an existing user profile.
+
+Input (UpdateProfileInput):
+
+id: UUID! (Required) - The ID of the profile to update.
+
+full_name: String (Optional)
+
+alx_id: String (Optional)
+
+github_username: String (Optional)
+
+linkedin_url: String (Optional)
+
+bio: String (Optional)
+
+avatar_url: String (Optional)
+
+certifications: [String!] (Optional)
+
+skills: [String!] (Optional)
+
+achievements: [String!] (Optional)
+
+is_public_profile: Boolean (Optional)
+
+ai_portfolio_summary: String (Optional)
+
+ai_recommendations: [String!] (Optional)
+
+Return Type: Profile (the updated profile object).
+
+Backend Logic: This mutation directly maps to an UPDATE operation on the profiles table. RLS policies will ensure only the owner can update their profile.
+
+generateAIPortfolioSummary(userId: UUID!): Profile
+
+Description: Triggers the AI service to generate a portfolio summary for the specified user and updates their profile.
+
+Input:
+
+userId: UUID! (Required) - The ID of the user whose summary is to be generated.
+
+Return Type: Profile (the updated profile object including the new summary).
+
+Backend Logic (Recommended using Supabase Edge Functions):
+
+Authentication/Authorization: Verify that auth.uid() matches the userId provided in the input.
+
+Fetch Context Data: Retrieve the user's bio, skills from the profiles table. Optionally, fetch relevant data from their public projects (e.g., titles, descriptions, technologies).
+
+Call OpenAI Service: Invoke the aiGenerateProjectSummary function (from ai-service.js) with the fetched context data. This call should use the OPENAI_API_KEY securely stored on the server/Edge Function, not exposed to the frontend.
+
+Update Database: Update the ai_portfolio_summary field in the profiles table for the given userId with the AI-generated content.
+
+Return: Return the updated Profile object.
+
+generateAIProjectRecommendations(userId: UUID!): Profile
+
+Description: Triggers the AI service to generate project recommendations for the specified user and updates their profile.
+
+Input:
+
+userId: UUID! (Required) - The ID of the user for whom recommendations are to be generated.
+
+Return Type: Profile (the updated profile object including the new recommendations).
+
+Backend Logic (Recommended using Supabase Edge Functions):
+
+Authentication/Authorization: Verify that auth.uid() matches the userId in the input.
+
+Fetch Context Data: Retrieve the user's skills and bio (as a proxy for interests) from the profiles table.
+
+Call OpenAI Service: Invoke the aiGetProjectRecommendations function (from ai-service.js) with the fetched context data. This call should use the server-side OPENAI_API_KEY.
+
+Update Database: Update the ai_recommendations field in the profiles table for the given userId with the AI-generated list.
+
+Return: Return the updated Profile object.
+
+4. OpenAI Integration Logic (ai-service.js and Backend)
+As noted in the frontend context, ai-service.js currently makes direct calls to the OpenAI API from the client. For a robust and secure backend implementation, these calls should be moved to a server-side environment, such as Supabase Edge Functions (Deno/TypeScript) or a dedicated Node.js/Python backend service.
+
+Recommended Backend AI Flow:
+
+Frontend Action: User clicks "Regenerate Summary" (or "Regenerate Recommendations") in the ProfileForm.
+
+Redux Thunk Dispatch: The generateAIPortfolioSummary (or generateAIProjectRecommendations) Redux thunk is dispatched.
+
+API Call to Backend: This thunk makes an authenticated API call to a specific backend endpoint (e.g., a Supabase Edge Function: /api/generate-ai-summary or /api/generate-ai-recommendations). The call includes the userId and any necessary context data (e.g., current bio, skills).
+
+Backend (Edge Function) Execution:
+
+The Edge Function receives the request.
+
+It verifies the user's authentication token and userId.
+
+It fetches the latest and complete user profile data (and potentially public project data) directly from Supabase using a secure service_role key or appropriate RLS. This ensures the AI has the most up-to-date and comprehensive context.
+
+It then calls the aiGenerateProjectSummary (or aiGetProjectRecommendations) function from ai-service.js (which would be adapted to run in the Deno/Node.js environment of the Edge Function). This call uses the OPENAI_API_KEY securely stored as an Edge Function secret.
+
+Upon receiving the AI's response, the Edge Function updates the ai_portfolio_summary (or ai_recommendations) field in the profiles table directly.
+
+It returns the updated profile data to the frontend.
+
+Frontend Update: The Redux thunk receives the updated profile data and dispatches updateUserProfile.fulfilled, updating the Redux store and consequently the UI.
+
+This approach ensures the OPENAI_API_KEY is never exposed client-side, centralizes AI logic, and allows for more complex data fetching and processing on the server.

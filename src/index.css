@@ -145,3 +145,220 @@
     padding: 0.5rem 1rem;
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300..700&display=swap'); */
+
+body {
+  font-family: 'Inter', sans-serif;
+  @apply bg-gray-950 text-white; /* Ensures global dark background and white text */
+}
+
+/* Custom Keyframes for Animations */
+
+/* For the gradient blobs in HeroSection */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30vw, -20vh) scale(1.1);
+  }
+  66% {
+    transform: translate(-20vw, 30vh) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+/* Custom animation delays */
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* For general fade-in effect */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1s ease-out forwards;
+}
+.animate-fade-in.delay-500 { animation-delay: 0.5s; }
+.animate-fade-in.delay-1000 { animation-delay: 1s; }
+
+/* For slow fade-in on background patterns */
+@keyframes fadeInSlow {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.1; /* Target opacity for background elements */
+  }
+}
+
+.animate-fade-in-slow {
+  animation: fadeInSlow 3s ease-out forwards;
+}
+
+/* For slide-up effect on text/elements */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.8s ease-out forwards;
+}
+
+/* For fade-in-up effect on feature cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+  /* Add individual delays in JS or manually for staggered effect if desired */
+}
+
+
+/* You can also define custom Tailwind animation utilities in tailwind.config.js */
+/*
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      animation: {
+        blob: 'blob 7s infinite cubic-bezier(0.68, -0.55, 0.27, 1.55)',
+        'fade-in': 'fadeIn 1s ease-out forwards',
+        'fade-in-slow': 'fadeInSlow 3s ease-out forwards',
+        'slide-up': 'slideUp 0.8s ease-out forwards',
+        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+      },
+      keyframes: {
+        blob: {
+          '0%, 100%': { transform: 'translate(0px, 0px) scale(1)' },
+          '33%': { transform: 'translate(30vw, -20vh) scale(1.1)' },
+          '66%': { transform: 'translate(-20vw, 30vh) scale(0.9)' },
+        },
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        fadeInSlow: {
+          from: { opacity: '0' },
+          to: { opacity: '0.1' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(20px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        fadeInUp: {
+          from: { opacity: '0', transform: 'translateY(30px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+    },
+  },
+};
+*/
+
+
+/* src/globals.css (or index.css) */
+/* Example for Shadcn UI theming */
+@layer base {
+  :root {
+    --background: 0 0% 3.9%; /* A very dark background for overall tech feel */
+    --foreground: 0 0% 98%;  /* White foreground */
+
+    --card: 0 0% 14.5%;       /* Darker card background, e.g., neutral-800/50 */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 240 5.9% 10%;  /* Primary button/accent background, can be adjusted */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72.2% 50.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%; /* Darker border */
+    --input: 240 3.7% 15.9%;
+    --ring: 240 5.9% 10%;
+
+    --radius: 0.75rem; /* Standard border radius for Shadcn components */
+  }
+
+  .dark {
+    /* You can redefine for dark mode here if different from light mode, but with a tech UI, this might be the default */
+  }
+}
+
+/* src/index.css or src/globals.css */
+
+/* General Purpose Animation Delays */
+.animation-delay-0 { animation-delay: 0s; }
+.animation-delay-100 { animation-delay: 0.1s; }
+.animation-delay-200 { animation-delay: 0.2s; }
+.animation-delay-300 { animation-delay: 0.3s; }
+.animation-delay-400 { animation-delay: 0.4s; }
+.animation-delay-500 { animation-delay: 0.5s; }
+.animation-delay-600 { animation-delay: 0.6s; }
+.animation-delay-700 { animation-delay: 0.7s; }
+.animation-delay-800 { animation-delay: 0.8s; }
+.animation-delay-900 { animation-delay: 0.9s; }
+.animation-delay-1000 { animation-delay: 1s; }
+
+/* Specific delays for background elements (can be longer) */
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }
+/* Add more as needed */

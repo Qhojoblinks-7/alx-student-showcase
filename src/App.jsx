@@ -1,77 +1,108 @@
+// src/App.jsx
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { Provider, useDispatch, useSelector } from 'react-redux';
+import { store } from './store';
+import { supabase } from './lib/supabase';
+import { setUser, getSession } from './store/slices/authSlice';
 import { Toaster } from 'sonner';
-import { useAuth } from './hooks/use-auth'; // Your useAuth hook
+import { Loader2 } from 'lucide-react';
 
-// Directly import route components
-import { SignInPage } from './components/auth/SignInPage';
-import { SignUpPage } from './components/auth/SignUpPage';
-import  PasswordResetPage  from './components/auth/PasswordResetPage';
-import AuthForm from './components/auth/AuthForm';
-import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Direct import for named export
-import { AuthRedirect } from './components/AuthRedirect'
-import { Dashboard } from './components/Dashboard'; // Direct import for named export
-import { LandingPage } from './components/LandingPage'; // Import the LandingPage
-import { Loader2 } from 'lucide-react'; // Import Loader2 for loading state in ProtectedRoute/AuthRedirect
+// Import authentication forms and main application components
+import SignInForm from './components/auth/SignInForm';
+import SignUpForm from './components/auth/SignUpForm';
+import Dashboard from './components/Dashboard';
+import ProjectListPage from './components/projects/ProjectListPage';
+import DashboardStats from './components/stats/DashboardStats';
+import ProjectForm from './components/projects/ProjectForm'; // The project form modal
+import LandingPage from './components/LandingPage';
 
-const SetNewPasswordPage = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
-    <h2 className="text-2xl font-bold mb-4 text-center">Set Your New Password</h2>
-    <AuthForm mode="update_password" />
-  </div>
-);
+// --- ProtectedRoute Component (Ensure this matches your src/components/ProtectedRoute.jsx) ---
+// If you're importing ProtectedRoute from a separate file:
+import ProtectedRoute from './components/ProtectedRoute'; // Ensure this import is present if it's a separate file
+import UserProfilePage from './components/profile/UserProfilePage';
+import { PublicShowcasePage } from './pages/PublicShowcasePage';
 
-export default function App() {
-  // Use useAuth to get the initialization status for the whole app
-  const { isInitialized } = useAuth();
+
+// --- Main App Component ---
+function App() {
+  const dispatch = useDispatch();
 
   useEffect(() => {
-    const theme = localStorage.getItem('theme') || 'light';
-    document.documentElement.classList.remove('dark', 'light');
-    document.documentElement.classList.add(theme);
-    console.log('Document classes after applying theme:', document.documentElement.classList);
-  }, []);
+    console.log("App.jsx -> Main App useEffect: Setting up auth state listener and initial getSession."); // ADD THIS LOG
 
-  // Show a global loading indicator until authentication state is initialized
-  // This prevents content flickering and ensures routing decisions are made
-  // only when the auth state is fully known.
-  if (!isInitialized) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <span className="ml-2 text-lg text-gray-600">Loading application...</span>
-      </div>
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log(`App.jsx -> Auth State Changed: Event: ${event}, Session:`, session); // ADD THIS LOG
+        if (session) {
+          dispatch(setUser(session.user));
+          console.log("App.jsx -> Auth State Changed: User SET to:", session.user); // ADD THIS LOG
+        } else {
+          dispatch(setUser(null));
+          console.log("App.jsx -> Auth State Changed: User SET to null (logged out)."); // ADD THIS LOG
+        }
+      }
     );
-  }
+
+    dispatch(getSession());
+    console.log("App.jsx -> Main App useEffect: getSession dispatched."); // ADD THIS LOG
+
+    return () => {
+      console.log("App.jsx -> Main App useEffect Cleanup: Unsubscribing from auth state changes."); // ADD THIS LOG
+      subscription.unsubscribe();
+    };
+  }, [dispatch]);
 
   return (
-    <Router>
+    <>
       <Routes>
-        {/* Public Routes - Wrapped with AuthRedirect to redirect authenticated users */}
-        {/* These routes should only be accessible if the user is NOT authenticated */}
-        <Route path="/" element={<AuthRedirect><LandingPage /></AuthRedirect>} /> {/* Set LandingPage as the root */}
-        <Route path="/signin" element={<AuthRedirect><SignInPage /></AuthRedirect>} />
-        <Route path="/signup" element={<AuthRedirect><SignUpPage /></AuthRedirect>} />
-        <Route path="/reset-password" element={<AuthRedirect><PasswordResetPage /></AuthRedirect>} />
-        <Route path="/reset-password-confirm" element={<AuthRedirect><SetNewPasswordPage /></AuthRedirect>} />
+        {/* --- Public Routes --- */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/signup" element={<SignUpForm />} />
+        <Route path="/signin" element={<SignInForm />} />
+        <Route path="/showcase/:userId" element={<PublicShowcasePage />} />
+        <Route path="/forgot-password" element={
+          <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white">
+            <h2 className="text-2xl">Forgot Password Page - Coming Soon!</h2>
+          </div>
+        } />
 
-        {/* Protected Route - Wrapped with ProtectedRoute to guard access */}
-        {/* These routes should only be accessible if the user IS authenticated */}
+        {/* --- Protected Routes --- */}
         <Route
-          path="/dashboard"
+          path="/dashboard/*"
           element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
           }
-        />
+        >
+          {/* Nested Routes for Dashboard */}
+          <Route index element={<Navigate to="projects" replace />} />
+          <Route path="projects" element={<ProjectListPage />} />
+          <Route path="stats" element={<DashboardStats />} />
+          <Route path="profile" element={<UserProfilePage />} />
+        </Route>
 
-        {/* Fallback route for any unmatched paths.
-            It will attempt to render the Dashboard, and ProtectedRoute will handle
-            redirection to signin if the user is not authenticated. */}
-        <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        {/* --- Fallback Route --- */}
+        <Route path="*" element={
+          <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white">
+            <h2 className="text-2xl">404 - Page Not Found</h2>
+          </div>
+        } />
       </Routes>
-      <Toaster position="bottom-right" richColors />
-    </Router>
+
+      <Toaster richColors position="bottom-right" />
+    </>
+  );
+}
+
+// --- AppWrapper Component ---
+export default function AppWrapper() {
+  return (
+    <Provider store={store}>
+      <Router>
+        <App />
+      </Router>
+    </Provider>
   );
 }

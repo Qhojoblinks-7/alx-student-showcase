@@ -1,34 +1,34 @@
+// src/store/index.js
 import { configureStore } from '@reduxjs/toolkit';
-import authSlice from './slices/authSlice.js';
-import projectsSlice from './slices/projectsSlice.js';
-import uiSlice from './slices/uiSlice.js';
-import sharingSlice from './slices/sharingSlice.js';
-import githubSlice from './slices/githubSlice.js';
+import authReducer from './slices/authSlice';
+import uiReducer from './slices/uiSlice';
+// Import other slices here as they are created:
+import projectsReducer from './slices/projectsSlice';
+import profileReducer from './slices/profileSlice';
+import statsReducer from './slices/statsSlice';
+import githubReducer from './slices/githubSlice';
+import sharingReducer from './slices/sharingSlice';
 
-/**
- * Configures and creates the Redux store for the application.
- * It combines various slices (auth, projects, ui, sharing, github) into a single reducer.
- * Custom middleware is applied to handle non-serializable actions from Redux Persist.
- */
 export const store = configureStore({
   reducer: {
-    // Each key here corresponds to a slice of your application state
-    auth: authSlice,      // Handles authentication state (user, loading, error)
-    projects: projectsSlice,  // Manages project data (list, current project, stats)
-    ui: uiSlice,          // Controls UI-related states (modals, tabs, notifications, theme)
-    sharing: sharingSlice,    // Manages data and state related to social sharing features
-    github: githubSlice,    // Handles GitHub import and related states
-    
+    auth: authReducer,
+    ui: uiReducer,
+    projects: projectsReducer, // NEW
+    profile: profileReducer,   // NEW
+    stats: statsReducer,       // NEW
+    github: githubReducer,     // NEW
+    sharing: sharingReducer,
+
   },
-  // Custom middleware setup
+  // Optionally add middleware or enhancers
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      // Disable serializable check for specific Redux Persist actions
-      // This is necessary because Redux Persist actions like 'persist/PERSIST' and 'persist/REHYDRATE'
-      // contain non-serializable values (e.g., Promises), which would otherwise trigger warnings.
-      serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
-      },
+      // You might need to disable serializableCheck for large objects from APIs like Supabase session,
+      // but it's good practice to keep it on if possible for debugging.
+      // serializableCheck: {
+      //   ignoredActions: ['auth/getSession/fulfilled', 'auth/signIn/fulfilled'],
+      //   ignoredPaths: ['auth.user.aud', 'auth.user.created_at', 'auth.user.email_confirmed_at', 'auth.user.last_sign_in_at', 'auth.user.role', 'auth.user.updated_at'],
+      // },
     }),
 });
 

@@ -1,301 +1,366 @@
-// src/store/slices/projectsSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { supabase } from '../../lib/supabase.js'; // Correct path to supabase client
-// Import the fulfilled action type from the githubSlice to listen for its completion
-import { importSelectedProjects } from './githubSlice.js'; // Ensure this path is correct
+import { supabase } from '../../lib/supabase';
+import { createSelector } from 'reselect';
 
-// Async Thunks
-export const fetchProjects = createAsyncThunk(
-  'projects/fetchProjects',
-  async (userId, { rejectWithValue }) => {
-    try {
-      if (!userId) {
-        return rejectWithValue('User ID is required to fetch projects.');
-      }
-      // Select all necessary fields, using 'category' instead of 'project_type'
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, user_id, title, description, technologies, github_url, live_url, category, original_repo_name, alx_confidence, last_updated, is_public, created_at, updated_at, image_url, difficulty_level, completion_date, time_spent_hours, key_learnings, challenges_faced, tags, ai_summary, ai_work_log, is_ai_processed, ai_error') // ADDED AI fields
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Supabase fetch projects error:', String(error)); // Explicitly stringify error for console
-        throw error;
-      }
-      return data;
-    } catch (error) {
-      console.error('Error fetching projects:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
-    }
-  }
-);
-
-export const fetchProjectStats = createAsyncThunk(
-  'projects/fetchProjectStats',
-  async (userId, { rejectWithValue }) => {
-    try {
-      if (!userId) {
-        return rejectWithValue('User ID is required to fetch project stats.');
-      }
-
-      // Fetch total projects
-      const { count: totalCount, error: totalError } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-      if (totalError) {
-        console.error('Supabase fetch total projects error:', String(totalError)); // Explicitly stringify error for console
-        throw totalError;
-      }
-
-      // Fetch public projects
-      const { count: publicCount, error: publicError } = await supabase
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_public', true);
-
-      if (publicError) {
-        console.error('Supabase fetch public projects error:', String(publicError)); // Explicitly stringify error for console
-        throw publicError;
-      }
-
-      // Fetch distinct technologies (this might be a large query, consider a separate RPC if performance is an issue)
-      const { data: technologiesData, error: technologiesError } = await supabase
-        .from('projects')
-        .select('technologies')
-        .eq('user_id', userId);
-
-      if (technologiesError) {
-        console.error('Supabase fetch technologies error:', String(technologiesError)); // Explicitly stringify error for console
-        throw technologiesError;
-      }
-
-      const allTechnologies = new Set();
-      technologiesData.forEach(project => {
-        if (Array.isArray(project.technologies)) {
-          project.technologies.forEach(tech => allTechnologies.add(tech));
-        }
-      });
-
-      return {
-        total: totalCount,
-        public: publicCount,
-        technologies: allTechnologies.size,
-      };
-    } catch (error) {
-      console.error('Error fetching project stats:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
-    }
-  }
-);
-
-export const addProject = createAsyncThunk(
-  'projects/addProject',
-  async (projectData, { rejectWithValue }) => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert([projectData])
-        .select(); // Select the inserted data to return it
-
-      if (error) {
-        console.error('Supabase add project error:', String(error)); // Explicitly stringify error for console
-        throw error;
-      }
-      return data[0]; // Return the first (and only) inserted record
-    } catch (error) {
-      console.error('Error adding project:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
-    }
-  }
-);
-
-export const updateProject = createAsyncThunk(
-  'projects/updateProject',
-  async ({ id, projectData }, { rejectWithValue }) => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .update(projectData)
-        .eq('id', id)
-        .select(); // Select the updated data to return it
-
-      if (error) {
-        console.error('Supabase update project error:', String(error)); // Explicitly stringify error for console
-        throw error;
-      }
-      return data[0]; // Return the first (and only) updated record
-    } catch (error) {
-      console.error('Error updating project:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
-    }
-  }
-);
-
-export const deleteProject = createAsyncThunk(
-  'projects/deleteProject',
-  async (projectId, { rejectWithValue }) => {
-    try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', projectId);
-
-      if (error) {
-        console.error('Supabase delete project error:', String(error)); // Explicitly stringify error for console
-        throw error;
-      }
-      return projectId; // Return the ID of the deleted project
-    } catch (error) {
-      console.error('Error deleting project:', String(error)); // Explicitly stringify error for console
-      return rejectWithValue(error.message ? String(error.message) : String(error)); // Ensure rejected value is a string
-    }
-  }
-);
-
-export const initialState = {
+// --- Initial State ---
+const initialState = {
   projects: [],
-  stats: { total: 0, public: 0, technologies: 0 },
-  isLoading: false,
+  // isLoading: false, // You can remove this if 'status' is your primary loading indicator
+  status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
   error: null,
-  filters: { // Added filters to initial state
-    category: 'all',
-    isPublic: 'all',
-    searchTerm: '',
-  },
-  currentProject: null, // Added currentProject to initial state
-  isCreating: false, // Added specific loading states
+  currentProject: null,
+  isCreating: false,
   isUpdating: false,
   isDeleting: false,
-  isImporting: false, // This refers to projectsSlice's own import status if any, not GitHub import
-  isFetchingSingleProject: false, // Added for fetching a single project
+  filters: {
+    category: null,
+    technology: null,
+    difficulty: null,
+    isPublic: null,
+    searchQuery: '',
+  },
 };
+
+// --- Async Thunks (createAsyncThunk) ---
+
+/**
+ * Fetches projects for a specific user from Supabase, applying filters.
+ * @param {object} params - Parameters for fetching projects.
+ * @param {string} [params.userId] - The ID of the user whose projects to fetch. Optional.
+ * @param {object} [params.filters] - Filter criteria (category, technology, difficulty, isPublic, searchQuery). Optional.
+ */
+export const fetchProjects = createAsyncThunk(
+  'projects/fetchProjects',
+  async ({ userId, filters = {} }, { dispatch, rejectWithValue }) => {
+    try {
+      // Manual setLoading dispatch is removed; status will be handled in extraReducers
+      // dispatch(projectsSlice.actions.setLoading(true)); // REMOVED
+
+      let query = supabase.from('projects').select('*');
+
+      // Always filter by user_id if provided
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      // Apply filters for isPublic only if explicitly set (true or false)
+      if (typeof filters.isPublic === 'boolean') {
+        query = query.eq('is_public', filters.isPublic);
+      }
+      // If no userId is provided AND filters.isPublic is NOT explicitly set (meaning it's for public view),
+      // default to fetching only public projects.
+      else if (!userId) {
+          query = query.eq('is_public', true);
+      }
+
+      // Apply other filters
+      if (filters.category) {
+        query = query.eq('category', filters.category);
+      }
+      if (filters.technology) {
+        query = query.contains('technologies', [filters.technology]);
+      }
+      if (filters.difficulty) {
+        query = query.eq('difficulty', filters.difficulty);
+      }
+      if (filters.searchQuery) {
+        query = query.or(`title.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(error.message || 'Failed to fetch projects.');
+      }
+
+      // Manual setProjects dispatch is removed; payload will be set in extraReducers
+      // dispatch(projectsSlice.actions.setProjects(data)); // REMOVED
+      return data;
+    } catch (error) {
+      console.error("Fetch projects error:", error.message);
+      // Manual setError dispatch is removed; error will be handled in extraReducers
+      // dispatch(projectsSlice.actions.setError(error.message)); // REMOVED
+      return rejectWithValue(error.message);
+    } finally {
+      // Manual setLoading(false) dispatch is removed; status will be handled in extraReducers
+      // dispatch(projectsSlice.actions.setLoading(false)); // REMOVED
+    }
+  }
+);
+
+/**
+ * Adds a new project to Supabase.
+ * @param {object} projectData - The project data to insert. Must include user_id.
+ */
+export const addProject = createAsyncThunk(
+  'projects/addProject',
+  async (projectData, { dispatch, rejectWithValue }) => {
+    try {
+      dispatch(projectsSlice.actions.setIsCreating(true));
+      dispatch(projectsSlice.actions.setError(null));
+
+      const { data, error } = await supabase.from('projects').insert(projectData).select();
+
+      if (error) {
+        throw new Error(error.message || 'Failed to add project.');
+      }
+
+      const newProject = data[0];
+      dispatch(projectsSlice.actions.addProjectLocally(newProject));
+      return newProject;
+    } catch (error) {
+      console.error("Add project error:", error.message);
+      dispatch(projectsSlice.actions.setError(error.message));
+      return rejectWithValue(error.message);
+    } finally {
+      dispatch(projectsSlice.actions.setIsCreating(false));
+    }
+  }
+);
+
+/**
+ * Updates an existing project in Supabase.
+ * @param {object} params - Parameters for updating a project.
+ * @param {string} params.id - The ID of the project to update.
+ * @param {object} params.projectData - The updated project data.
+ */
+export const updateProject = createAsyncThunk(
+  'projects/updateProject',
+  async ({ id, projectData }, { dispatch, rejectWithValue }) => {
+    try {
+      dispatch(projectsSlice.actions.setIsUpdating(true));
+      dispatch(projectsSlice.actions.setError(null));
+
+      const { data, error } = await supabase.from('projects').update(projectData).eq('id', id).select();
+
+      if (error) {
+        throw new Error(error.message || 'Failed to update project.');
+      }
+
+      const updatedProject = data[0];
+      dispatch(projectsSlice.actions.updateProjectLocally(updatedProject));
+      return updatedProject;
+    } catch (error) {
+      console.error("Update project error:", error.message);
+      dispatch(projectsSlice.actions.setError(error.message));
+      return rejectWithValue(error.message);
+    } finally {
+      dispatch(projectsSlice.actions.setIsUpdating(false));
+    }
+  }
+);
+
+/**
+ * Deletes a project from Supabase.
+ * @param {string} projectId - The ID of the project to delete.
+ */
+export const deleteProject = createAsyncThunk(
+  'projects/deleteProject',
+  async (projectId, { dispatch, rejectWithValue }) => {
+    try {
+      dispatch(projectsSlice.actions.setIsDeleting(true));
+      dispatch(projectsSlice.actions.setError(null));
+
+      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+
+      if (error) {
+        throw new Error(error.message || 'Failed to delete project.');
+      }
+
+      dispatch(projectsSlice.actions.deleteProjectLocally(projectId));
+      return projectId;
+    } catch (error) {
+      console.error("Delete project error:", error.message);
+      dispatch(projectsSlice.actions.setError(error.message));
+      return rejectWithValue(error.message);
+    } finally {
+      dispatch(projectsSlice.actions.setIsDeleting(false));
+    }
+  }
+);
+
+
+// --- Slice Definition ---
 
 const projectsSlice = createSlice({
   name: 'projects',
   initialState,
   reducers: {
-    // Synchronous reducers if needed
-    setProjectFilters: (state, action) => { // Added reducer for filters
-      state.filters = { ...state.filters, ...action.payload };
+    // Note: setProjects is no longer explicitly dispatched by fetchProjects thunk,
+    // but can still be used for other purposes if needed.
+    setProjects: (state, action) => {
+      state.projects = action.payload;
     },
-    setCurrentProject: (state, action) => { // Added reducer for current project
+    setCurrentProject: (state, action) => {
       state.currentProject = action.payload;
     },
-    clearCurrentProject: (state) => { // Added reducer to clear current project
+    clearCurrentProject: (state) => {
       state.currentProject = null;
-    }
+    },
+    // setLoading: (state, action) => { // REMOVE or COMMENT OUT if using 'status'
+    //   state.isLoading = action.payload;
+    // },
+    setError: (state, action) => {
+      state.error = action.payload;
+    },
+    setIsCreating: (state, action) => {
+      state.isCreating = action.payload;
+    },
+    setIsUpdating: (state, action) => {
+      state.isUpdating = action.payload;
+    },
+    setIsDeleting: (state, action) => {
+      state.isDeleting = action.payload;
+    },
+    setProjectFilters: (state, action) => {
+      state.filters = { ...state.filters, ...action.payload };
+    },
+    addProjectLocally: (state, action) => {
+      state.projects.unshift(action.payload);
+    },
+    updateProjectLocally: (state, action) => {
+      const index = state.projects.findIndex(
+        (project) => project.id === action.payload.id
+      );
+      if (index !== -1) {
+        state.projects[index] = action.payload;
+      }
+    },
+    deleteProjectLocally: (state, action) => {
+      state.projects = state.projects.filter(
+        (project) => project.id !== action.payload
+      );
+      if (state.currentProject && state.currentProject.id === action.payload) {
+        state.currentProject = null;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Projects
+      // --- fetchProjects lifecycle ---
       .addCase(fetchProjects.pending, (state) => {
-        state.isLoading = true;
+        state.status = 'loading';
         state.error = null;
       })
       .addCase(fetchProjects.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.projects = action.payload;
+        state.status = 'succeeded';
+        state.projects = action.payload; // Set projects data here directly from thunk return
       })
       .addCase(fetchProjects.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
+        state.status = 'failed';
+        state.error = action.payload; // Error message from rejectWithValue
+        state.projects = []; // Clear projects on failure or keep previous state if preferred
       })
-      // Fetch Project Stats
-      .addCase(fetchProjectStats.pending, (state) => {
-        // No specific loading state for stats, can use general isLoading or add a separate one
-      })
-      .addCase(fetchProjectStats.fulfilled, (state, action) => {
-        state.stats = action.payload;
-      })
-      .addCase(fetchProjectStats.rejected, (state, action) => {
-        console.error('Failed to fetch project stats:', String(action.payload)); // Explicitly stringify error for console
-        // Handle error for stats if necessary
-      })
-      // Add Project
-      .addCase(addProject.pending, (state) => {
-        state.isCreating = true; // Use specific loading state
-        state.error = null;
-      })
-      .addCase(addProject.fulfilled, (state, action) => {
-        state.isCreating = false;
-        state.projects.unshift(action.payload); // Add new project to the beginning of the list
-      })
-      .addCase(addProject.rejected, (state, action) => {
-        state.isCreating = false;
-        state.error = action.payload;
-      })
-      // Update Project
-      .addCase(updateProject.pending, (state) => {
-        state.isUpdating = true; // Use specific loading state
-        state.error = null;
-      })
-      .addCase(updateProject.fulfilled, (state, action) => {
-        state.isUpdating = false;
-        const updatedProject = action.payload;
-        state.projects = state.projects.map((project) =>
-          project.id === updatedProject.id ? updatedProject : project
-        );
-        // If the updated project is the current one, update it too
-        if (state.currentProject && state.currentProject.id === updatedProject.id) {
-          state.currentProject = updatedProject;
-        }
-      })
-      .addCase(updateProject.rejected, (state, action) => {
-        state.isUpdating = false;
-        state.error = action.payload;
-      })
-      // Delete Project
-      .addCase(deleteProject.pending, (state) => {
-        state.isDeleting = true; // Use specific loading state
-        state.error = null;
-      })
-      .addCase(deleteProject.fulfilled, (state, action) => {
-        state.isDeleting = false;
-        const deletedProjectId = action.payload;
-        state.projects = state.projects.filter((project) => project.id !== deletedProjectId);
-        // Clear current project if it was the one deleted
-        if (state.currentProject && state.currentProject.id === deletedProjectId) {
-          state.currentProject = null;
-        }
-      })
-      .addCase(deleteProject.rejected, (state, action) => {
-        state.isDeleting = false;
-        state.error = action.payload;
-      })
-      // NEW: Handle projects imported from GitHub (which are already AI-processed)
-      .addCase(importSelectedProjects.fulfilled, (state, action) => {
-        // action.payload here is an array of projects, already inserted into Supabase
-        // and processed with AI by the githubSlice's importSelectedProjects thunk.
-        // We need to add these to the projects state.
-        const newProjects = action.payload;
-        newProjects.forEach(newProject => {
-          // Check if the project already exists (e.g., if re-fetching all projects)
-          // If it doesn't, add it. This prevents duplicates if fetchProjects runs later.
-          const exists = state.projects.some(p => p.id === newProject.id);
-          if (!exists) {
-            state.projects.unshift(newProject); // Add to the beginning
-          } else {
-            // If it exists, update it (e.g., if AI processing updated an already fetched project)
-            state.projects = state.projects.map(p =>
-              p.id === newProject.id ? newProject : p
-            );
-          }
-        });
-        // Optionally, you might want to re-fetch stats here if they are not automatically updated
-        // dispatch(fetchProjectStats(userId)); // This would require dispatch from a thunk
-        // For now, rely on a separate dispatch of fetchProjectStats or a selector re-calculation
-      });
+      // You can add extraReducers for addProject, updateProject, deleteProject here too
+      // if you want to manage status for those operations in a unified way.
+      // For now, isCreating, isUpdating, isDeleting reducers handle it.
   },
 });
 
+// --- Synchronous Actions Export ---
 export const {
-  setProjectFilters,
+  setProjects,
   setCurrentProject,
   clearCurrentProject,
+  // setLoading, // REMOVE or COMMENT OUT if using 'status'
+  setError,
+  setIsCreating,
+  setIsUpdating,
+  setIsDeleting,
+  setProjectFilters,
+  addProjectLocally,
+  updateProjectLocally,
+  deleteProjectLocally,
 } = projectsSlice.actions;
+
+
+// --- Selectors ---
+const selectProjectsState = (state) => state.projects;
+
+export const selectAllProjects = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.projects
+);
+
+// New selector for the 'status'
+export const selectProjectsStatus = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.status
+);
+
+// You can still use selectProjectsLoading if you keep isLoading in state,
+// but it's often redundant if 'status' provides enough detail.
+// export const selectProjectsLoading = createSelector(
+//   [selectProjectsState],
+//   (projectsState) => projectsState.isLoading
+// );
+
+export const selectProjectsError = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.error
+);
+
+export const selectCurrentProject = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.currentProject
+);
+
+export const selectIsCreatingProject = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.isCreating
+);
+
+export const selectIsUpdatingProject = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.isUpdating
+);
+
+export const selectIsDeletingProject = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.isDeleting
+);
+
+export const selectProjectFilters = createSelector(
+  [selectProjectsState],
+  (projectsState) => projectsState.filters
+);
+
+export const selectFilteredProjects = createSelector(
+  [selectAllProjects, selectProjectFilters],
+  (projects, filters) => {
+    return projects.filter(project => {
+      let match = true;
+      if (filters.category && project.category !== filters.category) {
+        match = false;
+      }
+      if (filters.technology) {
+        if (!Array.isArray(project.technologies) || !project.technologies.includes(filters.technology)) {
+            match = false;
+        }
+      }
+      if (filters.difficulty && project.difficulty !== filters.difficulty) {
+        match = false;
+      }
+      if (filters.isPublic !== null && project.is_public !== filters.isPublic) {
+        match = false;
+      }
+      if (filters.searchQuery) {
+        const query = filters.searchQuery.toLowerCase();
+        if (!((project.title && project.title.toLowerCase().includes(query)) ||
+              (project.description && project.description.toLowerCase().includes(query)))) {
+          match = false;
+        }
+      }
+      return match;
+    });
+  }
+);
+
+export const selectPublicProjects = createSelector(
+  [selectAllProjects],
+  (allProjects) => allProjects.filter(project => project.is_public === true)
+);
 
 export default projectsSlice.reducer;
