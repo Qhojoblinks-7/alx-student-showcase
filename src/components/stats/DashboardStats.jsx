@@ -13,7 +13,7 @@ import {ProjectCategoryChart} from './ProjectCategoryChart';
 import {ProjectTechnologyChart} from './ProjectTechnologyChart';
 import {ProjectsOverTimeChart} from './ProjectsOverTimeChart';
 import {ProjectDifficultyChart} from './ProjectDifficultyChart';
-import {ErrorMessage} from '../Layout/ErrorMessage';     // Assuming you have an ErrorMessage component
+import {ErrorMessage} from '../layout/ErrorMessage';     // Assuming you have an ErrorMessage component
 import {FilterPanel} from './FilterPanel';   // Component for filters
 
 // Import icons from lucide-react <--- ADD OR ENSURE THESE IMPORTS ARE PRESENT AND CORRECT

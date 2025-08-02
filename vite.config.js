@@ -18,8 +18,16 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // Remove the 'external' array if you want axios to be bundled
-      // external: ['axios'] // <-- REMOVE THIS LINE
-    }
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
+          charts: ['chart.js', 'react-chartjs-2', 'recharts'],
+          auth: ['@supabase/supabase-js', '@supabase/auth-ui-react'],
+          utils: ['axios', 'date-fns', 'zod', 'clsx']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
   }
 });

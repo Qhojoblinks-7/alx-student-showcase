@@ -33,7 +33,7 @@ import { toast } from 'sonner';
 import  DynamicTextInputList  from '../common/DynamicTextInputList'; // Assuming this path
 import { supabase } from '../../lib/supabase'; // Supabase client instance
 import LoadingSpinner from '../layout/LoadingSpinner';
-import ErrorMessage from '../Layout/ErrorMessage';
+import ErrorMessage from '../layout/ErrorMessage';
 import TagInput from '../common/TagInput';
 
 export const UserProfilePage = () => {
