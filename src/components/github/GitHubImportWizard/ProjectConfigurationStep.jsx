@@ -51,7 +51,7 @@ const ProjectConfigurationStep = ({
     if (projectFormFields) {
       setLocalProjectFormFields(projectFormFields);
     }
-  }, [projectFormFields]); // Re-sync if the *parent-provided* projectFormFields object changes
+  }, []); // Only run once on mount to initialize local state
 
   const [isRepoInputValid, setIsRepoInputValid] = useState(false);
 
