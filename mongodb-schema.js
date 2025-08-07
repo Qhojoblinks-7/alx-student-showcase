@@ -38,11 +38,20 @@ const createCollections = async (db) => {
           websiteUrl: { bsonType: 'string' },
           location: { bsonType: 'string' },
           skills: { bsonType: 'array' },
+          password: { bsonType: 'string' },
           createdAt: { bsonType: 'date' },
           updatedAt: { bsonType: 'date' },
           lastLoginAt: { bsonType: 'date' },
           isVerified: { bsonType: 'bool' },
-          role: { bsonType: 'string' }
+          emailVerified: { bsonType: 'bool' },
+          role: { bsonType: 'string' },
+          githubUsername: { bsonType: 'string' },
+          githubAccessToken: { bsonType: 'string' },
+          verificationToken: { bsonType: 'string' },
+          verificationTokenExpires: { bsonType: 'date' },
+          passwordResetToken: { bsonType: 'string' },
+          passwordResetExpires: { bsonType: 'date' },
+          emailPreferences: { bsonType: 'object' }
         }
       }
     }
@@ -159,6 +168,25 @@ const createCollections = async (db) => {
       }
     }
   });
+
+  // Comment reports collection
+  await db.createCollection('comment_reports', {
+    validator: {
+      $jsonSchema: {
+        bsonType: 'object',
+        required: ['commentId', 'reporterId', 'reason', 'createdAt'],
+        properties: {
+          commentId: { bsonType: 'string' },
+          reporterId: { bsonType: 'string' },
+          reason: { bsonType: 'string' },
+          status: { bsonType: 'string' },
+          createdAt: { bsonType: 'date' },
+          resolvedBy: { bsonType: 'string' },
+          resolvedAt: { bsonType: 'date' }
+        }
+      }
+    }
+  });
 };
 
 const createIndexes = async (db) => {
@@ -194,6 +222,18 @@ const createIndexes = async (db) => {
   await db.collection('notifications').createIndex({ userId: 1 });
   await db.collection('notifications').createIndex({ isRead: 1 });
   await db.collection('notifications').createIndex({ createdAt: -1 });
+
+  // Comment reports indexes
+  await db.collection('comment_reports').createIndex({ commentId: 1 });
+  await db.collection('comment_reports').createIndex({ reporterId: 1 });
+  await db.collection('comment_reports').createIndex({ status: 1 });
+  await db.collection('comment_reports').createIndex({ createdAt: -1 });
+
+  // Additional user indexes for new fields
+  await db.collection('users').createIndex({ emailVerified: 1 });
+  await db.collection('users').createIndex({ githubUsername: 1 });
+  await db.collection('users').createIndex({ verificationToken: 1 });
+  await db.collection('users').createIndex({ passwordResetToken: 1 });
 };
 
 // Sample data insertion

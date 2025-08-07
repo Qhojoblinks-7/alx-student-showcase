@@ -100,11 +100,14 @@ export const signIn = createAsyncThunk(
  */
 export const signInWithGitHub = createAsyncThunk(
   'auth/signInWithGitHub',
-  async (_, { rejectWithValue }) => {
+  async (code, { rejectWithValue }) => {
     try {
-      // For now, we'll implement a simple GitHub OAuth flow
-      // This would need to be implemented with a backend service
-      throw new Error('GitHub OAuth not implemented yet. Please use email/password authentication.');
+      const { user, token } = await AuthService.signInWithGitHub(code);
+
+      // Store token in localStorage
+      localStorage.setItem('authToken', token);
+
+      return user;
     } catch (error) {
       console.error("Sign in with GitHub thunk caught error:", error.message);
       return rejectWithValue(error.message);
@@ -136,6 +139,84 @@ export const clearAuthError = createAsyncThunk(
   'auth/clearAuthError',
   async (_, { dispatch }) => {
     dispatch(authSlice.actions.setError(null)); // Clear the error state
+  }
+);
+
+export const verifyEmail = createAsyncThunk(
+  'auth/verifyEmail',
+  async (token, { rejectWithValue }) => {
+    try {
+      const result = await AuthService.verifyEmail(token);
+      return result;
+    } catch (error) {
+      console.error("Email verification error:", error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const resendVerificationEmail = createAsyncThunk(
+  'auth/resendVerificationEmail',
+  async (userId, { rejectWithValue }) => {
+    try {
+      const result = await AuthService.resendVerificationEmail(userId);
+      return result;
+    } catch (error) {
+      console.error("Resend verification email error:", error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const sendPasswordResetEmail = createAsyncThunk(
+  'auth/sendPasswordResetEmail',
+  async (email, { rejectWithValue }) => {
+    try {
+      const result = await AuthService.sendPasswordResetEmail(email);
+      return result;
+    } catch (error) {
+      console.error("Send password reset email error:", error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const resetPassword = createAsyncThunk(
+  'auth/resetPassword',
+  async ({ token, newPassword }, { rejectWithValue }) => {
+    try {
+      const result = await AuthService.resetPassword(token, newPassword);
+      return result;
+    } catch (error) {
+      console.error("Reset password error:", error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const linkGitHubAccount = createAsyncThunk(
+  'auth/linkGitHubAccount',
+  async ({ userId, code }, { rejectWithValue }) => {
+    try {
+      const result = await AuthService.linkGitHubAccount(userId, code);
+      return result;
+    } catch (error) {
+      console.error("Link GitHub account error:", error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const unlinkGitHubAccount = createAsyncThunk(
+  'auth/unlinkGitHubAccount',
+  async (userId, { rejectWithValue }) => {
+    try {
+      const result = await AuthService.unlinkGitHubAccount(userId);
+      return result;
+    } catch (error) {
+      console.error("Unlink GitHub account error:", error.message);
+      return rejectWithValue(error.message);
+    }
   }
 );
 
@@ -247,6 +328,84 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = null; // Ensure user is null if session retrieval fails
         state.error = action.payload; // Set error if session retrieval fails
+      })
+      // --- Email verification ---
+      .addCase(verifyEmail.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(verifyEmail.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(verifyEmail.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      // --- Resend verification email ---
+      .addCase(resendVerificationEmail.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resendVerificationEmail.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(resendVerificationEmail.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      // --- Send password reset email ---
+      .addCase(sendPasswordResetEmail.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(sendPasswordResetEmail.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(sendPasswordResetEmail.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      // --- Reset password ---
+      .addCase(resetPassword.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(resetPassword.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(resetPassword.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      // --- Link GitHub account ---
+      .addCase(linkGitHubAccount.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(linkGitHubAccount.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(linkGitHubAccount.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      // --- Unlink GitHub account ---
+      .addCase(unlinkGitHubAccount.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(unlinkGitHubAccount.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(unlinkGitHubAccount.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
       });
   },
 });

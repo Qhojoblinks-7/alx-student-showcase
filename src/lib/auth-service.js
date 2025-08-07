@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getCollection } from './mongodb.js';
+import { GitHubOAuthService } from './github-oauth.js';
+import { EmailService } from './email-service.js';
 
 const JWT_SECRET = import.meta.env.VITE_JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = '7d';
@@ -42,6 +44,7 @@ export class AuthService {
         updatedAt: new Date(),
         lastLoginAt: new Date(),
         isVerified: false,
+        emailVerified: false,
         role: 'student'
       };
 
@@ -56,6 +59,14 @@ export class AuthService {
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
       );
+
+      // Send verification email
+      try {
+        await EmailService.sendVerificationEmail(result.insertedId, newUser.email);
+        await EmailService.sendWelcomeEmail({ ...userWithoutPassword, _id: result.insertedId });
+      } catch (error) {
+        console.error('Error sending verification email:', error);
+      }
 
       return {
         user: { ...userWithoutPassword, _id: result.insertedId },
@@ -243,5 +254,168 @@ export class AuthService {
     } catch (error) {
       return null;
     }
+  }
+
+  // GitHub OAuth methods
+  static async signInWithGitHub(code) {
+    try {
+      // Exchange code for access token
+      const accessToken = await GitHubOAuthService.exchangeCodeForToken(code);
+      
+      // Get user info from GitHub
+      const githubUser = await GitHubOAuthService.getUserInfo(accessToken);
+      const githubEmails = await GitHubOAuthService.getUserEmails(accessToken);
+      
+      // Find primary email
+      const primaryEmail = githubEmails.find(email => email.primary) || githubEmails[0];
+      
+      if (!primaryEmail) {
+        throw new Error('No email found for GitHub account');
+      }
+
+      const usersCollection = await getCollection('users');
+      
+      // Check if user already exists
+      let user = await usersCollection.findOne({ email: primaryEmail.email });
+      
+      if (user) {
+        // User exists, update GitHub info
+        await usersCollection.updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              githubUrl: githubUser.html_url,
+              avatar: githubUser.avatar_url,
+              githubUsername: githubUser.login,
+              githubAccessToken: accessToken,
+              lastLoginAt: new Date(),
+              updatedAt: new Date()
+            }
+          }
+        );
+        
+        // Get updated user
+        user = await usersCollection.findOne({ _id: user._id });
+      } else {
+        // Create new user
+        const newUser = {
+          email: primaryEmail.email,
+          username: githubUser.login,
+          fullName: githubUser.name || githubUser.login,
+          bio: githubUser.bio || '',
+          avatar: githubUser.avatar_url,
+          githubUrl: githubUser.html_url,
+          linkedinUrl: '',
+          websiteUrl: githubUser.blog || '',
+          location: githubUser.location || '',
+          skills: [],
+          password: '', // No password for OAuth users
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastLoginAt: new Date(),
+          isVerified: true,
+          emailVerified: true,
+          role: 'student',
+          githubUsername: githubUser.login,
+          githubAccessToken: accessToken
+        };
+
+        const result = await usersCollection.insertOne(newUser);
+        user = { ...newUser, _id: result.insertedId };
+      }
+
+      // Remove sensitive data
+      const { password, githubAccessToken, ...userWithoutSensitiveData } = user;
+      
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user._id.toString(), email: user.email },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRES_IN }
+      );
+
+      return {
+        user: userWithoutSensitiveData,
+        token
+      };
+    } catch (error) {
+      console.error('GitHub OAuth error:', error);
+      throw error;
+    }
+  }
+
+  static async linkGitHubAccount(userId, code) {
+    try {
+      // Exchange code for access token
+      const accessToken = await GitHubOAuthService.exchangeCodeForToken(code);
+      
+      // Get user info from GitHub
+      const githubUser = await GitHubOAuthService.getUserInfo(accessToken);
+      
+      const usersCollection = await getCollection('users');
+      
+      // Update user with GitHub info
+      await usersCollection.updateOne(
+        { _id: userId },
+        {
+          $set: {
+            githubUrl: githubUser.html_url,
+            githubUsername: githubUser.login,
+            githubAccessToken: accessToken,
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      return { success: true, message: 'GitHub account linked successfully' };
+    } catch (error) {
+      console.error('Error linking GitHub account:', error);
+      throw error;
+    }
+  }
+
+  static async unlinkGitHubAccount(userId) {
+    try {
+      const usersCollection = await getCollection('users');
+      
+      await usersCollection.updateOne(
+        { _id: userId },
+        {
+          $unset: {
+            githubAccessToken: "",
+            githubUsername: ""
+          },
+          $set: {
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      return { success: true, message: 'GitHub account unlinked successfully' };
+    } catch (error) {
+      console.error('Error unlinking GitHub account:', error);
+      throw error;
+    }
+  }
+
+  // Email verification methods
+  static async verifyEmail(token) {
+    return await EmailService.verifyEmail(token);
+  }
+
+  static async resendVerificationEmail(userId) {
+    return await EmailService.resendVerificationEmail(userId);
+  }
+
+  static async sendPasswordResetEmail(email) {
+    return await EmailService.sendPasswordResetEmail(email);
+  }
+
+  static async resetPassword(token, newPassword) {
+    return await EmailService.resetPassword(token, newPassword);
+  }
+
+  static async isEmailVerified(userId) {
+    return await EmailService.isEmailVerified(userId);
   }
 }
