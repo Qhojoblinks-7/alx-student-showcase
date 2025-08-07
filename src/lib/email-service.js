@@ -1,4 +1,4 @@
-// Email Service for verification and password reset
+// Email Service for verification and password reset - FREE VERSION
 import { getCollection } from './mongodb.js';
 import { AuthService } from './auth-service.js';
 
@@ -22,29 +22,23 @@ export class EmailService {
         }
       );
 
-      // In a real application, you would send an email here
-      // For now, we'll simulate the email sending
+      // For free version, we'll use a simple approach
+      // In development, just log the verification URL
       const verificationUrl = `${window.location.origin}/verify-email?token=${verificationToken}`;
       
-      console.log('Verification email would be sent to:', email);
+      console.log('=== EMAIL VERIFICATION (FREE VERSION) ===');
+      console.log('To:', email);
+      console.log('Subject: Verify your email address');
       console.log('Verification URL:', verificationUrl);
+      console.log('==========================================');
 
-      // For development, you can use a service like SendGrid, AWS SES, or Nodemailer
-      // Example with a hypothetical email service:
-      /*
-      await emailProvider.send({
-        to: email,
-        subject: 'Verify your email address',
-        html: `
-          <h1>Welcome to ALX Student Showcase!</h1>
-          <p>Please click the link below to verify your email address:</p>
-          <a href="${verificationUrl}">Verify Email</a>
-          <p>This link will expire in 24 hours.</p>
-        `
-      });
-      */
+      // For production, you can use free email services like:
+      // 1. Gmail SMTP (free for personal use)
+      // 2. Mailgun (free tier: 5,000 emails/month)
+      // 3. SendGrid (free tier: 100 emails/day)
+      // 4. Resend (free tier: 3,000 emails/month)
 
-      return { success: true, message: 'Verification email sent' };
+      return { success: true, message: 'Verification email sent (check console for URL)' };
     } catch (error) {
       console.error('Error sending verification email:', error);
       throw error;
@@ -116,25 +110,13 @@ export class EmailService {
       // Generate reset URL
       const resetUrl = `${window.location.origin}/reset-password?token=${resetToken}`;
       
-      console.log('Password reset email would be sent to:', email);
+      console.log('=== PASSWORD RESET EMAIL (FREE VERSION) ===');
+      console.log('To:', email);
+      console.log('Subject: Reset your password');
       console.log('Reset URL:', resetUrl);
+      console.log('==========================================');
 
-      // In a real application, send the email here
-      /*
-      await emailProvider.send({
-        to: email,
-        subject: 'Reset your password',
-        html: `
-          <h1>Password Reset Request</h1>
-          <p>Click the link below to reset your password:</p>
-          <a href="${resetUrl}">Reset Password</a>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        `
-      });
-      */
-
-      return { success: true, message: 'Password reset email sent' };
+      return { success: true, message: 'Password reset email sent (check console for URL)' };
     } catch (error) {
       console.error('Error sending password reset email:', error);
       throw error;
@@ -183,23 +165,13 @@ export class EmailService {
 
   static async sendWelcomeEmail(user) {
     try {
-      console.log('Welcome email would be sent to:', user.email);
-      
-      // In a real application, send welcome email
-      /*
-      await emailProvider.send({
-        to: user.email,
-        subject: 'Welcome to ALX Student Showcase!',
-        html: `
-          <h1>Welcome ${user.fullName}!</h1>
-          <p>Thank you for joining ALX Student Showcase.</p>
-          <p>Start showcasing your projects and connecting with other developers!</p>
-          <a href="${window.location.origin}/dashboard">Go to Dashboard</a>
-        `
-      });
-      */
+      console.log('=== WELCOME EMAIL (FREE VERSION) ===');
+      console.log('To:', user.email);
+      console.log('Subject: Welcome to ALX Student Showcase!');
+      console.log('Message: Welcome to the platform!');
+      console.log('==========================================');
 
-      return { success: true, message: 'Welcome email sent' };
+      return { success: true, message: 'Welcome email sent (check console)' };
     } catch (error) {
       console.error('Error sending welcome email:', error);
       throw error;
@@ -208,22 +180,13 @@ export class EmailService {
 
   static async sendProjectNotification(user, project, action) {
     try {
-      console.log(`Project ${action} notification would be sent to:`, user.email);
-      
-      // In a real application, send project notification
-      /*
-      await emailProvider.send({
-        to: user.email,
-        subject: `Project ${action} - ${project.title}`,
-        html: `
-          <h1>Project ${action}</h1>
-          <p>Your project "${project.title}" has been ${action}.</p>
-          <a href="${window.location.origin}/projects/${project._id}">View Project</a>
-        `
-      });
-      */
+      console.log(`=== PROJECT ${action.toUpperCase()} NOTIFICATION (FREE VERSION) ===`);
+      console.log('To:', user.email);
+      console.log(`Subject: Project ${action} - ${project.title}`);
+      console.log(`Message: Your project "${project.title}" has been ${action}.`);
+      console.log('==========================================');
 
-      return { success: true, message: 'Project notification sent' };
+      return { success: true, message: 'Project notification sent (check console)' };
     } catch (error) {
       console.error('Error sending project notification:', error);
       throw error;
@@ -232,23 +195,13 @@ export class EmailService {
 
   static async sendCommentNotification(user, comment, project) {
     try {
-      console.log('Comment notification would be sent to:', user.email);
-      
-      // In a real application, send comment notification
-      /*
-      await emailProvider.send({
-        to: user.email,
-        subject: `New comment on ${project.title}`,
-        html: `
-          <h1>New Comment</h1>
-          <p>Someone commented on your project "${project.title}":</p>
-          <p>"${comment.content}"</p>
-          <a href="${window.location.origin}/projects/${project._id}">View Comment</a>
-        `
-      });
-      */
+      console.log('=== COMMENT NOTIFICATION (FREE VERSION) ===');
+      console.log('To:', user.email);
+      console.log('Subject: New comment on your project');
+      console.log('Message: Someone commented on your project');
+      console.log('==========================================');
 
-      return { success: true, message: 'Comment notification sent' };
+      return { success: true, message: 'Comment notification sent (check console)' };
     } catch (error) {
       console.error('Error sending comment notification:', error);
       throw error;
@@ -257,22 +210,13 @@ export class EmailService {
 
   static async sendFollowNotification(user, follower) {
     try {
-      console.log('Follow notification would be sent to:', user.email);
-      
-      // In a real application, send follow notification
-      /*
-      await emailProvider.send({
-        to: user.email,
-        subject: `New follower: ${follower.fullName}`,
-        html: `
-          <h1>New Follower</h1>
-          <p>${follower.fullName} started following you!</p>
-          <a href="${window.location.origin}/profile/${follower.username}">View Profile</a>
-        `
-      });
-      */
+      console.log('=== FOLLOW NOTIFICATION (FREE VERSION) ===');
+      console.log('To:', user.email);
+      console.log('Subject: New follower');
+      console.log('Message: Someone started following you!');
+      console.log('==========================================');
 
-      return { success: true, message: 'Follow notification sent' };
+      return { success: true, message: 'Follow notification sent (check console)' };
     } catch (error) {
       console.error('Error sending follow notification:', error);
       throw error;
@@ -349,5 +293,43 @@ export class EmailService {
       console.error('Error getting email preferences:', error);
       throw error;
     }
+  }
+
+  // FREE EMAIL SERVICE INTEGRATION OPTIONS
+  static async setupFreeEmailService() {
+    console.log(`
+=== FREE EMAIL SERVICE SETUP GUIDE ===
+
+For production use, you can integrate with these FREE email services:
+
+1. GMAIL SMTP (FREE for personal use):
+   - Use your Gmail account
+   - Enable 2-factor authentication
+   - Generate app password
+   - Configure SMTP settings
+
+2. MAILGUN (FREE: 5,000 emails/month):
+   - Sign up at mailgun.com
+   - Verify your domain
+   - Use their free tier
+
+3. SENDGRID (FREE: 100 emails/day):
+   - Sign up at sendgrid.com
+   - Verify your email
+   - Use their free tier
+
+4. RESEND (FREE: 3,000 emails/month):
+   - Sign up at resend.com
+   - Verify your domain
+   - Use their free tier
+
+5. ELASTIC EMAIL (FREE: 100 emails/day):
+   - Sign up at elasticemail.com
+   - Verify your email
+   - Use their free tier
+
+For now, emails are logged to console for development.
+==========================================
+    `);
   }
 }

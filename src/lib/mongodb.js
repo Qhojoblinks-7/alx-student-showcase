@@ -1,5 +1,6 @@
 import { MongoClient } from 'mongodb';
 
+// FREE VERSION - Use MongoDB Atlas Free Tier
 const MONGODB_URI = import.meta.env.VITE_MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = import.meta.env.VITE_MONGODB_DB_NAME || 'alx-showcase';
 
@@ -13,29 +14,30 @@ export const connectToDatabase = async () => {
   }
 
   try {
+    // FREE VERSION - Simplified connection for free tier
     client = new MongoClient(MONGODB_URI, {
-      // Enable change streams
-      replicaSet: 'rs0', // Required for change streams in development
-      // For production, use proper replica set configuration
+      // Remove replica set requirement for free tier
+      // Most free tiers don't support replica sets
+      maxPoolSize: 10, // Limit connections for free tier
+      serverSelectionTimeoutMS: 5000, // Faster timeout
+      socketTimeoutMS: 45000,
     });
+    
     await client.connect();
     db = client.db(DB_NAME);
     
-    console.log('Connected to MongoDB successfully');
+    console.log('✅ Connected to MongoDB successfully (FREE VERSION)');
+    console.log('📊 Database:', DB_NAME);
+    console.log('🔗 Connection:', MONGODB_URI.includes('localhost') ? 'Local' : 'Atlas');
+    
     return { client, db };
   } catch (error) {
-    console.error('Failed to connect to MongoDB:', error);
-    // Fallback to basic connection if replica set is not available
-    try {
-      client = new MongoClient(MONGODB_URI);
-      await client.connect();
-      db = client.db(DB_NAME);
-      console.log('Connected to MongoDB (basic mode)');
-      return { client, db };
-    } catch (fallbackError) {
-      console.error('Failed to connect to MongoDB (fallback):', fallbackError);
-      throw fallbackError;
-    }
+    console.error('❌ Failed to connect to MongoDB:', error);
+    console.log('💡 FREE TIER SETUP TIPS:');
+    console.log('   1. Use MongoDB Atlas Free Tier (512MB)');
+    console.log('   2. Or use local MongoDB installation');
+    console.log('   3. Check your connection string');
+    throw error;
   }
 };
 
@@ -70,72 +72,9 @@ export const getCollection = async (collectionName) => {
   return database.collection(collectionName);
 };
 
-// Real-time subscription with MongoDB Change Streams
+// FREE VERSION - Simplified real-time subscription with polling
 export const subscribeToProjectChanges = (onUpdate) => {
-  const streamKey = 'projects-changes';
-  
-  // Close existing stream if any
-  if (changeStreams.has(streamKey)) {
-    changeStreams.get(streamKey).close();
-  }
-
-  const setupChangeStream = async () => {
-    try {
-      const projectsCollection = await getCollection('projects');
-      
-      // Create change stream for projects collection
-      const changeStream = projectsCollection.watch([
-        {
-          $match: {
-            'operationType': { $in: ['insert', 'update', 'delete'] }
-          }
-        }
-      ]);
-
-      changeStream.on('change', (change) => {
-        console.log('Project change detected:', change);
-        
-        switch (change.operationType) {
-          case 'insert':
-            onUpdate({ type: 'insert', data: change.fullDocument });
-            break;
-          case 'update':
-            onUpdate({ type: 'update', data: change.fullDocument, documentKey: change.documentKey });
-            break;
-          case 'delete':
-            onUpdate({ type: 'delete', documentKey: change.documentKey });
-            break;
-        }
-      });
-
-      changeStream.on('error', (error) => {
-        console.error('Change stream error:', error);
-        // Fallback to polling if change streams fail
-        setTimeout(() => setupChangeStream(), 5000);
-      });
-
-      changeStreams.set(streamKey, changeStream);
-      
-      return {
-        unsubscribe: () => {
-          if (changeStreams.has(streamKey)) {
-            changeStreams.get(streamKey).close();
-            changeStreams.delete(streamKey);
-          }
-        }
-      };
-    } catch (error) {
-      console.error('Failed to setup change stream, falling back to polling:', error);
-      return fallbackToPolling(onUpdate);
-    }
-  };
-
-  return setupChangeStream();
-};
-
-// Fallback polling mechanism
-const fallbackToPolling = (onUpdate) => {
-  console.log('Using polling fallback for real-time updates');
+  console.log('🔄 Setting up project change subscription (FREE VERSION - Polling)');
   
   const interval = setInterval(async () => {
     try {
@@ -150,114 +89,75 @@ const fallbackToPolling = (onUpdate) => {
     } catch (error) {
       console.error('Error polling for project changes:', error);
     }
+  }, 5000); // Poll every 5 seconds
+
+  return {
+    unsubscribe: () => {
+      clearInterval(interval);
+      console.log('🔄 Project change subscription stopped');
+    }
+  };
+};
+
+// FREE VERSION - Simplified user change subscription
+export const subscribeToUserChanges = (userId, onUpdate) => {
+  console.log('🔄 Setting up user change subscription (FREE VERSION - Polling)');
+  
+  const interval = setInterval(async () => {
+    try {
+      const usersCollection = await getCollection('users');
+      const user = await usersCollection.findOne({ 
+        _id: userId,
+        updatedAt: { $gte: new Date(Date.now() - 5000) }
+      });
+      
+      if (user) {
+        onUpdate({ type: 'update', data: user });
+      }
+    } catch (error) {
+      console.error('Error polling for user changes:', error);
+    }
   }, 5000);
 
   return {
-    unsubscribe: () => clearInterval(interval)
-  };
-};
-
-// Subscribe to user profile changes
-export const subscribeToUserChanges = (userId, onUpdate) => {
-  const streamKey = `user-${userId}`;
-  
-  if (changeStreams.has(streamKey)) {
-    changeStreams.get(streamKey).close();
-  }
-
-  const setupUserChangeStream = async () => {
-    try {
-      const usersCollection = await getCollection('users');
-      
-      const changeStream = usersCollection.watch([
-        {
-          $match: {
-            'operationType': { $in: ['update'] },
-            'documentKey._id': userId
-          }
-        }
-      ]);
-
-      changeStream.on('change', (change) => {
-        console.log('User change detected:', change);
-        onUpdate({ type: 'update', data: change.fullDocument });
-      });
-
-      changeStream.on('error', (error) => {
-        console.error('User change stream error:', error);
-        setTimeout(() => setupUserChangeStream(), 5000);
-      });
-
-      changeStreams.set(streamKey, changeStream);
-      
-      return {
-        unsubscribe: () => {
-          if (changeStreams.has(streamKey)) {
-            changeStreams.get(streamKey).close();
-            changeStreams.delete(streamKey);
-          }
-        }
-      };
-    } catch (error) {
-      console.error('Failed to setup user change stream:', error);
-      return { unsubscribe: () => {} };
+    unsubscribe: () => {
+      clearInterval(interval);
+      console.log('🔄 User change subscription stopped');
     }
   };
-
-  return setupUserChangeStream();
 };
 
-// Subscribe to comments changes
+// FREE VERSION - Simplified comment change subscription
 export const subscribeToCommentChanges = (projectId, onUpdate) => {
-  const streamKey = `comments-${projectId}`;
+  console.log('🔄 Setting up comment change subscription (FREE VERSION - Polling)');
   
-  if (changeStreams.has(streamKey)) {
-    changeStreams.get(streamKey).close();
-  }
-
-  const setupCommentChangeStream = async () => {
+  const interval = setInterval(async () => {
     try {
       const commentsCollection = await getCollection('comments');
+      const recentComments = await commentsCollection
+        .find({ 
+          projectId: projectId,
+          createdAt: { $gte: new Date(Date.now() - 5000) }
+        })
+        .toArray();
       
-      const changeStream = commentsCollection.watch([
-        {
-          $match: {
-            'operationType': { $in: ['insert', 'update', 'delete'] },
-            'fullDocument.projectId': projectId
-          }
-        }
-      ]);
-
-      changeStream.on('change', (change) => {
-        console.log('Comment change detected:', change);
-        onUpdate({ type: change.operationType, data: change.fullDocument });
+      recentComments.forEach(comment => {
+        onUpdate({ type: 'insert', data: comment });
       });
-
-      changeStream.on('error', (error) => {
-        console.error('Comment change stream error:', error);
-        setTimeout(() => setupCommentChangeStream(), 5000);
-      });
-
-      changeStreams.set(streamKey, changeStream);
-      
-      return {
-        unsubscribe: () => {
-          if (changeStreams.has(streamKey)) {
-            changeStreams.get(streamKey).close();
-            changeStreams.delete(streamKey);
-          }
-        }
-      };
     } catch (error) {
-      console.error('Failed to setup comment change stream:', error);
-      return { unsubscribe: () => {} };
+      console.error('Error polling for comment changes:', error);
+    }
+  }, 5000);
+
+  return {
+    unsubscribe: () => {
+      clearInterval(interval);
+      console.log('🔄 Comment change subscription stopped');
     }
   };
-
-  return setupCommentChangeStream();
 };
 
-// Advanced aggregation functions
+// Advanced aggregation functions (FREE VERSION - Optimized for free tier)
 export const getProjectStats = async (userId) => {
   try {
     const projectsCollection = await getCollection('projects');
@@ -339,16 +239,19 @@ export const getProjectTimeline = async (userId) => {
   }
 };
 
-// Search functionality with text search
+// FREE VERSION - Simplified search functionality
 export const searchProjects = async (query, filters = {}) => {
   try {
     const projectsCollection = await getCollection('projects');
     
     let searchQuery = {};
     
-    // Text search
+    // Simple text search (no text index required)
     if (query) {
-      searchQuery.$text = { $search: query };
+      searchQuery.$or = [
+        { title: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } }
+      ];
     }
     
     // Apply filters
@@ -367,7 +270,7 @@ export const searchProjects = async (query, filters = {}) => {
     
     const projects = await projectsCollection
       .find(searchQuery)
-      .sort(query ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
+      .sort({ createdAt: -1 })
       .limit(filters.limit || 50)
       .toArray();
     
@@ -378,7 +281,7 @@ export const searchProjects = async (query, filters = {}) => {
   }
 };
 
-// Backup and restore functionality
+// Backup and restore functionality (FREE VERSION)
 export const backupProjectData = async (projectData) => {
   try {
     const backupsCollection = await getCollection('project_backups');
@@ -420,7 +323,7 @@ export const restoreProjectData = async (backupId) => {
   }
 };
 
-// Badge system
+// Badge system (FREE VERSION)
 export const fetchUserBadges = async (userId) => {
   try {
     const badgesCollection = await getCollection('badges');
@@ -450,7 +353,7 @@ export const awardBadge = async (userId, badge) => {
   }
 };
 
-// Notification system
+// Notification system (FREE VERSION)
 export const createNotification = async (notification) => {
   try {
     const notificationsCollection = await getCollection('notifications');
@@ -495,7 +398,7 @@ export const getUserNotifications = async (userId, limit = 20) => {
   }
 };
 
-// Follow system
+// Follow system (FREE VERSION)
 export const followUser = async (followerId, followingId) => {
   try {
     const followersCollection = await getCollection('followers');
@@ -549,4 +452,43 @@ export const getFollowing = async (userId) => {
     console.error('Error fetching following:', error);
     throw error;
   }
+};
+
+// FREE TIER SETUP GUIDE
+export const showFreeTierSetupGuide = () => {
+  console.log(`
+=== FREE TIER SETUP GUIDE ===
+
+🎯 MONGODB ATLAS FREE TIER (RECOMMENDED):
+1. Go to mongodb.com/atlas
+2. Create free account
+3. Create new cluster (FREE tier - 512MB)
+4. Get connection string
+5. Add to .env.local:
+   VITE_MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/alx-showcase
+
+🔧 LOCAL MONGODB (ALTERNATIVE):
+1. Install MongoDB locally
+2. Start MongoDB service
+3. Use connection string:
+   VITE_MONGODB_URI=mongodb://localhost:27017
+
+📧 FREE EMAIL SERVICES:
+1. Gmail SMTP (personal use)
+2. Mailgun (5,000 emails/month)
+3. SendGrid (100 emails/day)
+4. Resend (3,000 emails/month)
+
+💾 FREE STORAGE:
+1. Cloudinary (25GB free)
+2. Firebase Storage (5GB free)
+3. AWS S3 (5GB free tier)
+
+🚀 FREE HOSTING:
+1. Vercel (unlimited)
+2. Netlify (unlimited)
+3. GitHub Pages (unlimited)
+
+==========================================
+  `);
 };
