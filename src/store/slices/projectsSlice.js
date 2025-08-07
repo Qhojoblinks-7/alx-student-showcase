@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { supabase } from '../../lib/supabase';
+import { getCollection } from '../../lib/mongodb';
 import { createSelector } from 'reselect';
 
 // --- Initial State ---
@@ -33,59 +33,52 @@ export const fetchProjects = createAsyncThunk(
   'projects/fetchProjects',
   async ({ userId, filters = {} }, { dispatch, rejectWithValue }) => {
     try {
-      // Manual setLoading dispatch is removed; status will be handled in extraReducers
-      // dispatch(projectsSlice.actions.setLoading(true)); // REMOVED
-
-      let query = supabase.from('projects').select('*');
-
-      // Always filter by user_id if provided
+      const projectsCollection = await getCollection('projects');
+      
+      // Build MongoDB query
+      let query = {};
+      
+      // Always filter by userId if provided
       if (userId) {
-        query = query.eq('user_id', userId);
+        query.userId = userId;
       }
 
       // Apply filters for isPublic only if explicitly set (true or false)
       if (typeof filters.isPublic === 'boolean') {
-        query = query.eq('is_public', filters.isPublic);
+        query.isPublic = filters.isPublic;
       }
       // If no userId is provided AND filters.isPublic is NOT explicitly set (meaning it's for public view),
       // default to fetching only public projects.
       else if (!userId) {
-          query = query.eq('is_public', true);
+        query.isPublic = true;
       }
 
       // Apply other filters
       if (filters.category) {
-        query = query.eq('category', filters.category);
+        query.category = filters.category;
       }
       if (filters.technology) {
-        query = query.contains('technologies', [filters.technology]);
+        query.technologies = { $in: [filters.technology] };
       }
       if (filters.difficulty) {
-        query = query.eq('difficulty', filters.difficulty);
+        query.difficulty = filters.difficulty;
       }
+
+      let projects = await projectsCollection.find(query).sort({ createdAt: -1 }).toArray();
+
+      // Apply search filter in memory (MongoDB text search could be used for better performance)
       if (filters.searchQuery) {
-        query = query.or(`title.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`);
+        const query = filters.searchQuery.toLowerCase();
+        projects = projects.filter(project => 
+          (project.title && project.title.toLowerCase().includes(query)) ||
+          (project.description && project.description.toLowerCase().includes(query))
+        );
       }
 
-      query = query.order('created_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch projects.');
-      }
-
-      // Manual setProjects dispatch is removed; payload will be set in extraReducers
-      // dispatch(projectsSlice.actions.setProjects(data)); // REMOVED
-      return data;
+      return projects;
     } catch (error) {
       console.error("Fetch projects error:", error.message);
-      // Manual setError dispatch is removed; error will be handled in extraReducers
-      // dispatch(projectsSlice.actions.setError(error.message)); // REMOVED
       return rejectWithValue(error.message);
-    } finally {
-      // Manual setLoading(false) dispatch is removed; status will be handled in extraReducers
-      // dispatch(projectsSlice.actions.setLoading(false)); // REMOVED
     }
   }
 );
@@ -101,13 +94,18 @@ export const addProject = createAsyncThunk(
       dispatch(projectsSlice.actions.setIsCreating(true));
       dispatch(projectsSlice.actions.setError(null));
 
-      const { data, error } = await supabase.from('projects').insert(projectData).select();
+      const projectsCollection = await getCollection('projects');
+      
+      // Add timestamps
+      const projectWithTimestamps = {
+        ...projectData,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
-      if (error) {
-        throw new Error(error.message || 'Failed to add project.');
-      }
-
-      const newProject = data[0];
+      const result = await projectsCollection.insertOne(projectWithTimestamps);
+      
+      const newProject = { ...projectWithTimestamps, _id: result.insertedId };
       dispatch(projectsSlice.actions.addProjectLocally(newProject));
       return newProject;
     } catch (error) {
@@ -133,13 +131,24 @@ export const updateProject = createAsyncThunk(
       dispatch(projectsSlice.actions.setIsUpdating(true));
       dispatch(projectsSlice.actions.setError(null));
 
-      const { data, error } = await supabase.from('projects').update(projectData).eq('id', id).select();
+      const projectsCollection = await getCollection('projects');
+      
+      // Add updated timestamp
+      const projectWithTimestamp = {
+        ...projectData,
+        updatedAt: new Date()
+      };
 
-      if (error) {
-        throw new Error(error.message || 'Failed to update project.');
+      const result = await projectsCollection.updateOne(
+        { _id: id },
+        { $set: projectWithTimestamp }
+      );
+
+      if (result.matchedCount === 0) {
+        throw new Error('Project not found.');
       }
 
-      const updatedProject = data[0];
+      const updatedProject = await projectsCollection.findOne({ _id: id });
       dispatch(projectsSlice.actions.updateProjectLocally(updatedProject));
       return updatedProject;
     } catch (error) {
@@ -163,10 +172,12 @@ export const deleteProject = createAsyncThunk(
       dispatch(projectsSlice.actions.setIsDeleting(true));
       dispatch(projectsSlice.actions.setError(null));
 
-      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+      const projectsCollection = await getCollection('projects');
+      
+      const result = await projectsCollection.deleteOne({ _id: projectId });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to delete project.');
+      if (result.deletedCount === 0) {
+        throw new Error('Project not found.');
       }
 
       dispatch(projectsSlice.actions.deleteProjectLocally(projectId));

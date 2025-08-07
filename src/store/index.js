@@ -8,6 +8,7 @@ import profileReducer from './slices/profileSlice';
 import statsReducer from './slices/statsSlice';
 import githubReducer from './slices/githubSlice';
 import sharingReducer from './slices/sharingSlice';
+import commentsReducer from './slices/commentsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -18,7 +19,7 @@ export const store = configureStore({
     stats: statsReducer,       // NEW
     github: githubReducer,     // NEW
     sharing: sharingReducer,
-
+    comments: commentsReducer, // NEW
   },
   // Optionally add middleware or enhancers
   middleware: (getDefaultMiddleware) =>
