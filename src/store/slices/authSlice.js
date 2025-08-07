@@ -1,7 +1,7 @@
 // src/store/slices/authSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { createSelector } from 'reselect'; // For memoized selectors
-import authService from '../../components/service/auth-service'; // Import the authService
+import { AuthService } from '../../lib/auth-service'; // Import the MongoDB auth service
 
 // --- Initial State ---
 const initialState = {
@@ -20,17 +20,15 @@ const initialState = {
  */
 export const signUp = createAsyncThunk(
   'auth/signUp',
-  async ({ email, password }, { rejectWithValue }) => {
+  async ({ email, password, username, fullName }, { rejectWithValue }) => {
     try {
-      // Use authService for the actual API call
-      const { user, error } = await authService.signUp(email, password);
+      // Use AuthService for the actual API call
+      const { user, token } = await AuthService.signUp({ email, password, username, fullName });
 
-      if (error) {
-        throw new Error(error.message || 'Sign up failed.');
-      }
+      // Store token in localStorage
+      localStorage.setItem('authToken', token);
 
-      // If sign-up is successful but user needs email confirmation, user might be null initially
-      return user || { message: 'Please check your email to confirm your account.' };
+      return user;
     } catch (error) {
       console.error("Sign up error:", error.message);
       return rejectWithValue(error.message);
@@ -48,51 +46,26 @@ export const getSession = createAsyncThunk(
   'auth/getSession',
   async (_, { rejectWithValue }) => {
     try {
-      // Fetch the current session first, as it contains provider_token for OAuth
-      const { session, error: sessionError } = await authService.getCurrentSession();
-      if (sessionError) {
-        throw new Error(sessionError.message || 'Failed to get session from authService.');
+      // Get token from localStorage
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        return null;
       }
 
-      let user = null;
-      if (session) {
-        // Then fetch the user object, which includes user_metadata from the database
-        const { user: supabaseUser, error: userError } = await authService.getCurrentUser();
-        if (userError) {
-          throw new Error(userError.message || 'Failed to get user from authService.');
-        }
-
-        user = { ...supabaseUser }; // Start with the user object from Supabase
-
-        // CRITICAL LOGIC: Ensure github_access_token is in user_metadata
-        // Supabase often puts the OAuth token (provider_token) directly on the session
-        // after a login, but it might not be immediately in user_metadata from getUser()
-        // unless explicitly handled or a database trigger is used.
-        if (session.provider_token && !user.user_metadata?.github_access_token) {
-          user.user_metadata = {
-            ...(user.user_metadata || {}), // Preserve existing metadata
-            github_access_token: session.provider_token,
-          };
-          console.log("authSlice: Copied session.provider_token to user.user_metadata.github_access_token");
-        }
-        // Fallback: If provider_token isn't directly on session (e.g., after a deep refresh),
-        // check user.identities, which should contain details for linked OAuth providers.
-        else if (user.app_metadata.provider === 'github' && !user.user_metadata?.github_access_token) {
-            const githubIdentity = user.identities?.find(id => id.provider === 'github');
-            if (githubIdentity?.access_token) {
-                user.user_metadata = {
-                    ...(user.user_metadata || {}),
-                    github_access_token: githubIdentity.access_token,
-                };
-                console.log("authSlice: Copied githubIdentity.access_token from identities to user.user_metadata.github_access_token");
-            }
-        }
+      // Get current user using the token
+      const user = await AuthService.getCurrentUser(token);
+      
+      if (!user) {
+        // Token is invalid, remove it
+        localStorage.removeItem('authToken');
+        return null;
       }
 
-      // Return the potentially modified user object
       return user;
     } catch (error) {
       console.error("Get session error:", error.message);
+      localStorage.removeItem('authToken');
       return rejectWithValue(error.message);
     }
   }
@@ -108,12 +81,12 @@ export const signIn = createAsyncThunk(
   'auth/signIn',
   async ({ email, password }, { rejectWithValue }) => {
     try {
-      const { user, error } = await authService.signIn(email, password);
+      const { user, token } = await AuthService.signIn(email, password);
 
-      if (error) {
-        throw new Error(error.message || 'Sign in failed.');
-      }
-      return user; // Return the user object directly from authService
+      // Store token in localStorage
+      localStorage.setItem('authToken', token);
+
+      return user; // Return the user object directly from AuthService
     } catch (error) {
       console.error("Sign in thunk caught error:", error.message);
       return rejectWithValue(error.message);
@@ -129,18 +102,9 @@ export const signInWithGitHub = createAsyncThunk(
   'auth/signInWithGitHub',
   async (_, { rejectWithValue }) => {
     try {
-      // Call the new signInWithGitHub method from your authService
-      // This will initiate the redirect to GitHub for OAuth.
-      const { data, error } = await authService.signInWithGitHub();
-
-      if (error) {
-        console.error("Auth service signInWithGitHub error:", error);
-        throw new Error(error.message || 'GitHub sign-in failed to initiate.');
-      }
-
-      // For OAuth redirect flows, data might be null here as the user is immediately redirected.
-      // The actual session and user data will be available on callback, handled by getSession().
-      return data;
+      // For now, we'll implement a simple GitHub OAuth flow
+      // This would need to be implemented with a backend service
+      throw new Error('GitHub OAuth not implemented yet. Please use email/password authentication.');
     } catch (error) {
       console.error("Sign in with GitHub thunk caught error:", error.message);
       return rejectWithValue(error.message);
@@ -155,13 +119,8 @@ export const signOut = createAsyncThunk(
   'auth/signOut',
   async (_, { rejectWithValue }) => {
     try {
-      // Use authService for the actual API call
-      const { error } = await authService.signOut();
-
-      if (error) {
-        throw new Error(error.message || 'Sign out failed.');
-      }
-
+      // Remove token from localStorage
+      localStorage.removeItem('authToken');
       return true; // Indicate success
     } catch (error) {
       console.error("Sign out error:", error.message);

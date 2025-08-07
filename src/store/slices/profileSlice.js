@@ -1,6 +1,6 @@
 // src/store/slices/profileSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { supabase } from '../../lib/supabase';
+import { getCollection } from '../../lib/mongodb';
 import { createSelector } from 'reselect';
 
 import { aiService } from '../../components/service/ai-service';
@@ -34,21 +34,18 @@ export const fetchUserProfile = createAsyncThunk(
       dispatch(profileSlice.actions.setLoading(true));
       dispatch(profileSlice.actions.setError(null));
 
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const usersCollection = await getCollection('users');
+      const user = await usersCollection.findOne({ _id: userId });
 
-      if (error && error.code === 'PGRST116') { // No rows found
+      if (!user) {
         dispatch(profileSlice.actions.setUserProfile(null));
         return null;
-      } else if (error) {
-        throw new Error(error.message || 'Failed to fetch user profile.');
       }
 
-      dispatch(profileSlice.actions.setUserProfile(data));
-      return data;
+      // Remove password from user data
+      const { password, ...userProfile } = user;
+      dispatch(profileSlice.actions.setUserProfile(userProfile));
+      return userProfile;
     } catch (error) {
       console.error("Fetch profile error:", error.message);
       dispatch(profileSlice.actions.setError(error.message));
@@ -88,32 +85,25 @@ export const updateUserProfile = createAsyncThunk(
       dispatch(profileSlice.actions.setIsUpdating(true));
       dispatch(profileSlice.actions.setError(null));
 
-      const { data: updatedData, error: updateError } = await supabase
-        .from('user_profiles')
-        .update(profileData)
-        .eq('id', profileData.id)
-        .select()
-        .single();
+      const usersCollection = await getCollection('users');
+      
+      // Remove sensitive fields that shouldn't be updated
+      const { password, _id, ...updateData } = profileData;
+      
+      const result = await usersCollection.updateOne(
+        { _id: profileData.id },
+        { $set: { ...updateData, updatedAt: new Date() } }
+      );
 
-      if (updateError && updateError.code === 'PGRST116') {
-        const { data: insertedData, error: insertError } = await supabase
-          .from('user_profiles')
-          .insert(profileData)
-          .select()
-          .single();
-
-        if (insertError) {
-          throw new Error(insertError.message || 'Failed to create user profile.');
-        }
-        dispatch(profileSlice.actions.setUserProfile(insertedData));
-        return insertedData;
-
-      } else if (updateError) {
-        throw new Error(updateError.message || 'Failed to update user profile.');
+      if (result.matchedCount === 0) {
+        throw new Error('User not found.');
       }
 
-      dispatch(profileSlice.actions.setUserProfile(updatedData));
-      return updatedData;
+      const updatedUser = await usersCollection.findOne({ _id: profileData.id });
+      const { password: _, ...userProfile } = updatedUser;
+      
+      dispatch(profileSlice.actions.setUserProfile(userProfile));
+      return userProfile;
     } catch (error) {
       console.error("Update profile error:", error.message);
       dispatch(profileSlice.actions.setError(error.message));

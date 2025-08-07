@@ -1,7 +1,7 @@
 // src/store/slices/statsSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { createSelector } from 'reselect'; // For memoized selectors
-import { supabase } from '../../lib/supabase'; // Import Supabase client
+import { getCollection } from '../../lib/mongodb'; // Import MongoDB client
 import { selectAllProjects } from './projectsSlice'; // To get projects from projectsSlice
 
 // --- Initial State ---
@@ -142,18 +142,13 @@ export const fetchProjectStats = createAsyncThunk(
 
       // If no projects or projects are not loaded for the user, fetch them
       // This condition ensures we fetch if `projects` is empty or doesn't contain the current user's projects.
-      if (!projects || projects.length === 0 || !projects.some(p => p.user_id === userId)) {
-        // Fallback: Fetch projects directly from Supabase if not in store or not user's projects
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          throw new Error(error.message || 'Failed to fetch raw project data for stats.');
-        }
-        projects = data;
+      if (!projects || projects.length === 0 || !projects.some(p => p.userId === userId)) {
+        // Fallback: Fetch projects directly from MongoDB if not in store or not user's projects
+        const projectsCollection = await getCollection('projects');
+        projects = await projectsCollection
+          .find({ userId: userId })
+          .sort({ createdAt: -1 })
+          .toArray();
       }
 
       // Perform client-side aggregation

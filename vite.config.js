@@ -23,7 +23,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
           charts: ['chart.js', 'react-chartjs-2', 'recharts'],
-          auth: ['@supabase/supabase-js', '@supabase/auth-ui-react'],
+          auth: ['bcryptjs', 'jsonwebtoken'],
           utils: ['axios', 'date-fns', 'zod', 'clsx']
         }
       }

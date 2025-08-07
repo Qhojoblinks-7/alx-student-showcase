@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './store';
-import { supabase } from './lib/supabase';
+import { AuthService } from './lib/auth-service';
 import { setUser, getSession } from './store/slices/authSlice';
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -31,26 +31,27 @@ function App() {
   useEffect(() => {
     console.log("App.jsx -> Main App useEffect: Setting up auth state listener and initial getSession."); // ADD THIS LOG
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log(`App.jsx -> Auth State Changed: Event: ${event}, Session:`, session); // ADD THIS LOG
-        if (session) {
-          dispatch(setUser(session.user));
-          console.log("App.jsx -> Auth State Changed: User SET to:", session.user); // ADD THIS LOG
+    // Check for existing token in localStorage
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      // Verify token and get user
+      AuthService.getCurrentUser(token).then(user => {
+        if (user) {
+          dispatch(setUser(user));
+          console.log("App.jsx -> Auth State Changed: User SET to:", user); // ADD THIS LOG
         } else {
+          localStorage.removeItem('authToken');
           dispatch(setUser(null));
-          console.log("App.jsx -> Auth State Changed: User SET to null (logged out)."); // ADD THIS LOG
+          console.log("App.jsx -> Auth State Changed: User SET to null (invalid token)."); // ADD THIS LOG
         }
-      }
-    );
+      });
+    } else {
+      dispatch(setUser(null));
+      console.log("App.jsx -> Auth State Changed: User SET to null (no token)."); // ADD THIS LOG
+    }
 
     dispatch(getSession());
     console.log("App.jsx -> Main App useEffect: getSession dispatched."); // ADD THIS LOG
-
-    return () => {
-      console.log("App.jsx -> Main App useEffect Cleanup: Unsubscribing from auth state changes."); // ADD THIS LOG
-      subscription.unsubscribe();
-    };
   }, [dispatch]);
 
   return (

@@ -6,7 +6,7 @@ Your ultimate portfolio platform to document, manage, and share your incredible 
 
 ✨ **Features at a Glance**
 
-  * **Secure Authentication:** Seamless sign-up and login powered by Supabase Auth, including Google & GitHub integrations.
+  * **Secure Authentication:** Seamless sign-up and login powered by JWT authentication with bcrypt password hashing.
   * **Comprehensive Project Management:** Easily add, edit, and organize all your coding projects with rich metadata.
   * **Smart Social Sharing:** Generate perfectly formatted posts for X (Twitter), LinkedIn, Facebook, and Discord with a single click.
   * **Dynamic Profile:** Create a detailed profile showcasing your ALX journey, skills, and contact information.
@@ -22,7 +22,7 @@ This application is built with a robust and modern technology stack:
 
   * **Frontend:** React 19, JavaScript (JSX), Vite
   * **Styling:** Tailwind CSS V4, shadcn/ui
-  * **Backend & Database:** Supabase (PostgreSQL, Authentication, Realtime)
+  * **Backend & Database:** MongoDB, JWT Authentication
   * **Package Manager:** npm
   * **Icons:** Lucide React
 
@@ -38,7 +38,7 @@ Before you begin, ensure you have the following installed:
 
   * Node.js (v18 or higher)
   * npm (Node Package Manager)
-  * A Supabase account (free tier is sufficient)
+  * MongoDB database (local installation or MongoDB Atlas)
 
 ### Installation Steps
 
@@ -56,29 +56,39 @@ Before you begin, ensure you have the following installed:
     # If you encounter ERESOLVE errors, try: npm install --legacy-peer-deps
     ```
 
-3.  **Set up your Supabase Project:**
+3.  **Set up your MongoDB Database:**
 
-      * Go to [supabase.com](https://supabase.com/) and create a new project.
-      * Navigate to **Settings \> API** to find your **Project URL** and **Anon Key**.
-      * Open your Supabase SQL Editor and run the database schema provided in `supabase-schema.txt`. This will create your `users` and `projects` tables, along with Row Level Security (RLS) policies and triggers.
+      * **Option A - Local MongoDB:** Install MongoDB locally or use Docker:
+        ```bash
+        docker run -d -p 27017:27017 --name mongodb mongo:latest
+        ```
+      * **Option B - MongoDB Atlas:** Create a free cluster at [mongodb.com](https://mongodb.com/) and get your connection string.
 
 4.  **Configure Environment Variables:**
 
       * Create a copy of the example environment file:
         ```bash
-        cp .env.local.example .env.local
+        cp .env.example .env.local
         ```
-      * Open `.env.local` and update it with your Supabase credentials:
+      * Open `.env.local` and update it with your MongoDB credentials:
         ```
-        VITE_SUPABASE_URL="YOUR_SUPABASE_PROJECT_URL"
-        VITE_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
+        VITE_MONGODB_URI="mongodb://localhost:27017"
+        VITE_MONGODB_DB_NAME="alx-showcase"
+        VITE_JWT_SECRET="your-super-secret-jwt-key-here"
         # Optional: For GitHub API rate limit increase (recommended for import feature)
         # VITE_GITHUB_TOKEN="YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
         ```
-        Replace `"YOUR_SUPABASE_PROJECT_URL"` and `"YOUR_SUPABASE_ANON_KEY"` with your actual values.
+        Replace the values with your actual MongoDB connection string and a strong JWT secret.
         For `VITE_GITHUB_TOKEN`, generate a Personal Access Token (PAT) with `public_repo` scope on GitHub if you plan to use the GitHub import feature extensively.
 
-5.  **Start the Development Server:**
+5.  **Initialize Database:**
+
+    ```bash
+    npm run db:init
+    ```
+    This will create all necessary collections, indexes, and sample data.
+
+6.  **Start the Development Server:**
 
     ```bash
     npm run dev
@@ -86,7 +96,7 @@ Before you begin, ensure you have the following installed:
 
     Your application will now be running locally, typically at `http://localhost:5173`.
 
-6.  **Build for Production:**
+7.  **Build for Production:**
 
     ```bash
     npm run build
