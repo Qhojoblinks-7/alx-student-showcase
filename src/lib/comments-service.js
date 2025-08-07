@@ -1,139 +1,158 @@
-// Comments Service for project comments and interactions
+// Comments Service - OPTIMIZED FOR 1,800 USERS
 import { getCollection } from './mongodb.js';
-import { createNotification } from './mongodb.js';
-import { EmailService } from './email-service.js';
+import { OptimizationService } from './optimization-service.js';
 
 export class CommentsService {
-  static async addComment(projectId, userId, content) {
+  static async createComment(commentData) {
+    const startTime = Date.now();
+    
     try {
-      const commentsCollection = await getCollection('comments');
-      const usersCollection = await getCollection('users');
-      const projectsCollection = await getCollection('projects');
-
-      // Get user and project details
-      const [user, project] = await Promise.all([
-        usersCollection.findOne({ _id: userId }),
-        projectsCollection.findOne({ _id: projectId })
-      ]);
-
-      if (!user || !project) {
-        throw new Error('User or project not found');
+      // Check rate limiting
+      if (!OptimizationService.checkRateLimit(`comment_${commentData.userId}`, 10, 60000)) { // 10 per minute
+        throw new Error('Too many comments. Please wait before posting another.');
       }
 
-      // Create comment
-      const comment = {
-        content: content.trim(),
-        userId: userId,
-        projectId: projectId,
-        userInfo: {
-          username: user.username,
-          fullName: user.fullName,
-          avatar: user.avatar
-        },
+      // Optimize comment data
+      const optimizedComment = OptimizationService.optimizeCommentData({
+        content: commentData.content,
+        userId: commentData.userId,
+        projectId: commentData.projectId,
+        userInfo: commentData.userInfo,
+        parentId: commentData.parentId || null,
         likes: [],
         createdAt: new Date(),
         updatedAt: new Date()
-      };
+      });
 
-      const result = await commentsCollection.insertOne(comment);
-      const newComment = { ...comment, _id: result.insertedId };
+      const commentsCollection = await getCollection('comments');
+      const result = await commentsCollection.insertOne(optimizedComment);
 
-      // Create notification for project owner (if not the same user)
-      if (project.userId !== userId) {
-        try {
-          await createNotification({
-            userId: project.userId,
-            type: 'comment',
-            title: 'New comment on your project',
-            message: `${user.fullName} commented on "${project.title}"`,
-            data: {
-              commentId: result.insertedId,
-              projectId: projectId,
-              commenterId: userId
-            }
-          });
+      // Clear cache for this project
+      OptimizationService.cache.delete(`comments_${commentData.projectId}`);
+      OptimizationService.cache.delete(`comment_count_${commentData.projectId}`);
 
-          // Send email notification if enabled
-          const projectOwner = await usersCollection.findOne({ _id: project.userId });
-          if (projectOwner) {
-            const preferences = await EmailService.getEmailPreferences(project.userId);
-            if (preferences.comments) {
-              await EmailService.sendCommentNotification(projectOwner, newComment, project);
-            }
-          }
-        } catch (error) {
-          console.error('Error creating comment notification:', error);
-        }
-      }
-
-      return newComment;
+      OptimizationService.trackOperation('create_comment', Date.now() - startTime);
+      return { ...optimizedComment, _id: result.insertedId };
     } catch (error) {
-      console.error('Error adding comment:', error);
+      console.error('Error creating comment:', error);
       throw error;
     }
   }
 
-  static async getProjectComments(projectId, page = 1, limit = 10) {
+  static async getComments(projectId, page = 1, limit = 20) {
+    const startTime = Date.now();
+    
     try {
+      // Check cache first
+      const cacheKey = `comments_${projectId}_${page}_${limit}`;
+      const cached = OptimizationService.getCache(cacheKey);
+      if (cached) {
+        OptimizationService.performanceMetrics.cacheHits++;
+        return cached;
+      }
+
       const commentsCollection = await getCollection('comments');
-      
       const skip = (page - 1) * limit;
-      
+
       const comments = await commentsCollection
-        .find({ projectId: projectId })
+        .find({ projectId: projectId, parentId: null }) // Only top-level comments
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .toArray();
 
-      const totalComments = await commentsCollection.countDocuments({ projectId: projectId });
+      // Get replies for each comment (limited to 5 per comment)
+      const commentsWithReplies = await Promise.all(
+        comments.map(async (comment) => {
+          const replies = await commentsCollection
+            .find({ parentId: comment._id.toString() })
+            .sort({ createdAt: 1 })
+            .limit(5)
+            .toArray();
+          
+          return {
+            ...comment,
+            replies: replies.map(reply => OptimizationService.optimizeCommentData(reply))
+          };
+        })
+      );
 
-      return {
-        comments,
-        pagination: {
-          page,
-          limit,
-          total: totalComments,
-          pages: Math.ceil(totalComments / limit),
-          hasNext: page * limit < totalComments,
-          hasPrev: page > 1
-        }
-      };
+      // Cache for 2 minutes
+      OptimizationService.setCache(cacheKey, commentsWithReplies, 2);
+      OptimizationService.performanceMetrics.cacheMisses++;
+
+      OptimizationService.trackOperation('get_comments', Date.now() - startTime);
+      return commentsWithReplies;
     } catch (error) {
-      console.error('Error getting project comments:', error);
+      console.error('Error getting comments:', error);
       throw error;
     }
   }
 
-  static async updateComment(commentId, userId, content) {
+  static async getCommentReplies(commentId, limit = 10) {
+    const startTime = Date.now();
+    
+    try {
+      // Check cache first
+      const cacheKey = `replies_${commentId}_${limit}`;
+      const cached = OptimizationService.getCache(cacheKey);
+      if (cached) {
+        OptimizationService.performanceMetrics.cacheHits++;
+        return cached;
+      }
+
+      const commentsCollection = await getCollection('comments');
+      const replies = await commentsCollection
+        .find({ parentId: commentId })
+        .sort({ createdAt: 1 })
+        .limit(limit)
+        .toArray();
+
+      const optimizedReplies = replies.map(reply => 
+        OptimizationService.optimizeCommentData(reply)
+      );
+
+      // Cache for 3 minutes
+      OptimizationService.setCache(cacheKey, optimizedReplies, 3);
+      OptimizationService.performanceMetrics.cacheMisses++;
+
+      OptimizationService.trackOperation('get_replies', Date.now() - startTime);
+      return optimizedReplies;
+    } catch (error) {
+      console.error('Error getting comment replies:', error);
+      throw error;
+    }
+  }
+
+  static async updateComment(commentId, userId, updates) {
+    const startTime = Date.now();
+    
     try {
       const commentsCollection = await getCollection('comments');
       
-      // Check if comment exists and belongs to user
+      // Check if user owns the comment
       const comment = await commentsCollection.findOne({ _id: commentId, userId: userId });
       if (!comment) {
         throw new Error('Comment not found or you do not have permission to edit it');
       }
 
-      // Update comment
+      // Optimize update data
+      const optimizedUpdates = {
+        content: updates.content?.substring(0, 500),
+        updatedAt: new Date()
+      };
+
       const result = await commentsCollection.updateOne(
         { _id: commentId },
-        {
-          $set: {
-            content: content.trim(),
-            updatedAt: new Date(),
-            edited: true
-          }
-        }
+        { $set: optimizedUpdates }
       );
 
-      if (result.matchedCount === 0) {
-        throw new Error('Comment not found');
-      }
+      // Clear cache
+      OptimizationService.cache.delete(`comments_${comment.projectId}`);
+      OptimizationService.cache.delete(`comment_${commentId}`);
 
-      // Return updated comment
-      const updatedComment = await commentsCollection.findOne({ _id: commentId });
-      return updatedComment;
+      OptimizationService.trackOperation('update_comment', Date.now() - startTime);
+      return { success: true, message: 'Comment updated successfully' };
     } catch (error) {
       console.error('Error updating comment:', error);
       throw error;
@@ -141,21 +160,30 @@ export class CommentsService {
   }
 
   static async deleteComment(commentId, userId) {
+    const startTime = Date.now();
+    
     try {
       const commentsCollection = await getCollection('comments');
       
-      // Check if comment exists and belongs to user
+      // Check if user owns the comment
       const comment = await commentsCollection.findOne({ _id: commentId, userId: userId });
       if (!comment) {
         throw new Error('Comment not found or you do not have permission to delete it');
       }
 
-      const result = await commentsCollection.deleteOne({ _id: commentId });
-      
-      if (result.deletedCount === 0) {
-        throw new Error('Comment not found');
-      }
+      // Delete comment and all its replies
+      await commentsCollection.deleteMany({
+        $or: [
+          { _id: commentId },
+          { parentId: commentId }
+        ]
+      });
 
+      // Clear cache
+      OptimizationService.cache.delete(`comments_${comment.projectId}`);
+      OptimizationService.cache.delete(`comment_count_${comment.projectId}`);
+
+      OptimizationService.trackOperation('delete_comment', Date.now() - startTime);
       return { success: true, message: 'Comment deleted successfully' };
     } catch (error) {
       console.error('Error deleting comment:', error);
@@ -164,92 +192,61 @@ export class CommentsService {
   }
 
   static async likeComment(commentId, userId) {
+    const startTime = Date.now();
+    
     try {
+      // Check rate limiting
+      if (!OptimizationService.checkRateLimit(`like_${userId}`, 20, 60000)) { // 20 likes per minute
+        throw new Error('Too many likes. Please wait before liking more comments.');
+      }
+
       const commentsCollection = await getCollection('comments');
       
-      // Check if comment exists
+      // Check if already liked
       const comment = await commentsCollection.findOne({ _id: commentId });
       if (!comment) {
         throw new Error('Comment not found');
       }
 
-      // Check if user already liked the comment
-      const alreadyLiked = comment.likes.includes(userId);
+      const isLiked = comment.likes?.includes(userId);
       
-      if (alreadyLiked) {
-        // Unlike comment
+      if (isLiked) {
+        // Unlike
         await commentsCollection.updateOne(
           { _id: commentId },
           { $pull: { likes: userId } }
         );
-        return { liked: false, message: 'Comment unliked' };
       } else {
-        // Like comment
+        // Like
         await commentsCollection.updateOne(
           { _id: commentId },
-          { $push: { likes: userId } }
+          { $addToSet: { likes: userId } }
         );
-
-        // Create notification for comment author (if not the same user)
-        if (comment.userId !== userId) {
-          try {
-            await createNotification({
-              userId: comment.userId,
-              type: 'comment_like',
-              title: 'Someone liked your comment',
-              message: 'Your comment received a like',
-              data: {
-                commentId: commentId,
-                likerId: userId
-              }
-            });
-          } catch (error) {
-            console.error('Error creating like notification:', error);
-          }
-        }
-
-        return { liked: true, message: 'Comment liked' };
       }
+
+      // Clear cache
+      OptimizationService.cache.delete(`comments_${comment.projectId}`);
+
+      OptimizationService.trackOperation('like_comment', Date.now() - startTime);
+      return { success: true, liked: !isLiked };
     } catch (error) {
       console.error('Error liking comment:', error);
       throw error;
     }
   }
 
-  static async getUserComments(userId, page = 1, limit = 10) {
-    try {
-      const commentsCollection = await getCollection('comments');
-      
-      const skip = (page - 1) * limit;
-      
-      const comments = await commentsCollection
-        .find({ userId: userId })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray();
-
-      const totalComments = await commentsCollection.countDocuments({ userId: userId });
-
-      return {
-        comments,
-        pagination: {
-          page,
-          limit,
-          total: totalComments,
-          pages: Math.ceil(totalComments / limit),
-          hasNext: page * limit < totalComments,
-          hasPrev: page > 1
-        }
-      };
-    } catch (error) {
-      console.error('Error getting user comments:', error);
-      throw error;
-    }
-  }
-
   static async getCommentStats(projectId) {
+    const startTime = Date.now();
+    
     try {
+      // Check cache first
+      const cacheKey = `comment_stats_${projectId}`;
+      const cached = OptimizationService.getCache(cacheKey);
+      if (cached) {
+        OptimizationService.performanceMetrics.cacheHits++;
+        return cached;
+      }
+
       const commentsCollection = await getCollection('comments');
       
       const stats = await commentsCollection.aggregate([
@@ -259,172 +256,161 @@ export class CommentsService {
             _id: null,
             totalComments: { $sum: 1 },
             totalLikes: { $sum: { $size: '$likes' } },
-            uniqueCommenters: { $addToSet: '$userId' }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            totalComments: 1,
-            totalLikes: 1,
-            uniqueCommenters: { $size: '$uniqueCommenters' }
+            topLevelComments: { $sum: { $cond: [{ $eq: ['$parentId', null] }, 1, 0] } },
+            replies: { $sum: { $cond: [{ $ne: ['$parentId', null] }, 1, 0] } }
           }
         }
       ]).toArray();
 
-      return stats[0] || {
+      const result = stats[0] || {
         totalComments: 0,
         totalLikes: 0,
-        uniqueCommenters: 0
+        topLevelComments: 0,
+        replies: 0
       };
+
+      // Cache for 5 minutes
+      OptimizationService.setCache(cacheKey, result, 5);
+      OptimizationService.performanceMetrics.cacheMisses++;
+
+      OptimizationService.trackOperation('comment_stats', Date.now() - startTime);
+      return result;
     } catch (error) {
       console.error('Error getting comment stats:', error);
       throw error;
     }
   }
 
-  static async searchComments(query, filters = {}) {
+  static async searchComments(query, projectId = null, limit = 20) {
+    const startTime = Date.now();
+    
     try {
+      // Check cache first
+      const cacheKey = `comment_search_${query}_${projectId}_${limit}`;
+      const cached = OptimizationService.getCache(cacheKey);
+      if (cached) {
+        OptimizationService.performanceMetrics.cacheHits++;
+        return cached;
+      }
+
       const commentsCollection = await getCollection('comments');
       
-      let searchQuery = {};
-      
-      // Text search
-      if (query) {
-        searchQuery.content = { $regex: query, $options: 'i' };
-      }
-      
-      // Apply filters
-      if (filters.projectId) {
-        searchQuery.projectId = filters.projectId;
-      }
-      if (filters.userId) {
-        searchQuery.userId = filters.userId;
-      }
-      if (filters.dateFrom) {
-        searchQuery.createdAt = { $gte: new Date(filters.dateFrom) };
-      }
-      if (filters.dateTo) {
-        if (searchQuery.createdAt) {
-          searchQuery.createdAt.$lte = new Date(filters.dateTo);
-        } else {
-          searchQuery.createdAt = { $lte: new Date(filters.dateTo) };
-        }
+      let searchQuery = {
+        content: { $regex: query, $options: 'i' }
+      };
+
+      if (projectId) {
+        searchQuery.projectId = projectId;
       }
 
       const comments = await commentsCollection
         .find(searchQuery)
         .sort({ createdAt: -1 })
-        .limit(filters.limit || 50)
+        .limit(limit)
         .toArray();
 
-      return comments;
+      const optimizedComments = comments.map(comment => 
+        OptimizationService.optimizeCommentData(comment)
+      );
+
+      // Cache for 1 minute
+      OptimizationService.setCache(cacheKey, optimizedComments, 1);
+      OptimizationService.performanceMetrics.cacheMisses++;
+
+      OptimizationService.trackOperation('search_comments', Date.now() - startTime);
+      return optimizedComments;
     } catch (error) {
       console.error('Error searching comments:', error);
       throw error;
     }
   }
 
-  static async getRecentComments(limit = 10) {
+  static async getUserComments(userId, page = 1, limit = 20) {
+    const startTime = Date.now();
+    
     try {
+      // Check cache first
+      const cacheKey = `user_comments_${userId}_${page}_${limit}`;
+      const cached = OptimizationService.getCache(cacheKey);
+      if (cached) {
+        OptimizationService.performanceMetrics.cacheHits++;
+        return cached;
+      }
+
       const commentsCollection = await getCollection('comments');
-      
+      const skip = (page - 1) * limit;
+
       const comments = await commentsCollection
-        .find({})
+        .find({ userId: userId })
         .sort({ createdAt: -1 })
+        .skip(skip)
         .limit(limit)
         .toArray();
 
-      return comments;
+      const optimizedComments = comments.map(comment => 
+        OptimizationService.optimizeCommentData(comment)
+      );
+
+      // Cache for 3 minutes
+      OptimizationService.setCache(cacheKey, optimizedComments, 3);
+      OptimizationService.performanceMetrics.cacheMisses++;
+
+      OptimizationService.trackOperation('user_comments', Date.now() - startTime);
+      return optimizedComments;
     } catch (error) {
-      console.error('Error getting recent comments:', error);
+      console.error('Error getting user comments:', error);
       throw error;
     }
   }
 
-  static async getCommentReplies(commentId) {
+  static async getPopularComments(projectId, limit = 10) {
+    const startTime = Date.now();
+    
     try {
+      // Check cache first
+      const cacheKey = `popular_comments_${projectId}_${limit}`;
+      const cached = OptimizationService.getCache(cacheKey);
+      if (cached) {
+        OptimizationService.performanceMetrics.cacheHits++;
+        return cached;
+      }
+
       const commentsCollection = await getCollection('comments');
       
-      const replies = await commentsCollection
-        .find({ parentCommentId: commentId })
-        .sort({ createdAt: 1 })
+      const popularComments = await commentsCollection
+        .find({ projectId: projectId })
+        .sort({ 'likes': -1, 'createdAt': -1 })
+        .limit(limit)
         .toArray();
 
-      return replies;
+      const optimizedComments = popularComments.map(comment => 
+        OptimizationService.optimizeCommentData(comment)
+      );
+
+      // Cache for 5 minutes
+      OptimizationService.setCache(cacheKey, optimizedComments, 5);
+      OptimizationService.performanceMetrics.cacheMisses++;
+
+      OptimizationService.trackOperation('popular_comments', Date.now() - startTime);
+      return optimizedComments;
     } catch (error) {
-      console.error('Error getting comment replies:', error);
-      throw error;
-    }
-  }
-
-  static async addReply(parentCommentId, userId, content) {
-    try {
-      const commentsCollection = await getCollection('comments');
-      const usersCollection = await getCollection('users');
-
-      // Check if parent comment exists
-      const parentComment = await commentsCollection.findOne({ _id: parentCommentId });
-      if (!parentComment) {
-        throw new Error('Parent comment not found');
-      }
-
-      // Get user details
-      const user = await usersCollection.findOne({ _id: userId });
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      // Create reply
-      const reply = {
-        content: content.trim(),
-        userId: userId,
-        projectId: parentComment.projectId,
-        parentCommentId: parentCommentId,
-        userInfo: {
-          username: user.username,
-          fullName: user.fullName,
-          avatar: user.avatar
-        },
-        likes: [],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      const result = await commentsCollection.insertOne(reply);
-      const newReply = { ...reply, _id: result.insertedId };
-
-      // Create notification for parent comment author
-      if (parentComment.userId !== userId) {
-        try {
-          await createNotification({
-            userId: parentComment.userId,
-            type: 'comment_reply',
-            title: 'Reply to your comment',
-            message: `${user.fullName} replied to your comment`,
-            data: {
-              commentId: result.insertedId,
-              parentCommentId: parentCommentId,
-              replierId: userId
-            }
-          });
-        } catch (error) {
-          console.error('Error creating reply notification:', error);
-        }
-      }
-
-      return newReply;
-    } catch (error) {
-      console.error('Error adding reply:', error);
+      console.error('Error getting popular comments:', error);
       throw error;
     }
   }
 
   static async reportComment(commentId, userId, reason) {
+    const startTime = Date.now();
+    
     try {
+      // Check rate limiting
+      if (!OptimizationService.checkRateLimit(`report_${userId}`, 5, 300000)) { // 5 reports per 5 minutes
+        throw new Error('Too many reports. Please wait before reporting more comments.');
+      }
+
       const reportsCollection = await getCollection('comment_reports');
       
-      // Check if user already reported this comment
+      // Check if already reported
       const existingReport = await reportsCollection.findOne({
         commentId: commentId,
         reporterId: userId
@@ -434,17 +420,17 @@ export class CommentsService {
         throw new Error('You have already reported this comment');
       }
 
-      // Create report
       const report = {
         commentId: commentId,
         reporterId: userId,
-        reason: reason,
+        reason: reason.substring(0, 200), // Limit reason length
         status: 'pending',
         createdAt: new Date()
       };
 
       const result = await reportsCollection.insertOne(report);
-      
+
+      OptimizationService.trackOperation('report_comment', Date.now() - startTime);
       return { success: true, message: 'Comment reported successfully' };
     } catch (error) {
       console.error('Error reporting comment:', error);
@@ -453,10 +439,17 @@ export class CommentsService {
   }
 
   static async moderateComment(commentId, action, moderatorId) {
+    const startTime = Date.now();
+    
     try {
       const commentsCollection = await getCollection('comments');
       const reportsCollection = await getCollection('comment_reports');
       
+      const comment = await commentsCollection.findOne({ _id: commentId });
+      if (!comment) {
+        throw new Error('Comment not found');
+      }
+
       switch (action) {
         case 'hide':
           await commentsCollection.updateOne(
@@ -477,16 +470,65 @@ export class CommentsService {
           throw new Error('Invalid moderation action');
       }
 
-      // Update reports status
+      // Update report status
       await reportsCollection.updateMany(
         { commentId: commentId },
         { $set: { status: 'resolved', resolvedBy: moderatorId, resolvedAt: new Date() } }
       );
 
+      // Clear cache
+      OptimizationService.cache.delete(`comments_${comment.projectId}`);
+
+      OptimizationService.trackOperation('moderate_comment', Date.now() - startTime);
       return { success: true, message: `Comment ${action}ed successfully` };
     } catch (error) {
       console.error('Error moderating comment:', error);
       throw error;
     }
+  }
+
+  static async getCommentReports(status = 'pending', limit = 20) {
+    const startTime = Date.now();
+    
+    try {
+      // Check cache first
+      const cacheKey = `reports_${status}_${limit}`;
+      const cached = OptimizationService.getCache(cacheKey);
+      if (cached) {
+        OptimizationService.performanceMetrics.cacheHits++;
+        return cached;
+      }
+
+      const reportsCollection = await getCollection('comment_reports');
+      
+      const reports = await reportsCollection
+        .find({ status: status })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .toArray();
+
+      // Cache for 2 minutes
+      OptimizationService.setCache(cacheKey, reports, 2);
+      OptimizationService.performanceMetrics.cacheMisses++;
+
+      OptimizationService.trackOperation('get_reports', Date.now() - startTime);
+      return reports;
+    } catch (error) {
+      console.error('Error getting comment reports:', error);
+      throw error;
+    }
+  }
+
+  // Performance monitoring
+  static getCommentStats() {
+    const performance = OptimizationService.getPerformanceReport();
+    return {
+      performance,
+      cacheStats: {
+        size: OptimizationService.cache.size,
+        hitRate: performance.cacheHitRate
+      },
+      rateLimits: OptimizationService.rateLimits.size
+    };
   }
 }
